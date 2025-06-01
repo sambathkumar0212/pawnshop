@@ -1,0 +1,323 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Pawnshop Management System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card-stats {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .stat-icon {
+        font-size: 2.5rem;
+        opacity: 0.7;
+    }
+    .card-accent-blue {
+        border-left: 4px solid #0d6efd;
+    }
+    .card-accent-green {
+        border-left: 4px solid #198754;
+    }
+    .card-accent-yellow {
+        border-left: 4px solid #ffc107;
+    }
+    .card-accent-red {
+        border-left: 4px solid #dc3545;
+    }
+    .table-responsive {
+        max-height: 400px;
+    }
+    .branch-select {
+        max-width: 250px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-tachometer-alt"></i> Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-calendar"></i> Today
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-calendar-week"></i> This Week
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-calendar-alt"></i> This Month
+            </button>
+        </div>
+        {% if branch_count > 1 %}
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="fas fa-store"></i> All Branches
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#">All Branches</a></li>
+                <li><hr class="dropdown-divider"></li>
+                {% for branch in branches %}
+                <li><a class="dropdown-item" href="#">{{ branch.name }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card card-stats card-accent-blue bg-white text-dark h-100">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <h5 class="card-title text-muted mb-0">Active Loans</h5>
+                        <p class="h3 mb-0">{{ active_loans }}</p>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="stat-icon text-primary">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-3 mb-0 text-muted">
+                    <span class="text-danger me-2"><i class="fas fa-exclamation-circle"></i> {{ overdue_loans }} overdue</span>
+                    <span class="text-muted">{{ loans_due_today }} due today</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card card-stats card-accent-green bg-white text-dark h-100">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <h5 class="card-title text-muted mb-0">Today's Sales</h5>
+                        <p class="h3 mb-0">₹{{ total_sales }}</p>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="stat-icon text-success">
+                            <i class="fas fa-cash-register"></i>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-3 mb-0 text-muted">
+                    <span class="text-success me-2"><i class="fas fa-arrow-up"></i> 3.48%</span>
+                    <span class="text-muted">vs. last week</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card card-stats card-accent-yellow bg-white text-dark h-100">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <h5 class="card-title text-muted mb-0">Inventory Items</h5>
+                        <p class="h3 mb-0">{{ total_items }}</p>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="stat-icon text-warning">
+                            <i class="fas fa-box-open"></i>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-3 mb-0 text-muted">
+                    <span class="text-muted">{{ available_items }} available, {{ pawned_items }} pawned</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card card-stats card-accent-red bg-white text-dark h-100">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-8">
+                        <h5 class="card-title text-muted mb-0">Customers</h5>
+                        <p class="h3 mb-0">{{ customer_count }}</p>
+                    </div>
+                    <div class="col-4 text-end">
+                        <div class="stat-icon text-danger">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-3 mb-0 text-muted">
+                    <span class="text-success me-2"><i class="fas fa-user-plus"></i> {{ new_customers_today }}</span>
+                    <span class="text-muted">new today</span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Information -->
+<div class="row mb-4">
+    <!-- Recent Loans -->
+    <div class="col-xl-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-hand-holding-usd text-primary me-2"></i>Recent Loans</h5>
+                    <a href="{% url 'loan_list' %}" class="btn btn-sm btn-primary">View All</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Loan #</th>
+                                <th>Customer</th>
+                                <th>Amount</th>
+                                <th>Due Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loan in recent_loans %}
+                            <tr>
+                                <td><a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a></td>
+                                <td>{{ loan.customer.full_name }}</td>
+                                <td>₹{{ loan.principal_amount }}</td>
+                                <td>{{ loan.due_date }}</td>
+                                <td>
+                                    {% if loan.status == 'active' %}
+                                        {% if loan.is_overdue %}
+                                        <span class="badge bg-danger">Overdue</span>
+                                        {% else %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    {% elif loan.status == 'repaid' %}
+                                        <span class="badge bg-info">Repaid</span>
+                                    {% elif loan.status == 'defaulted' %}
+                                        <span class="badge bg-warning">Defaulted</span>
+                                    {% elif loan.status == 'extended' %}
+                                        <span class="badge bg-primary">Extended</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ loan.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-3">No recent loans found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Sales -->
+    <div class="col-xl-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-cash-register text-success me-2"></i>Recent Sales</h5>
+                    <a href="{% url 'sale_list' %}" class="btn btn-sm btn-success">View All</a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Transaction #</th>
+                                <th>Item</th>
+                                <th>Price</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td><a href="{% url 'sale_detail' sale.transaction_number %}">{{ sale.transaction_number }}</a></td>
+                                <td>{{ sale.item.name }}</td>
+                                <td>₹{{ sale.total_amount }}</td>
+                                <td>{{ sale.sale_date }}</td>
+                                <td>
+                                    {% if sale.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif sale.status == 'pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% elif sale.status == 'cancelled' %}
+                                        <span class="badge bg-danger">Cancelled</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ sale.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-3">No recent sales found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'loan_create' %}" class="btn btn-outline-primary w-100 p-3">
+                            <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                            <div>New Loan</div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'sale_create' %}" class="btn btn-outline-success w-100 p-3">
+                            <i class="fas fa-tag fa-2x mb-2"></i>
+                            <div>New Sale</div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'customer_create' %}" class="btn btn-outline-info w-100 p-3">
+                            <i class="fas fa-user-plus fa-2x mb-2"></i>
+                            <div>New Customer</div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{% url 'item_create' %}" class="btn btn-outline-secondary w-100 p-3">
+                            <i class="fas fa-box-open fa-2x mb-2"></i>
+                            <div>Add Inventory</div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+        
+        // Add any dashboard-specific JavaScript here
+    });
+</script>
+{% endblock %}

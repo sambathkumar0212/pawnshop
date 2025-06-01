@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ customer.full_name }} - Customer Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="d-flex align-items-center">
+                <h2 class="mb-0">
+                    <i class="fas fa-user me-2"></i>{{ customer.full_name }}
+                </h2>
+                {% if customer.active_loans_count %}
+                    <span class="badge bg-primary ms-3">{{ customer.active_loans_count }} Active Loans</span>
+                {% endif %}
+            </div>
+            <nav aria-label="breadcrumb" class="mt-2">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'customer_list' %}">Customers</a></li>
+                    <li class="breadcrumb-item active">{{ customer.full_name }}</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <a href="{% url 'customer_update' customer.id %}" class="btn btn-outline-primary">
+                    <i class="fas fa-edit me-2"></i>Edit
+                </a>
+                <a href="{% url 'loan_create' %}?customer_id={{ customer.id }}" class="btn btn-primary">
+                    <i class="fas fa-hand-holding-usd me-2"></i>New Loan
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Customer Information -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>Personal Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Contact Details</h6>
+                        {% if customer.email %}
+                        <p class="mb-2">
+                            <i class="fas fa-envelope me-2"></i>
+                            <a href="mailto:{{ customer.email }}">{{ customer.email }}</a>
+                        </p>
+                        {% endif %}
+                        {% if customer.phone %}
+                        <p class="mb-2">
+                            <i class="fas fa-phone me-2"></i>
+                            <a href="tel:{{ customer.phone }}">{{ customer.phone }}</a>
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Address</h6>
+                        <address class="mb-0">
+                            {% if customer.address %}{{ customer.address }}<br>{% endif %}
+                            {% if customer.city %}{{ customer.city }}{% endif %}
+                            {% if customer.state %}, {{ customer.state }}{% endif %}
+                            {% if customer.zip_code %} {{ customer.zip_code }}{% endif %}
+                        </address>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Identification</h6>
+                        {% if customer.id_type or customer.id_number %}
+                        <p class="mb-2">
+                            <i class="fas fa-id-card me-2"></i>
+                            {{ customer.id_type }}: {{ customer.id_number }}
+                        </p>
+                        {% endif %}
+                        {% if customer.id_image %}
+                        <div class="mt-2">
+                            <img src="{{ customer.id_image.url }}" alt="ID Document" class="img-fluid img-thumbnail">
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if customer.notes %}
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-2">Notes</h6>
+                        <p class="mb-0">{{ customer.notes }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="text-muted small">
+                        <p class="mb-1">Created by: {{ customer.created_by|default:"Unknown" }}</p>
+                        <p class="mb-1">Registered: {{ customer.created_at|date:"M d, Y" }}</p>
+                        <p class="mb-0">Last updated: {{ customer.updated_at|date:"M d, Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Loans -->
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Active Loans</h5>
+                </div>
+                <div class="card-body">
+                    {% if active_loans %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Loan #</th>
+                                    <th>Item</th>
+                                    <th>Principal</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loan in active_loans %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a>
+                                    </td>
+                                    <td>
+                                        {% for loan_item in loan.loanitem_set.all %}
+                                        <div class="mb-1">
+                                            <a href="{% url 'item_detail' loan_item.item.id %}">{{ loan_item.item.name }}</a>
+                                            <small class="text-muted">({{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g)</small>
+                                        </div>
+                                        {% endfor %}
+                                    </td>
+                                    <td>₹{{ loan.principal_amount|floatformat:2 }}</td>
+                                    <td>
+                                        {% if loan.is_overdue %}
+                                            <span class="text-danger">{{ loan.due_date|date:"M d, Y" }}</span>
+                                        {% else %}
+                                            {{ loan.due_date|date:"M d, Y" }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if loan.is_overdue %}
+                                            <span class="badge bg-danger">Overdue</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{% url 'payment_create' loan.id %}" class="btn btn-outline-success" title="Make Payment">
+                                                <i class="fas fa-dollar-sign"></i>
+                                            </a>
+                                            <a href="{% url 'loan_extend' loan.id %}" class="btn btn-outline-info" title="Extend Loan">
+                                                <i class="fas fa-calendar-plus"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No active loans.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Items -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="fas fa-box me-2"></i>Items</h5>
+                </div>
+                <div class="card-body">
+                    {% if items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Status</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'item_detail' item.id %}">{{ item.name }}</a>
+                                        <small class="d-block text-muted">{{ item.category }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if item.status == 'available' %}success
+                                            {% elif item.status == 'pawned' %}primary
+                                            {% elif item.status == 'sold' %}info
+                                            {% else %}secondary{% endif %}">
+                                            {{ item.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>₹{{ item.appraised_value|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No items found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Loan History -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0"><i class="fas fa-history me-2"></i>Loan History</h5>
+                </div>
+                <div class="card-body">
+                    {% if loans %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Loan #</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for loan in loans %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a>
+                                    </td>
+                                    <td>₹{{ loan.principal_amount|floatformat:2 }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if loan.status == 'active' %}success
+                                            {% elif loan.status == 'repaid' %}info
+                                            {% elif loan.status == 'defaulted' %}danger
+                                            {% elif loan.status == 'extended' %}warning
+                                            {% else %}secondary{% endif %}">
+                                            {{ loan.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ loan.issue_date|date:"M d, Y" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No loan history found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

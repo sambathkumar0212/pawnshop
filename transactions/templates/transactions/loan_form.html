@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if form.instance.pk %}Edit Loan{% else %}New Loan{% endif %} - Pawnshop Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-hand-holding-usd me-2"></i>
+                    {% if form.instance.pk %}Edit Loan{% else %}New Loan{% endif %}
+                </h2>
+                <a href="{% url 'loan_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Loans
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-user me-2"></i>Customer & Branch
+                                </h5>
+                            </div>
+                            <div class="col-md-8">
+                                {{ form.customer|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.branch|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-box me-2"></i>Item Information
+                                </h5>
+                            </div>
+                            
+                            <div class="col-12">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form.item_name|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.item_category|as_crispy_field }}
+                                    </div>
+                                    <div class="col-12">
+                                        {{ form.item_description|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.market_price_22k|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.gold_karat|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.gross_weight|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.stone_weight|as_crispy_field }}
+                                    </div>
+                                    <div class="col-12">
+                                        {{ form.net_weight|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-money-bill-wave me-2"></i>Loan Details
+                                </h5>
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.principal_amount|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.processing_fee|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.distribution_amount|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.interest_rate|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-calendar me-2"></i>Dates
+                                </h5>
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.issue_date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.due_date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.grace_period_end|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'loan_list' %}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>
+                                {% if form.instance.pk %}Update{% else %}Create{% endif %} Loan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        const KARAT_PURITY = {
+            '24': 0.999,
+            '22': 0.916,
+            '21': 0.875,
+            '20': 0.833,
+            '18': 0.750,
+            '14': 0.583
+        };
+
+        // Debounce function to prevent multiple rapid updates
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Calculate net weight when gross weight or stone weight changes
+        const calculateNetWeight = function() {
+            const grossWeight = parseFloat($('#id_gross_weight').val()) || 0;
+            const stoneWeight = parseFloat($('#id_stone_weight').val()) || 0;
+            const netWeight = Math.max(0, grossWeight - stoneWeight);
+            $('#id_net_weight').val(netWeight.toFixed(3));
+            
+            // Calculate and set principal amount automatically
+            const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;
+            const selectedKarat = $('#id_gold_karat').val();
+            if (marketPrice && selectedKarat && netWeight) {
+                const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
+                const goldValue = marketPrice * netWeight * purityRatio;
+                const suggestedPrincipal = goldValue * 0.75; // Set to 75% of gold value
+                $('#id_principal_amount').val(suggestedPrincipal.toFixed(2)).trigger('input');
+                
+                // Show notification message
+                const messageDiv = $('<div class="alert alert-info mt-2" role="alert">')
+                    .text('Principal amount has been automatically set to 75% of the gold value.')
+                    .insertAfter('#id_principal_amount');
+                    
+                // Remove the message after 3 seconds
+                setTimeout(() => {
+                    messageDiv.fadeOut('slow', function() {
+                        $(this).remove();
+                    });
+                }, 3000);
+            }
+        };
+
+        // Function to update principal amount message
+        const updatePrincipalMessage = debounce(function() {
+            const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;
+            const selectedKarat = $('#id_gold_karat').val();
+            const netWeight = parseFloat($('#id_net_weight').val()) || 0;
+            const principalField = $('#id_principal_amount');
+            const principalGroup = principalField.closest('.form-group');
+            const currentPrincipal = parseFloat(principalField.val()) || 0;
+            
+            // Remove existing messages
+            $('.principal-message').remove();
+
+            // Create new message container
+            const messageDiv = $('<div class="principal-message text-muted small"></div>');
+            principalField.after(messageDiv);
+
+            if (marketPrice && selectedKarat && netWeight) {
+                const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
+                const goldValue = marketPrice * netWeight * purityRatio;
+                const maxPrincipal = goldValue * 0.85;
+                const minPrincipal = goldValue * 0.50;
+
+                // Always show the allowed range
+                messageDiv.html(`<i class="fas fa-info-circle"></i> Allowed principal range: ₹${minPrincipal.toFixed(2)} (50%) to ₹${maxPrincipal.toFixed(2)} (85%)`);
+
+                // Update field constraints
+                principalField
+                    .attr('min', minPrincipal)
+                    .attr('max', maxPrincipal)
+                    .attr('data-min-value', minPrincipal)
+                    .attr('data-max-value', maxPrincipal);
+
+                // Add validation message if needed
+                if (currentPrincipal && (currentPrincipal < minPrincipal || currentPrincipal > maxPrincipal)) {
+                    principalField.addClass('is-invalid');
+                    $('<div class="invalid-feedback"></div>')
+                        .text(currentPrincipal > maxPrincipal 
+                            ? `Principal amount cannot exceed ₹${maxPrincipal.toFixed(2)}`
+                            : `Principal amount must be at least ₹${minPrincipal.toFixed(2)}`)
+                        .insertAfter(messageDiv);
+                } else {
+                    principalField.removeClass('is-invalid');
+                }
+            }
+        }, 250); // 250ms debounce
+
+        // Calculate distribution amount when principal or processing fee changes
+        const calculateDistributionAmount = function() {
+            const principal = parseFloat($('#id_principal_amount').val()) || 0;
+            const processingFeePercentage = parseFloat($('#id_processing_fee').val()) || 0;
+            const processingFeeAmount = principal * processingFeePercentage;
+            const distributionAmount = principal - processingFeeAmount;
+            
+            $('#id_distribution_amount')
+                .val(distributionAmount.toFixed(2))
+                .prop('readonly', true);
+        };
+
+        // Set up event handlers
+        $('#id_gross_weight, #id_stone_weight').on('input', calculateNetWeight);
+        $('#id_market_price_22k, #id_gold_karat, #id_net_weight').on('input', function() {
+            calculateNetWeight();
+            updatePrincipalMessage();
+        });
+        $('#id_principal_amount')
+            .on('input', function() {
+                calculateDistributionAmount();
+                updatePrincipalMessage();
+            })
+            .trigger('input'); // Trigger on page load
+
+        // Calculate due date when issue date changes
+        const calculateDueDate = function() {
+            const issueDate = new Date($('#id_issue_date').val());
+            if (issueDate) {
+                const dueDate = new Date(issueDate);
+                dueDate.setDate(dueDate.getDate() + 364);
+                $('#id_due_date').val(dueDate.toISOString().split('T')[0]);
+            }
+        };
+
+        // Set up issue date change handler
+        $('#id_issue_date').on('change', calculateDueDate);
+        if ($('#id_issue_date').val()) {
+            calculateDueDate();
+        }
+
+        // Calculate grace period end when due date changes
+        const calculateGracePeriod = function() {
+            const dueDate = new Date($('#id_due_date').val());
+            if (dueDate) {
+                const gracePeriodEnd = new Date(dueDate);
+                gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 6);
+                $('#id_grace_period_end').val(gracePeriodEnd.toISOString().split('T')[0]);
+            }
+        };
+
+        // Set up due date change handler
+        $('#id_due_date').on('change', calculateGracePeriod);
+        if ($('#id_due_date').val()) {
+            calculateGracePeriod();
+        }
+
+        // Initial calculations
+        calculateNetWeight();
+        updatePrincipalMessage();
+        calculateDistributionAmount();
+    });
+</script>
+{% endblock %}

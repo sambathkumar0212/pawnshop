@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Record Payment - Loan #{{ loan.loan_number }} - Pawnshop Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-dollar-sign me-2"></i>Record Payment</h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'loan_list' %}">Loans</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a></li>
+                            <li class="breadcrumb-item active">Record Payment</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Payment Details</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Loan Summary -->
+                    <div class="alert alert-info mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Customer:</strong> {{ loan.customer.first_name }} {{ loan.customer.last_name }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Loan Number:</strong> {{ loan.loan_number }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Principal Amount:</strong> ₹{{ loan.principal_amount|floatformat:2 }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Total Payable:</strong> ₹{{ loan.total_payable|floatformat:2 }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Form -->
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.amount|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.payment_method|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.payment_date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.reference_number|as_crispy_field }}
+                            </div>
+                            <div class="col-12 mb-3">
+                                {{ form.notes|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'loan_detail' loan.loan_number %}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Record Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        // Set default payment date to today
+        if (!$('#id_payment_date').val()) {
+            $('#id_payment_date').val(new Date().toISOString().split('T')[0]);
+        }
+    });
+</script>
+{% endblock %}

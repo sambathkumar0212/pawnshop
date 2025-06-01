@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Loan #{{ loan.loan_number }} - Pawnshop Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-hand-holding-usd me-2"></i>Loan Details</h2>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'loan_list' %}">Loans</a></li>
+                            <li class="breadcrumb-item active">{{ loan.loan_number }}</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="btn-group">
+                    {% if loan.status == 'active' %}
+                        <a href="{% url 'payment_create' loan.loan_number %}" class="btn btn-success">
+                            <i class="fas fa-dollar-sign me-2"></i>Make Payment
+                        </a>
+                        <a href="{% url 'loan_extend' loan.loan_number %}" class="btn btn-info">
+                            <i class="fas fa-calendar-plus me-2"></i>Extend Loan
+                        </a>
+                        <a href="{% url 'loan_foreclose' loan.loan_number %}" class="btn btn-warning">
+                            <i class="fas fa-hand-holding-usd me-2"></i>Foreclose
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-primary">
+                        <i class="fas fa-edit me-2"></i>Edit
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Basic Loan Information -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Loan Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted">Loan Number</label>
+                            <p class="mb-0">{{ loan.loan_number }}</p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted">Status</label>
+                            <p class="mb-0">
+                                <span class="badge bg-{% if loan.status == 'active' %}success
+                                    {% elif loan.status == 'repaid' %}info
+                                    {% elif loan.status == 'defaulted' %}danger
+                                    {% elif loan.status == 'extended' %}warning
+                                    {% else %}secondary{% endif %}">
+                                    {{ loan.get_status_display }}
+                                </span>
+                            </p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted">Customer</label>
+                            <p class="mb-0">
+                                <a href="{% url 'customer_detail' loan.customer.id %}">
+                                    {{ loan.customer.first_name }} {{ loan.customer.last_name }}
+                                </a>
+                            </p>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="text-muted">Branch</label>
+                            <p class="mb-0">{{ loan.branch.name }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Principal Amount</label>
+                            <p class="mb-0">₹{{ loan.principal_amount|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Processing Fee</label>
+                            <p class="mb-0">₹{{ loan.processing_fee|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Distribution Amount</label>
+                            <p class="mb-0">₹{{ loan.distribution_amount|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Interest Rate</label>
+                            <p class="mb-0">{{ loan.interest_rate }}% per annum</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Total Payable</label>
+                            <p class="mb-0">₹{{ loan.total_payable|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Days Remaining</label>
+                            <p class="mb-0">{{ loan.days_remaining }} days</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Issue Date</label>
+                            <p class="mb-0">{{ loan.issue_date|date:"M d, Y" }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Due Date</label>
+                            <p class="mb-0">{{ loan.due_date|date:"M d, Y" }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Grace Period End</label>
+                            <p class="mb-0">{{ loan.grace_period_end|date:"M d, Y" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pawned Items -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-box me-2"></i>Pawned Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Gold Karat</th>
+                                    <th>Gross Weight</th>
+                                    <th>Net Weight</th>
+                                    <th>Market Price (22K)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in loan_items %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'item_detail' item.item.id %}">{{ item.item.name }}</a>
+                                        <small class="d-block text-muted">{{ item.item.description|truncatechars:50 }}</small>
+                                    </td>
+                                    <td>{{ item.gold_karat }}K</td>
+                                    <td>{{ item.gross_weight }}g</td>
+                                    <td>{{ item.net_weight }}g</td>
+                                    <td>₹{{ item.market_price_22k|floatformat:2 }}/g</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment History and Extensions -->
+        <div class="col-lg-4">
+            <!-- Payment History -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Payment History</h5>
+                </div>
+                <div class="card-body">
+                    {% if payments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payments %}
+                                <tr>
+                                    <td>{{ payment.payment_date|date:"M d, Y" }}</td>
+                                    <td>₹{{ payment.amount|floatformat:2 }}</td>
+                                    <td>{{ payment.get_payment_method_display }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No payments recorded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Extension History -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calendar-plus me-2"></i>Extension History</h5>
+                </div>
+                <div class="card-body">
+                    {% if extensions %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Fee</th>
+                                    <th>New Due Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for extension in extensions %}
+                                <tr>
+                                    <td>{{ extension.extension_date|date:"M d, Y" }}</td>
+                                    <td>₹{{ extension.fee|floatformat:2 }}</td>
+                                    <td>{{ extension.new_due_date|date:"M d, Y" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">No extensions recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
