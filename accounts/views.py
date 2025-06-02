@@ -34,11 +34,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         
         # Determine if user is branch-specific or has global access
         if user.is_superuser or not user.branch:
-            # Get global stats
             branches = Branch.objects.filter(is_active=True)
             branch_filter = Q()
         else:
-            # Get branch-specific stats
             branches = Branch.objects.filter(id=user.branch.id)
             branch_filter = Q(branch=user.branch)
         
@@ -61,13 +59,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             branch_filter, status='completed', sale_date=today
         ).aggregate(total=Sum('total_amount'))['total'] or 0
         
-        context['recent_sales'] = Sale.objects.filter(
-            branch_filter
-        ).order_by('-created_at')[:5]
-        
+        # Get recent loans with all related data
         context['recent_loans'] = Loan.objects.filter(
             branch_filter
+        ).select_related(
+            'customer'
+        ).prefetch_related(
+            'loanitem_set',
+            'loanitem_set__item'
         ).order_by('-created_at')[:5]
+        
+        context['recent_sales'] = Sale.objects.filter(
+            branch_filter
+        ).select_related('item').order_by('-created_at')[:5]
         
         # Branch information
         context['branches'] = branches

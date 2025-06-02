@@ -1,11 +1,18 @@
+# Django imports
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
-from django.db.models import Sum, Count, Avg
+from django.db.models import Sum, Count, Avg, Q, F
 from django.utils import timezone
 from django.http import HttpResponse, FileResponse
+
+# Model imports
+from transactions.models import Sale, Loan, Payment
+from branches.models import Branch
+from .models import Report, ReportSchedule, ReportExecution, Dashboard, DashboardWidget
+
 import csv
 import io
 from datetime import datetime, timedelta
@@ -209,7 +216,170 @@ class FinancialDashboardView(LoginRequiredMixin, TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Financial Dashboard'
+        today = timezone.now().date()
+        first_day = today.replace(day=1)
+        last_month = (first_day - timedelta(days=1)).replace(day=1)
+        
+        # Filter by branch if user is not superuser
+        branch_filter = Q()
+        if not self.request.user.is_superuser and self.request.user.branch:
+            branch_filter = Q(branch=self.request.user.branch)
+        
+        # Calculate revenue metrics
+        current_month_sales = Sale.objects.filter(
+            branch_filter,
+            sale_date__year=today.year,
+            sale_date__month=today.month,
+            status='completed'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        last_month_sales = Sale.objects.filter(
+            branch_filter,
+            sale_date__year=last_month.year,
+            sale_date__month=last_month.month,
+            status='completed'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        # Calculate loan metrics
+        loan_portfolio = Loan.objects.filter(
+            branch_filter,
+            status='active'
+        ).aggregate(total=Sum('principal_amount'))['total'] or 0
+        
+        last_month_portfolio = Loan.objects.filter(
+            branch_filter,
+            status='active',
+            created_at__lt=first_day
+        ).aggregate(total=Sum('principal_amount'))['total'] or 0
+        
+        # Get branch data
+        branches = Branch.objects.filter(is_active=True)
+        if not self.request.user.is_superuser and self.request.user.branch:
+            branches = branches.filter(id=self.request.user.branch.id)
+        
+        branch_data = []
+        branch_labels = []
+        branch_revenue = []
+        branch_colors = []
+        
+        for idx, branch in enumerate(branches):
+            revenue = Sale.objects.filter(
+                branch=branch,
+                sale_date__year=today.year,
+                sale_date__month=today.month,
+                status='completed'
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
+            
+            color = [
+                'rgba(78, 115, 223, 0.8)',
+                'rgba(28, 200, 138, 0.8)',
+                'rgba(246, 194, 62, 0.8)',
+                'rgba(231, 74, 59, 0.8)',
+                'rgba(54, 185, 204, 0.8)'
+            ][idx % 5]
+            
+            branch_data.append({
+                'name': branch.name,
+                'revenue': revenue,
+                'color': color
+            })
+            branch_labels.append(branch.name)
+            branch_revenue.append(revenue)
+            branch_colors.append(color)
+        
+        # Calculate monthly data for charts
+        months = range(1, 13)
+        interest_income_data = []
+        sales_revenue_data = []
+        other_revenue_data = []
+        gross_margin_data = []
+        net_margin_data = []
+        
+        for month in months:
+            # Interest income from loans
+            interest = Loan.objects.filter(
+                branch_filter,
+                created_at__year=today.year,
+                created_at__month=month
+            ).aggregate(
+                total=Sum(F('principal_amount') * F('interest_rate') / 100)
+            )['total'] or 0
+            
+            # Sales revenue
+            sales = Sale.objects.filter(
+                branch_filter,
+                sale_date__year=today.year,
+                sale_date__month=month,
+                status='completed'
+            ).aggregate(total=Sum('total_amount'))['total'] or 0
+            
+            # Other revenue (placeholder - implement based on your needs)
+            other = 0
+            
+            # Calculate estimated expenses (60% of revenue as placeholder)
+            total_revenue = interest + sales + other
+            estimated_expenses = total_revenue * 0.6
+            estimated_profit = total_revenue * 0.2
+            
+            # Calculate margins
+            if total_revenue > 0:
+                gross_margin = ((total_revenue - estimated_expenses) / total_revenue) * 100
+                net_margin = (estimated_profit / total_revenue) * 100
+            else:
+                gross_margin = 0
+                net_margin = 0
+            
+            interest_income_data.append(interest)
+            sales_revenue_data.append(sales)
+            other_revenue_data.append(other)
+            gross_margin_data.append(gross_margin)
+            net_margin_data.append(net_margin)
+        
+        # Calculate growth rates
+        revenue_growth = ((current_month_sales - last_month_sales) / last_month_sales * 100) if last_month_sales else 0
+        portfolio_growth = ((loan_portfolio - last_month_portfolio) / last_month_portfolio * 100) if last_month_portfolio else 0
+        
+        # Add all data to context
+        context.update({
+            'total_revenue': current_month_sales,
+            'revenue_growth': revenue_growth,
+            'net_profit': current_month_sales * 0.2,  # Placeholder - implement actual calculation
+            'profit_growth': 2.5,  # Placeholder - implement actual calculation
+            'loan_portfolio': loan_portfolio,
+            'portfolio_growth': portfolio_growth,
+            'expenses': current_month_sales * 0.6,  # Placeholder - implement actual calculation
+            'expense_growth': 1.8,  # Placeholder - implement actual calculation
+            
+            # Chart data
+            'interest_income_data': interest_income_data,
+            'sales_revenue_data': sales_revenue_data,
+            'other_revenue_data': other_revenue_data,
+            'gross_margin_data': gross_margin_data,
+            'net_margin_data': net_margin_data,
+            
+            # Branch data
+            'branches': branch_data,
+            'branch_labels': branch_labels,
+            'branch_revenue_data': branch_revenue,
+            'branch_colors': branch_colors,
+            
+            # Financial metrics
+            'roa_current': 15.2,  # Placeholder - implement actual calculation
+            'roa_previous': 14.8,
+            'roa_change': 0.4,
+            'roa_target': 15.0,
+            
+            'current_ratio': 2.1,  # Placeholder - implement actual calculation
+            'previous_ratio': 2.0,
+            'ratio_change': 0.1,
+            'ratio_target': 2.0,
+            
+            'default_rate': 3.2,  # Placeholder - implement actual calculation
+            'previous_default_rate': 3.4,
+            'default_rate_change': -0.2,
+            'default_rate_target': 3.5,
+        })
+        
         return context
 
 

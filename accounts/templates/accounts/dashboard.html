@@ -171,7 +171,7 @@
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Loan #</th>
+                                <th>Item</th>
                                 <th>Customer</th>
                                 <th>Amount</th>
                                 <th>Due Date</th>
@@ -181,7 +181,14 @@
                         <tbody>
                             {% for loan in recent_loans %}
                             <tr>
-                                <td><a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a></td>
+                                <td>
+                                    {% for loan_item in loan.loanitem_set.all %}
+                                    <div class="mb-1">
+                                        <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan_item.item.name }}</a>
+                                        <small class="text-muted">({{ loan_item.gold_karat }}K)</small>
+                                    </div>
+                                    {% endfor %}
+                                </td>
                                 <td>{{ loan.customer.full_name }}</td>
                                 <td>₹{{ loan.principal_amount }}</td>
                                 <td>{{ loan.due_date }}</td>
