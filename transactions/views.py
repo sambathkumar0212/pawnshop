@@ -89,6 +89,18 @@ class LoanDetailView(LoginRequiredMixin, DetailView):
         # Add loan items with gold details
         context['loan_items'] = loan.loanitem_set.all()
         
+        # Process item photos for the template
+        if loan.item_photos:
+            import json
+            try:
+                if isinstance(loan.item_photos, str):
+                    photo_list = json.loads(loan.item_photos)
+                    context['item_photos_list'] = photo_list
+                elif hasattr(loan.item_photos, '__iter__'):
+                    context['item_photos_list'] = list(loan.item_photos)
+            except (json.JSONDecodeError, AttributeError):
+                context['item_photos_list'] = []
+        
         return context
 
 

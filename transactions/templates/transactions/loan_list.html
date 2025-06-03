@@ -132,19 +132,43 @@
                             {% for loan in loans %}
                                 <tr>
                                     <td>
-                                        <a href="{% url 'customer_detail' loan.customer.id %}">
-                                            {{ loan.customer.first_name }} {{ loan.customer.last_name }}
-                                        </a>
+                                        <div class="d-flex align-items-center">
+                                            {% if loan.customer_face_capture %}
+                                                <div class="me-2">
+                                                    <img src="{{ loan.customer_face_capture }}" 
+                                                         alt="Customer Photo" 
+                                                         class="rounded-circle"
+                                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                                </div>
+                                            {% endif %}
+                                            <div>
+                                                <a href="{% url 'customer_detail' loan.customer.id %}">
+                                                    {{ loan.customer.first_name }} {{ loan.customer.last_name }}
+                                                </a>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         {% for loan_item in loan.loanitem_set.all %}
-                                        <div class="mb-1">
-                                            <a href="{% url 'item_detail' loan_item.item.id %}">
-                                                {{ loan_item.item.name }}
-                                            </a>
-                                            <small class="text-muted">
-                                                ({{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g)
-                                            </small>
+                                        <div class="d-flex align-items-center mb-1">
+                                            {% if loan.item_photos %}
+                                                {% if forloop.first %}
+                                                    <div class="me-2" data-bs-toggle="tooltip" title="View all item images">
+                                                        <img src="{{ loan.item_photos|first_item_photo }}" 
+                                                             alt="Item Photo" 
+                                                             class="rounded"
+                                                             style="width: 40px; height: 40px; object-fit: cover;">
+                                                    </div>
+                                                {% endif %}
+                                            {% endif %}
+                                            <div>
+                                                <a href="{% url 'item_detail' loan_item.item.id %}">
+                                                    {{ loan_item.item.name }}
+                                                </a>
+                                                <small class="text-muted">
+                                                    ({{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g)
+                                                </small>
+                                            </div>
                                         </div>
                                         {% endfor %}
                                     </td>
@@ -258,7 +282,13 @@
 {% block extra_scripts %}
 <script>
     $(document).ready(function() {
-        // You can add client-side functionality for the loan list page here
+        // Initialize tooltips
+        $('[data-bs-toggle="tooltip"]').tooltip();
+        
+        // Optional: add item image preview modal functionality if needed
+        $('img[alt="Item Photo"]').click(function() {
+            // You could show a modal with all the item images here
+        });
     });
 </script>
 {% endblock %}

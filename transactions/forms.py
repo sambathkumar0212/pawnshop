@@ -129,6 +129,21 @@ class LoanForm(forms.ModelForm):
         if self.user and not self.user.is_superuser and self.user.branch:
             self.fields['branch'].initial = self.user.branch
             self.fields['branch'].widget = forms.HiddenInput()
+            
+        # If this is an existing loan, populate the item fields
+        if self.instance and self.instance.pk:
+            # Get the first loan item associated with this loan
+            loan_item = self.instance.loanitem_set.first()
+            if loan_item:
+                # Populate all item-related fields from the existing data
+                self.fields['item_name'].initial = loan_item.item.name
+                self.fields['item_description'].initial = loan_item.item.description
+                self.fields['item_category'].initial = loan_item.item.category
+                self.fields['gold_karat'].initial = loan_item.gold_karat
+                self.fields['gross_weight'].initial = loan_item.gross_weight
+                self.fields['net_weight'].initial = loan_item.net_weight
+                self.fields['stone_weight'].initial = loan_item.stone_weight
+                self.fields['market_price_22k'].initial = loan_item.market_price_22k
 
         # Set up crispy form layout
         self.helper = FormHelper()
@@ -243,29 +258,48 @@ class LoanForm(forms.ModelForm):
         if commit:
             instance.save()
             
-            # Create new item with gold details
-            new_item = Item(
-                name=self.cleaned_data['item_name'],
-                description=self.cleaned_data['item_description'],
-                category=self.cleaned_data['item_category'],
-                status='pawned',  # Set status to pawned when used in loan
-                branch=instance.branch if instance.branch else self.user.branch,
-                created_by=self.user
-            )
-            new_item.save()
-            
-            # Create LoanItem with gold details
-            loan_item = LoanItem(
-                loan=instance,
-                item=new_item,
-                gold_karat=self.cleaned_data['gold_karat'],
-                gross_weight=self.cleaned_data['gross_weight'],
-                net_weight=self.cleaned_data['net_weight'],
-                stone_weight=self.cleaned_data.get('stone_weight', 0),
-                market_price_22k=self.cleaned_data['market_price_22k']
-            )
-            loan_item.save()
+            # Check if this is an update or new loan
+            if instance.pk and instance.loanitem_set.exists():
+                # Update existing loan item information
+                loan_item = instance.loanitem_set.first()
+                if loan_item:
+                    # Update item information
+                    loan_item.item.name = self.cleaned_data['item_name']
+                    loan_item.item.description = self.cleaned_data['item_description']
+                    loan_item.item.category = self.cleaned_data['item_category']
+                    loan_item.item.save()
+                    
+                    # Update loan item details
+                    loan_item.gold_karat = self.cleaned_data['gold_karat']
+                    loan_item.gross_weight = self.cleaned_data['gross_weight']
+                    loan_item.net_weight = self.cleaned_data['net_weight']
+                    loan_item.stone_weight = self.cleaned_data.get('stone_weight', 0)
+                    loan_item.market_price_22k = self.cleaned_data['market_price_22k']
+                    loan_item.save()
+            else:
+                # Create new item with gold details
+                new_item = Item(
+                    name=self.cleaned_data['item_name'],
+                    description=self.cleaned_data['item_description'],
+                    category=self.cleaned_data['item_category'],
+                    status='pawned',  # Set status to pawned when used in loan
+                    branch=instance.branch if instance.branch else self.user.branch,
+                    created_by=self.user
+                )
+                new_item.save()
                 
+                # Create LoanItem with gold details
+                loan_item = LoanItem(
+                    loan=instance,
+                    item=new_item,
+                    gold_karat=self.cleaned_data['gold_karat'],
+                    gross_weight=self.cleaned_data['gross_weight'],
+                    net_weight=self.cleaned_data['net_weight'],
+                    stone_weight=self.cleaned_data.get('stone_weight', 0),
+                    market_price_22k=self.cleaned_data['market_price_22k']
+                )
+                loan_item.save()
+            
             # Handle existing items from formset
             if hasattr(self, 'items_formset') and self.items_formset.is_valid():
                 for item_form in self.items_formset:

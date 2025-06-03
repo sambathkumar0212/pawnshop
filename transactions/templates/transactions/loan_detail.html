@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load loan_tags %}
 
 {% block title %}Loan #{{ loan.loan_number }} - Pawnshop Management{% endblock %}
 
@@ -42,6 +43,40 @@
     </div>
 
     <div class="row">
+        <!-- Customer Photo Card -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Customer Details</h5>
+                </div>
+                <div class="card-body text-center">
+                    {% if loan.customer_face_capture %}
+                    <div class="mb-3">
+                        <img src="{{ loan.customer_face_capture }}" 
+                             alt="Customer Photo" 
+                             class="img-fluid rounded-circle"
+                             style="max-width: 180px; max-height: 180px; object-fit: cover;">
+                    </div>
+                    {% else %}
+                    <div class="mb-3">
+                        <div class="rounded-circle bg-light d-inline-flex align-items-center justify-content-center" 
+                             style="width: 180px; height: 180px;">
+                            <i class="fas fa-user fa-5x text-secondary"></i>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <h5>{{ loan.customer.first_name }} {{ loan.customer.last_name }}</h5>
+                    <p class="text-muted">
+                        <i class="fas fa-phone me-1"></i> {{ loan.customer.phone|default:"No phone" }}<br>
+                        <i class="fas fa-envelope me-1"></i> {{ loan.customer.email|default:"No email" }}
+                    </p>
+                    <a href="{% url 'customer_detail' loan.customer.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-id-card me-1"></i> View Customer Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <!-- Basic Loan Information -->
         <div class="col-lg-8">
             <div class="card mb-4">
@@ -64,14 +99,6 @@
                                     {% else %}secondary{% endif %}">
                                     {{ loan.status|title }}
                                 </span>
-                            </p>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted">Customer</label>
-                            <p class="mb-0">
-                                <a href="{% url 'customer_detail' loan.customer.id %}">
-                                    {{ loan.customer.first_name }} {{ loan.customer.last_name }}
-                                </a>
                             </p>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -138,6 +165,31 @@
                     <h5 class="mb-0"><i class="fas fa-box me-2"></i>Pawned Items</h5>
                 </div>
                 <div class="card-body">
+                    {% if loan.item_photos %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-muted mb-2">Item Photos</h6>
+                            <div class="item-photos-gallery d-flex flex-wrap">
+                                {% if item_photos_list %}
+                                    {% for photo in item_photos_list|slice:":4" %}
+                                        <div class="item-photo-thumbnail me-2 mb-2" data-bs-toggle="modal" data-bs-target="#photoModal" data-photo-url="{{ photo }}">
+                                            <img src="{{ photo }}" class="rounded" alt="Item Photo {{ forloop.counter }}" style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;">
+                                        </div>
+                                    {% endfor %}
+                                    {% if item_photos_list|length > 4 %}
+                                        <div class="item-photo-thumbnail me-2 mb-2 d-flex align-items-center justify-content-center bg-light rounded" style="width: 80px; height: 80px;">
+                                            <span class="text-secondary">+{{ item_photos_list|length|add:"-4" }}</span>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>Item photos are stored but couldn't be processed
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
@@ -170,112 +222,169 @@
         </div>
 
         <!-- Payment History and Extensions -->
-        <div class="col-lg-4">
-            <!-- Payment Summary Card -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Payment Summary</h5>
-                </div>
-                <div class="card-body">
-                    <div class="progress mb-3" style="height: 20px;">
-                        {% if loan.total_payable > 0 %}
-                            {% with percentage=loan.amount_paid|floatformat:0|slugify|add:".0"|stringformat:"s"|slice:":-2" %}
-                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ percentage }}%;" 
-                                aria-valuenow="{{ percentage }}" aria-valuemin="0" aria-valuemax="100">{{ percentage }}%</div>
-                            {% endwith %}
-                        {% else %}
-                            <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" 
-                                aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
-                        {% endif %}
+        <div class="col-lg-12">
+            <div class="row">
+                <div class="col-lg-4">
+                    <!-- Payment Summary Card -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Payment Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="progress mb-3" style="height: 20px;">
+                                {% if loan.total_payable > 0 %}
+                                    {% with percentage=loan.amount_paid|floatformat:0|slugify|add:".0"|stringformat:"s"|slice:":-2" %}
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ percentage }}%;" 
+                                        aria-valuenow="{{ percentage }}" aria-valuemin="0" aria-valuemax="100">{{ percentage }}%</div>
+                                    {% endwith %}
+                                {% else %}
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" 
+                                        aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-6 mb-2">
+                                    <small class="text-muted">Principal</small>
+                                    <p class="mb-0">₹{{ loan.principal_amount|floatformat:2 }}</p>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <small class="text-muted">Interest</small>
+                                    <p class="mb-0">₹{{ loan.total_interest|floatformat:2 }}</p>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <small class="text-muted">Total Paid</small>
+                                    <p class="mb-0">₹{{ loan.amount_paid|floatformat:2 }}</p>
+                                </div>
+                                <div class="col-6 mb-2">
+                                    <small class="text-muted">Remaining</small>
+                                    <p class="mb-0">₹{{ loan.remaining_balance|floatformat:2 }}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="row">
-                        <div class="col-6 mb-2">
-                            <small class="text-muted">Principal</small>
-                            <p class="mb-0">₹{{ loan.principal_amount|floatformat:2 }}</p>
+                </div>
+                
+                <div class="col-lg-4">
+                    <!-- Payment History -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-history me-2"></i>Payment History</h5>
                         </div>
-                        <div class="col-6 mb-2">
-                            <small class="text-muted">Interest</small>
-                            <p class="mb-0">₹{{ loan.total_interest|floatformat:2 }}</p>
-                        </div>
-                        <div class="col-6 mb-2">
-                            <small class="text-muted">Total Paid</small>
-                            <p class="mb-0">₹{{ loan.amount_paid|floatformat:2 }}</p>
-                        </div>
-                        <div class="col-6 mb-2">
-                            <small class="text-muted">Remaining</small>
-                            <p class="mb-0">₹{{ loan.remaining_balance|floatformat:2 }}</p>
+                        <div class="card-body">
+                            {% if payments %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Method</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for payment in payments %}
+                                        <tr>
+                                            <td>{{ payment.payment_date|date:"M d, Y" }}</td>
+                                            <td>₹{{ payment.amount|floatformat:2 }}</td>
+                                            <td>{{ payment.get_payment_method_display }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0">No payments recorded yet.</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Payment History -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Payment History</h5>
-                </div>
-                <div class="card-body">
-                    {% if payments %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Amount</th>
-                                    <th>Method</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for payment in payments %}
-                                <tr>
-                                    <td>{{ payment.payment_date|date:"M d, Y" }}</td>
-                                    <td>₹{{ payment.amount|floatformat:2 }}</td>
-                                    <td>{{ payment.get_payment_method_display }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="text-muted mb-0">No payments recorded yet.</p>
-                    {% endif %}
-                </div>
-            </div>
 
-            <!-- Extension History -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="fas fa-calendar-plus me-2"></i>Extension History</h5>
-                </div>
-                <div class="card-body">
-                    {% if extensions %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Fee</th>
-                                    <th>New Due Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for extension in extensions %}
-                                <tr>
-                                    <td>{{ extension.extension_date|date:"M d, Y" }}</td>
-                                    <td>₹{{ extension.fee|floatformat:2 }}</td>
-                                    <td>{{ extension.new_due_date|date:"M d, Y" }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <div class="col-lg-4">
+                    <!-- Extension History -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="fas fa-calendar-plus me-2"></i>Extension History</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if extensions %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Fee</th>
+                                            <th>New Due Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for extension in extensions %}
+                                        <tr>
+                                            <td>{{ extension.extension_date|date:"M d, Y" }}</td>
+                                            <td>₹{{ extension.fee|floatformat:2 }}</td>
+                                            <td>{{ extension.new_due_date|date:"M d, Y" }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0">No extensions recorded.</p>
+                            {% endif %}
+                        </div>
                     </div>
-                    {% else %}
-                    <p class="text-muted mb-0">No extensions recorded.</p>
-                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Photo Modal -->
+<div class="modal fade" id="photoModal" tabindex="-1" aria-labelledby="photoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="photoModalLabel">Item Photo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalPhotoImg" src="" class="img-fluid" alt="Item Photo">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle item photo click to show in modal
+        const photoThumbnails = document.querySelectorAll('.item-photo-thumbnail');
+        const modalPhotoImg = document.getElementById('modalPhotoImg');
+        
+        photoThumbnails.forEach(thumbnail => {
+            thumbnail.addEventListener('click', function() {
+                const photoUrl = this.getAttribute('data-photo-url');
+                modalPhotoImg.src = photoUrl;
+            });
+        });
+
+        // Parse item photos from JSON string if needed
+        const displayItemPhotos = function() {
+            try {
+                {% if loan.item_photos %}
+                const photoContainer = document.querySelector('.item-photos-gallery');
+                if (!photoContainer) return;
+                
+                // Check if item_photos is already parsed in the template
+                // If not, we can parse it here
+                {% endif %}
+            } catch (e) {
+                console.error("Error processing item photos:", e);
+            }
+        };
+        
+        displayItemPhotos();
+    });
+</script>
 {% endblock %}

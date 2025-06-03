@@ -21,6 +21,10 @@ class Loan(models.Model):
     items = models.ManyToManyField('inventory.Item', through='LoanItem', related_name='loans')
     branch = models.ForeignKey('branches.Branch', on_delete=models.CASCADE, related_name='loans')
     
+    # Photo information
+    customer_face_capture = models.TextField(blank=True, null=True, help_text="Base64-encoded customer photo")
+    item_photos = models.TextField(blank=True, null=True, help_text="JSON string of Base64-encoded item photos")
+    
     # Financial information
     principal_amount = models.DecimalField(max_digits=10, decimal_places=2)
     processing_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
