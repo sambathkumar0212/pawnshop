@@ -24,8 +24,8 @@ A comprehensive Django-based management system for pawn shops with multiple bran
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/pawnshop-management-system.git
-   cd pawnshop-management-system
+   git clone https://github.com/sambathkumar0212/pawnshop.git
+   cd pawnshop
    ```
 
 2. Create and activate a virtual environment:
