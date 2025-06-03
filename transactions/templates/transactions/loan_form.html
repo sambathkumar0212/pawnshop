@@ -23,20 +23,78 @@
         <div class="col-lg-8">
             <div class="card shadow">
                 <div class="card-body">
-                    <form method="post" novalidate>
+                    <form method="post" id="loanForm" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
+                        <input type="hidden" name="customer_face_capture" id="customerFaceCapture" value="">
+                        <input type="hidden" name="item_photos" id="itemPhotosData" value="">
                         
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5 class="card-title mb-3">
-                                    <i class="fas fa-user me-2"></i>Customer & Branch
+                                    <i class="fas fa-user me-2"></i>Customer & Authentication
                                 </h5>
                             </div>
                             <div class="col-md-8">
                                 {{ form.customer|as_crispy_field }}
+                                
+                                <!-- Biometric Authentication Section -->
+                                <div class="card mt-3">
+                                    <div class="card-header bg-light">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="enableBiometricAuth">
+                                            <label class="form-check-label" for="enableBiometricAuth">
+                                                <i class="fas fa-fingerprint me-2"></i>Use Biometric Authentication
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="card-body" id="biometricAuthSection" style="display: none;">
+                                        <div id="biometricStatus"></div>
+                                        <div class="text-center mb-2">
+                                            <button type="button" class="btn btn-outline-primary" id="verifyBiometricBtn">
+                                                <i class="fas fa-fingerprint me-2"></i>Verify Customer Biometric
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-md-4">
                                 {{ form.branch|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-camera me-2"></i>Customer Photo
+                                </h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div id="cameraView" class="border rounded mb-2" style="height: 240px; position: relative;">
+                                                    <video id="cameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                                                    <canvas id="photoCanvas" style="display:none;"></canvas>
+                                                </div>
+                                                <div class="d-flex justify-content-center mb-3">
+                                                    <button type="button" class="btn btn-primary" id="captureBtn">
+                                                        <i class="fas fa-camera me-2"></i>Capture Photo
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div id="photoPreview" class="border rounded mb-2 d-flex align-items-center justify-content-center bg-light" style="height: 240px;">
+                                                    <span id="noCaptureText">No photo captured</span>
+                                                    <img id="capturedPhoto" class="img-fluid" style="max-height: 240px; display: none;">
+                                                </div>
+                                                <div class="d-flex justify-content-center">
+                                                    <button type="button" class="btn btn-outline-secondary" id="retakeBtn" disabled>
+                                                        <i class="fas fa-redo me-2"></i>Retake Photo
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -72,6 +130,55 @@
                                     </div>
                                     <div class="col-12">
                                         {{ form.net_weight|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Gold Item Photos Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-images me-2"></i>Gold Item Photos
+                                </h5>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div id="itemCameraView" class="border rounded mb-2" style="height: 240px; position: relative;">
+                                                    <video id="itemCameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                                                    <canvas id="itemPhotoCanvas" style="display:none;"></canvas>
+                                                </div>
+                                                <div class="d-flex justify-content-center mb-3">
+                                                    <button type="button" class="btn btn-primary" id="captureItemBtn">
+                                                        <i class="fas fa-camera me-2"></i>Capture Item Photo
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="border rounded p-2 mb-3 bg-light" style="height: 240px; overflow-y: auto;">
+                                                    <div id="noItemPhotosText" class="text-center text-muted p-5">
+                                                        No item photos captured yet.<br>
+                                                        <small>Take at least 2 photos from different angles</small>
+                                                    </div>
+                                                    <div id="itemPhotosContainer" class="row g-2"></div>
+                                                </div>
+                                                <div class="d-flex justify-content-center">
+                                                    <span class="badge bg-primary me-2" id="photoCountBadge">0 Photos</span>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearItemPhotosBtn" disabled>
+                                                        <i class="fas fa-trash-alt me-1"></i>Clear All
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 small text-muted">
+                                            <ul>
+                                                <li>Take multiple photos from different angles</li>
+                                                <li>Ensure good lighting to capture details</li>
+                                                <li>Include photos of maker's marks, hallmarks or certificates if available</li>
+                                                <li>At least 2 photos are required</li>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -118,7 +225,7 @@
                             <a href="{% url 'loan_list' %}" class="btn btn-outline-secondary me-md-2">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </a>
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary" id="submitLoanBtn">
                                 <i class="fas fa-save me-2"></i>
                                 {% if form.instance.pk %}Update{% else %}Create{% endif %} Loan
                             </button>
@@ -134,6 +241,336 @@
 {% block extra_scripts %}
 <script>
     $(document).ready(function() {
+        // Camera functionality
+        const cameraStream = document.getElementById('cameraStream');
+        const photoCanvas = document.getElementById('photoCanvas');
+        const capturedPhoto = document.getElementById('capturedPhoto');
+        const captureBtn = document.getElementById('captureBtn');
+        const retakeBtn = document.getElementById('retakeBtn');
+        const noCaptureText = document.getElementById('noCaptureText');
+        const customerFaceCapture = document.getElementById('customerFaceCapture');
+        let stream = null;
+        
+        // Start the camera
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    }
+                });
+                cameraStream.srcObject = stream;
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+                showAlert('Could not access camera. Please check camera permissions.', 'danger');
+            }
+        }
+        
+        // Start camera when page loads
+        startCamera();
+        
+        // Capture photo function
+        captureBtn.addEventListener('click', function() {
+            // Set the canvas dimensions to match the video
+            photoCanvas.width = cameraStream.videoWidth;
+            photoCanvas.height = cameraStream.videoHeight;
+            
+            // Draw the current video frame to the canvas
+            const context = photoCanvas.getContext('2d');
+            context.drawImage(cameraStream, 0, 0, photoCanvas.width, photoCanvas.height);
+            
+            // Convert the canvas to a data URL and display the captured photo
+            const photoDataUrl = photoCanvas.toDataURL('image/jpeg');
+            capturedPhoto.src = photoDataUrl;
+            capturedPhoto.style.display = 'block';
+            noCaptureText.style.display = 'none';
+            
+            // Save the photo data in the hidden input
+            customerFaceCapture.value = photoDataUrl;
+            
+            // Enable the retake button
+            retakeBtn.disabled = false;
+        });
+        
+        // Retake photo function
+        retakeBtn.addEventListener('click', function() {
+            // Clear the captured photo
+            capturedPhoto.style.display = 'none';
+            noCaptureText.style.display = 'block';
+            customerFaceCapture.value = '';
+            retakeBtn.disabled = true;
+        });
+        
+        // Biometric verification functionality
+        const enableBiometricAuth = document.getElementById('enableBiometricAuth');
+        const biometricAuthSection = document.getElementById('biometricAuthSection');
+        const verifyBiometricBtn = document.getElementById('verifyBiometricBtn');
+        const biometricStatus = document.getElementById('biometricStatus');
+        let biometricVerified = false;
+        
+        // Toggle biometric authentication
+        enableBiometricAuth.addEventListener('change', function() {
+            if (this.checked) {
+                biometricAuthSection.style.display = 'block';
+            } else {
+                biometricAuthSection.style.display = 'none';
+                biometricVerified = true; // Skip verification if disabled
+            }
+        });
+        
+        // Biometric verification function
+        verifyBiometricBtn.addEventListener('click', function() {
+            const customerId = $('#id_customer').val();
+            
+            if (!customerId) {
+                showBiometricStatus('Please select a customer first', 'warning');
+                return;
+            }
+            
+            // Simulate biometric verification (in a real app, this would call your biometric verification API)
+            simulateBiometricVerification(customerId);
+        });
+        
+        // Simulate biometric verification (replace with actual API call in production)
+        function simulateBiometricVerification(customerId) {
+            showBiometricStatus('Verifying biometrics...', 'info');
+            
+            // Simulated verification - in production, replace with actual API call
+            setTimeout(function() {
+                // Successfully verified (for demo)
+                biometricVerified = true;
+                showBiometricStatus('Biometric verification successful!', 'success');
+                verifyBiometricBtn.disabled = true;
+                verifyBiometricBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Verified';
+                verifyBiometricBtn.classList.remove('btn-outline-primary');
+                verifyBiometricBtn.classList.add('btn-success');
+            }, 1500);
+            
+            // In production, you'd make an AJAX request to verify biometrics:
+            /*
+            $.ajax({
+                url: '/api/verify-biometric/',
+                type: 'POST',
+                data: {
+                    'customer_id': customerId,
+                    'csrfmiddlewaretoken': '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    if (response.verified) {
+                        biometricVerified = true;
+                        showBiometricStatus('Biometric verification successful!', 'success');
+                    } else {
+                        showBiometricStatus('Biometric verification failed: ' + response.message, 'danger');
+                    }
+                },
+                error: function(xhr, textStatus, errorThrown) {
+                    showBiometricStatus('Error: ' + errorThrown, 'danger');
+                }
+            });
+            */
+        }
+        
+        // Display biometric status
+        function showBiometricStatus(message, type) {
+            biometricStatus.innerHTML = `<div class="alert alert-${type} mb-3">${message}</div>`;
+        }
+        
+        // Gold Item Photo Capture Functionality
+        const itemCameraStream = document.getElementById('itemCameraStream');
+        const itemPhotoCanvas = document.getElementById('itemPhotoCanvas');
+        const captureItemBtn = document.getElementById('captureItemBtn');
+        const itemPhotosContainer = document.getElementById('itemPhotosContainer');
+        const noItemPhotosText = document.getElementById('noItemPhotosText');
+        const clearItemPhotosBtn = document.getElementById('clearItemPhotosBtn');
+        const photoCountBadge = document.getElementById('photoCountBadge');
+        const itemPhotosData = document.getElementById('itemPhotosData');
+        let itemStream = null;
+        let itemPhotos = [];
+        
+        // Start the item camera
+        async function startItemCamera() {
+            try {
+                itemStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'environment' // Use back camera if available
+                    }
+                });
+                itemCameraStream.srcObject = itemStream;
+            } catch (err) {
+                console.error('Error accessing camera for item photos:', err);
+                showAlert('Could not access camera for item photos. Please check camera permissions.', 'danger');
+            }
+        }
+        
+        // Start item camera when page loads
+        startItemCamera();
+        
+        // Capture item photo function
+        captureItemBtn.addEventListener('click', function() {
+            // Set the canvas dimensions to match the video
+            itemPhotoCanvas.width = itemCameraStream.videoWidth;
+            itemPhotoCanvas.height = itemCameraStream.videoHeight;
+            
+            // Draw the current video frame to the canvas
+            const context = itemPhotoCanvas.getContext('2d');
+            context.drawImage(itemCameraStream, 0, 0, itemPhotoCanvas.width, itemPhotoCanvas.height);
+            
+            // Convert the canvas to a data URL
+            const photoDataUrl = itemPhotoCanvas.toDataURL('image/jpeg');
+            
+            // Add the photo to the collection
+            addItemPhoto(photoDataUrl);
+            
+            // Update the photos data in the hidden input
+            updateItemPhotosData();
+            
+            // Enable the clear button
+            clearItemPhotosBtn.disabled = false;
+        });
+        
+        // Add an item photo to the collection
+        function addItemPhoto(photoDataUrl) {
+            const photoId = 'item-photo-' + Date.now();
+            itemPhotos.push({ id: photoId, dataUrl: photoDataUrl });
+            
+            // Hide the "no photos" text if this is the first photo
+            if (itemPhotos.length === 1) {
+                noItemPhotosText.style.display = 'none';
+            }
+            
+            // Create a thumbnail element
+            const thumbnailCol = document.createElement('div');
+            thumbnailCol.className = 'col-6';
+            thumbnailCol.innerHTML = `
+                <div class="position-relative">
+                    <img src="${photoDataUrl}" class="img-thumbnail" alt="Item photo ${itemPhotos.length}">
+                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 delete-photo" data-photo-id="${photoId}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="bg-dark bg-opacity-50 text-white position-absolute bottom-0 start-0 end-0 small text-center">
+                        Photo ${itemPhotos.length}
+                    </div>
+                </div>
+            `;
+            itemPhotosContainer.appendChild(thumbnailCol);
+            
+            // Add event listener to delete button
+            const deleteBtn = thumbnailCol.querySelector('.delete-photo');
+            deleteBtn.addEventListener('click', function() {
+                const photoId = this.getAttribute('data-photo-id');
+                deleteItemPhoto(photoId, this.closest('.col-6'));
+            });
+            
+            // Update the photo count badge
+            updatePhotoCountBadge();
+        }
+        
+        // Delete an item photo
+        function deleteItemPhoto(photoId, element) {
+            // Remove from the DOM
+            element.remove();
+            
+            // Remove from the array
+            itemPhotos = itemPhotos.filter(photo => photo.id !== photoId);
+            
+            // Show the "no photos" text if this was the last photo
+            if (itemPhotos.length === 0) {
+                noItemPhotosText.style.display = 'block';
+                clearItemPhotosBtn.disabled = true;
+            }
+            
+            // Update the photos data in the hidden input
+            updateItemPhotosData();
+            
+            // Update the photo count badge
+            updatePhotoCountBadge();
+        }
+        
+        // Update the item photos data in the hidden input
+        function updateItemPhotosData() {
+            // Store only the data URLs to save space
+            const dataUrls = itemPhotos.map(photo => photo.dataUrl);
+            itemPhotosData.value = JSON.stringify(dataUrls);
+        }
+        
+        // Update the photo count badge
+        function updatePhotoCountBadge() {
+            photoCountBadge.textContent = `${itemPhotos.length} Photos`;
+            photoCountBadge.className = 'badge me-2 ' + 
+                (itemPhotos.length < 2 ? 'bg-danger' : 'bg-success');
+        }
+        
+        // Clear all item photos
+        clearItemPhotosBtn.addEventListener('click', function() {
+            // Confirm before clearing
+            if (confirm('Are you sure you want to clear all item photos?')) {
+                // Clear the photos container
+                itemPhotosContainer.innerHTML = '';
+                
+                // Reset the photos array
+                itemPhotos = [];
+                
+                // Show the "no photos" text
+                noItemPhotosText.style.display = 'block';
+                
+                // Clear the hidden input
+                itemPhotosData.value = '';
+                
+                // Disable the clear button
+                clearItemPhotosBtn.disabled = true;
+                
+                // Update the photo count badge
+                updatePhotoCountBadge();
+            }
+        });
+        
+        // Form validation before submit
+        $('#loanForm').on('submit', function(e) {
+            // Check customer photo capture
+            if (!customerFaceCapture.value) {
+                e.preventDefault();
+                showAlert('Please capture a customer photo before proceeding', 'warning');
+                return false;
+            }
+            
+            // Check biometric verification if enabled
+            if (enableBiometricAuth.checked && !biometricVerified) {
+                e.preventDefault();
+                showAlert('Please complete biometric verification before proceeding', 'warning');
+                return false;
+            }
+            
+            // Check if at least 2 item photos were captured
+            if (itemPhotos.length < 2) {
+                e.preventDefault();
+                showAlert('Please capture at least 2 photos of the gold item from different angles', 'warning');
+                return false;
+            }
+        });
+        
+        // Display alerts
+        function showAlert(message, type) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            // Insert the alert at the top of the form
+            $('#loanForm').prepend(alertHtml);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                $('.alert').alert('close');
+            }, 5000);
+        }
+
+        // Original loan form JS code
         const KARAT_PURITY = {
             '24': 0.999,
             '22': 0.916,
@@ -235,8 +672,15 @@
         // Calculate distribution amount when principal or processing fee changes
         const calculateDistributionAmount = function() {
             const principal = parseFloat($('#id_principal_amount').val()) || 0;
-            const processingFeePercentage = parseFloat($('#id_processing_fee').val()) || 0;
+            // Calculate processing fee as 1% of principal amount
+            const processingFeePercentage = 0.01; // Fixed at 1%
             const processingFeeAmount = principal * processingFeePercentage;
+            
+            // Display the processing fee amount instead of percentage
+            $('#id_processing_fee')
+                .val(processingFeeAmount.toFixed(2))
+                .prop('readonly', true);
+            
             const distributionAmount = principal - processingFeeAmount;
             
             $('#id_distribution_amount')
@@ -293,6 +737,17 @@
         calculateNetWeight();
         updatePrincipalMessage();
         calculateDistributionAmount();
+        
+        // Clean up when leaving the page
+        $(window).on('beforeunload', function() {
+            // Stop the camera streams if they exist
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (itemStream) {
+                itemStream.getTracks().forEach(track => track.stop());
+            }
+        });
     });
 </script>
 {% endblock %}

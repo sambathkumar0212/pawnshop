@@ -132,8 +132,22 @@ class Item(models.Model):
             # Use branch code + category code + sequential number
             branch_code = self.branch.code if hasattr(self.branch, 'code') else 'XX'
             category_code = self.category.slug[:2].upper() if self.category else 'GN'
-            last_item = Item.objects.filter(branch=self.branch).order_by('-id').first()
-            seq_num = (last_item.id + 1 if last_item else 1)
+            
+            # Get the highest existing sequence number for this branch and category prefix
+            prefix = f"{branch_code}-{category_code}-"
+            highest_item = Item.objects.filter(item_id__startswith=prefix).order_by('-item_id').first()
+            
+            if highest_item:
+                # Extract sequence number from the highest item_id
+                try:
+                    seq_str = highest_item.item_id.split('-')[-1]
+                    seq_num = int(seq_str) + 1
+                except (IndexError, ValueError):
+                    # Fallback if parsing fails
+                    seq_num = 1
+            else:
+                seq_num = 1
+                
             self.item_id = f"{branch_code}-{category_code}-{seq_num:04d}"
         
         super().save(*args, **kwargs)

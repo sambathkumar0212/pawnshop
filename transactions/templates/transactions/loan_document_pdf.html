@@ -1,322 +1,225 @@
 <!DOCTYPE html>
-{% load loan_tags %}
-<html>
+{% load loan_filters %}
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loan Agreement - {{ loan.loan_number }}</title>
     <style>
         @page {
-            size: a4 portrait;
-            margin: 1.8cm;
+            size: A4;
+            margin: 2cm;
         }
         body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 13px; /* Increased from 12px */
-            line-height: 1.6;
-            color: #333333;
+            font-family: Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            font-size: 12px;
+            line-height: 1.3;
+            color: #000;
         }
-        .document-header {
-            display: flex;
-            margin-bottom: 30px;
-        }
-        .logo-section {
+        .container {
             width: 100%;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .header h1 {
+            margin: 0 0 6px 0;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .header h2 {
+            margin: 0 0 6px 0;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .header p {
+            margin: 4px 0;
+            font-size: 12px;
+        }
+        .branch-contact {
+            font-size: 11px;
+            margin: 5px 0 10px 0;
             text-align: center;
         }
-        .header-title {
-            font-size: 28px; /* Increased from 24px */
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-        }
-        .header-subtitle {
-            font-size: 20px; /* Increased from 18px */
-            color: #4a90e2;
-            margin: 5px 0 15px 0;
-            font-weight: 600;
-            letter-spacing: 1px;
-        }
-        .header-address {
-            font-size: 12px; /* Increased from 11px */
-            color: #555;
-            margin-bottom: 5px;
-        }
-        .header-contact {
-            font-size: 12px; /* Increased from 11px */
-            color: #555;
-        }
-        .document-divider {
-            height: 2px;
-            background: linear-gradient(to right, #fff, #4a90e2, #fff);
-            margin: 10px 0 20px 0;
-        }
-        .customer-info {
-            background-color: #f8f9fa;
-            padding: 12px 15px;
-            border-radius: 4px;
-            margin-bottom: 25px;
-            border-left: 3px solid #4a90e2;
-            font-size: 14px; /* Increased from 13px */
-            display: flex;
-            justify-content: space-between;
-        }
-        .customer-data {
-            flex: 1;
-        }
-        .customer-label {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .section {
-            margin-bottom: 25px;
-        }
-        .section-title {
-            font-size: 17px; /* Increased from 16px */
-            font-weight: 600;
-            margin-bottom: 10px;
-            color: #2c3e50;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #e5e5e5;
-        }
-        .loan-details {
+        table.data-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 11px;
         }
-        .loan-details th, .loan-details td {
-            padding: 9px; /* Increased from 8px */
-            border: 1px solid #ddd;
+        table.data-table, table.data-table th, table.data-table td {
+            border: 1px solid #000;
+        }
+        table.data-table th, table.data-table td {
+            padding: 5px;
             text-align: left;
-            font-size: 13px; /* Added explicit font size */
         }
-        .loan-details th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .items-table {
+        table.gold-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 11px;
         }
-        .items-table th, .items-table td {
-            padding: 9px; /* Increased from 8px */
-            border: 1px solid #ddd;
-            text-align: left;
-            font-size: 13px; /* Added explicit font size */
+        table.gold-table, table.gold-table th, table.gold-table td {
+            border: 1px solid #000;
         }
-        .items-table th {
-            background-color: #f8f9fa;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .items-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .terms {
-            font-size: 13px; /* Increased from 12px */
-            margin-top: 25px;
-            line-height: 1.6;
-        }
-        .term-title {
-            font-weight: 700;
-            margin-bottom: 15px;
-            color: #2c3e50;
-            font-size: 18px; /* Increased from 15px */
+        table.gold-table th, table.gold-table td {
+            padding: 5px;
             text-align: center;
         }
-        .terms ol {
-            padding-left: 20px;
+        table.gold-table th {
+            font-weight: bold;
         }
-        .terms ol li {
-            margin-bottom: 10px; /* Increased from 8px */
+        .terms-section h3 {
+            font-size: 13px;
+            font-weight: bold;
+            margin: 15px 0 10px 0;
+        }
+        .terms-list {
+            padding-left: 25px;
+            margin: 5px 0;
+            font-size: 11px;
+        }
+        .terms-list li {
+            margin-bottom: 6px;
+            text-align: justify;
         }
         .signatures {
-            margin-top: 40px;
-        }
-        .signatures-table {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
             width: 100%;
         }
-        .signatures-table td {
-            width: 50%;
-            vertical-align: top;
-            padding: 15px;
-            font-size: 13px; /* Added explicit font size */
+        .signature-box-left {
+            width: 45%;
         }
-        .signature-line {
-            border-top: 1px solid #666;
-            margin-top: 50px;
-            margin-bottom: 8px;
-            width: 80%;
-        }
-        .borrower-signature {
-            text-align: left;
-        }
-        .authorized-signature {
+        .signature-box-right {
+            width: 45%;
             text-align: right;
         }
-        .authorized-signature .signature-line {
-            margin-left: auto; /* Move line to the right */
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 40px;
+            margin-bottom: 5px;
         }
         .footer {
-            margin-top: 40px;
-            font-size: 10px; /* Increased from 9px */
+            margin-top: 20px;
+            font-size: 11px;
             text-align: center;
-            color: #777;
-        }
-        .highlight {
-            color: #4a90e2;
-            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <!-- New improved header design -->
-    <div class="logo-section">
-        <div class="header-title">{{ branch.name }}</div>
-        <div class="header-subtitle">GOLD LOAN AGREEMENT</div>
-        <div class="header-address">{{ branch.address }}, {{ branch.city }}, {{ branch.state }} - {{ branch.pin_code }}</div>
-        <div class="header-contact">Phone: {{ branch.phone }} | Email: {{ branch.email }}</div>
-    </div>
-    
-    <div class="document-divider"></div>
-    
-    <div class="customer-info">
-        <div class="customer-data">
-            <span class="customer-label">Borrower:</span> <span class="highlight">{{ customer.first_name }} {{ customer.last_name }} {{ customer.middle_name }}</span>
+    <div class="container">
+        <div class="header">
+            <h1>{{ branch.name }}</h1>
+            <p class="branch-contact">
+                {{ branch.address }}, {{ branch.city }}, {{ branch.state }} - {{ branch.zip_code }} | Phone: {{ branch.phone }}
+                {% if branch.email %} | Email: {{ branch.email }}{% endif %}
+            </p>
+            <h2>Gold Loan Agreement</h2>
         </div>
-        <div class="customer-data">
-            <span class="customer-label">Loan #:</span> {{ loan.loan_number }}
-        </div>
-        <div class="customer-data">
-            <span class="customer-label">Date:</span> {{ loan.issue_date|date:"d/m/Y" }}
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">LOAN DETAILS</div>
-        <table class="loan-details">
+        
+        <table class="data-table">
             <tr>
-                <th>Date of Agreement</th>
-                <td>{{ loan.issue_date|date:"d/m/Y" }}</td>
-                <th>Loan Term</th>
-                <td>1 Year</td>
+                <td width="50%"><b>Loan Number</b><br>{{ loan.loan_number }}</td>
+                <td width="50%"><b>Date of Agreement</b><br>{{ loan.issue_date|date:"d/m/Y" }}</td>
             </tr>
             <tr>
-                <th>Borrower Name</th>
-                <td class="highlight">{{ customer.first_name }} {{ customer.last_name }}</td>
-                <th>ID Proof Number</th>
-                <td>{{ customer.id_number }}</td>
+                <td><b>Borrower Name</b><br>{{ customer.full_name }}</td>
+                <td><b>ID Proof Number</b><br>{{ customer.id_number }}</td>
             </tr>
             <tr>
-                <th>Address</th>
-                <td colspan="3">{{ customer.address }}, {{ customer.city }}, {{ customer.state }} - {{ customer.pin_code }}</td>
+                <td><b>Address</b><br>
+                    {{ customer.address }}
+                    {% if customer.city %}, {{ customer.city }}{% endif %}
+                    {% if customer.state %}, {{ customer.state }}{% endif %}
+                    {% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}
+                </td>
+                <td>
+                    <b>Phone Number</b><br>{% if customer.phone %}{{ customer.phone }}{% else %}None{% endif %}<br>
+                    <b>Email</b><br>{% if customer.email %}{{ customer.email }}{% else %}None{% endif %}
+                </td>
             </tr>
             <tr>
-                <th>Phone Number</th>
-                <td>{{ customer.phone }}</td>
-                <th>Email</th>
-                <td>{{ customer.email }}</td>
+                <td><b>Principal Amount</b><br>Rs. {{ loan.principal_amount|floatformat:2 }}</td>
+                <td><b>Processing Fee</b><br>Rs. {{ loan.processing_fee|floatformat:2 }}</td>
             </tr>
             <tr>
-                <th>Principal Amount</th>
-                <td class="highlight">Rs. {{ loan.principal_amount|floatformat:2 }}</td>
-                <th>Processing Fee</th>
-                <td>Rs. {{ loan.processing_fee|floatformat:2 }}</td>
+                <td><b>Distribution Amount</b><br>Rs. {{ loan.distribution_amount|floatformat:2 }}</td>
+                <td><b>Interest Rate</b><br>{{ loan.interest_rate|floatformat:2 }}% per annum</td>
             </tr>
             <tr>
-                <th>Distribution Amount</th>
-                <td>Rs. {{ loan.distribution_amount|floatformat:2 }}</td>
-                <th>Issue Date</th>
-                <td>{{ loan.issue_date|date:"d/m/Y" }}</td>
+                <td><b>Total Payable Amount</b><br>Rs. {{ loan.total_payable|floatformat:2 }}</td>
+                <td><b>Loan Term</b><br>1 Year</td>
             </tr>
             <tr>
-                <th>Total Payable Amount</th>
-                <td class="highlight">Rs. {{ loan.total_payable|floatformat:2 }}</td>
-                <th>Interest Rate</th>
-                <td>{{ loan.interest_rate }}% per annum</td>
+                <td><b>Issue Date</b><br>{{ loan.issue_date|date:"d/m/Y" }}</td>
+                <td><b>Due Date</b><br>{{ loan.due_date|date:"d/m/Y" }}</td>
             </tr>
             <tr>
-                <th>Due Date</th>
-                <td class="highlight">{{ loan.due_date|date:"d/m/Y" }}</td>
-                <th>Grace Period End</th>
-                <td>{{ loan.grace_period_end|date:"d/m/Y" }}</td>
+                <td colspan="2"><b>Grace Period End</b><br>{{ loan.grace_period_end|date:"d/m/Y" }}</td>
             </tr>
         </table>
-    </div>
-
-    <div class="section">
-        <div class="section-title">PLEDGED ITEMS</div>
-        <table class="items-table">
+        
+        <table class="gold-table">
             <thead>
                 <tr>
                     <th>Item Description</th>
                     <th>Gold Karat</th>
                     <th>Gross Weight (g)</th>
                     <th>Net Weight (g)</th>
+                    <th>Value (Rs.)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in loan_items %}
                 <tr>
-                    <td>{{ item.item.name }}</td>
+                    <td>{{ item.item.description }}</td>
                     <td>{{ item.gold_karat }}K</td>
                     <td>{{ item.gross_weight|floatformat:3 }}</td>
                     <td>{{ item.net_weight|floatformat:3 }}</td>
+                    <td>{{ item.net_weight|multiply:item.market_price_22k|floatformat:2 }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-
-    <div class="terms">
-        <div class="term-title">Terms & Conditions</div>
         
-        <ol>
-            <li>The Borrower affirms that the pledged article is their own property and is not stolen or encumbered.</li>
+        <div class="terms-section">
+            <h3>TERMS AND CONDITIONS</h3>
+            <ol class="terms-list">
+                <li><b>Purpose of Loan:</b> The loan is granted solely on the security of gold ornaments/items deposited as collateral with the lender.
+                The borrower confirms that the gold items pledged are legally owned by the borrower.</li>
+                <li><b>KYC Compliance:</b> The borrower has provided necessary Know Your Customer (KYC) documents as required under RBI
+                guidelines, including proof of identity and address.</li>
+                <li><b>Fair Practices Code:</b> The lender abides by the Fair Practices Code as prescribed by RBI. A copy of the code is available at the
+                branch office.</li>
+                <li><b>Grievance Redressal:</b> Any complaints or grievances can be registered with the branch manager. If not resolved, the borrower
+                can escalate to the designated Grievance Redressal Officer at the head office.</li>
+                <li><b>Declaration:</b> The borrower declares that all information provided is true and correct. The borrower has read and understood all
+                the terms and conditions mentioned herein.</li>
+            </ol>
+        </div>
+        
+        <div class="signatures">
+            <div class="signature-box-left">
+                <div class="signature-line"></div>
+                <p><b>Borrower Signature</b><br>{{ customer.full_name }}</p>
+            </div>
             
-            <li>The Lender will retain the pledged article as security for the loan until full repayment of principal
-and interest.</li>
-            
-            <li>The loan is repayable on or before the due date. If not repaid, the Lender may sell the pledged
-article as per the provisions of the Indian Contract Act, 1872 and the Pawn Brokers Act, 1943.</li>
-            
-            <li>Interest will be charged at the agreed rate. Partial payments may be accepted at the Lender's
-discretion.</li>
-            
-            <li>Loss or damage to the pledged article due to natural calamities, theft, or circumstances beyond the
-Lender's control will not be the responsibility of the Lender.</li>
-            
-            <li>On full repayment, the pledged article will be returned to the Borrower against proper identification
-and this agreement.</li>
-            
-            <li>All disputes are subject to the jurisdiction of the local courts.</li>
-        </ol>
-        <br><br><br>
-    </div>
-
-    <div class="signatures">
-        <table class="signatures-table">
-            <tr>
-                <td class="borrower-signature">
-                    <div class="signature-line"></div>
-                    <p>Borrower Signature<br>
-                    {{ customer.first_name }} {{ customer.last_name }}</p>
-                </td>
-                <td class="authorized-signature">
-                    <div class="signature-line"></div>
-                    <p>Authorized Signatory<br>
-                    {{ branch.name }}</p>
-                </td>
-            </tr>
-        </table>
-    </div>
-
-    <div class="footer">
-        <p>Document generated on: {{ date_today|date:"d/m/Y" }}</p>
+            <div class="signature-box-right">
+                <div class="signature-line"></div>
+                <p><b>Authorized Signatory</b><br>{{ branch.city }}</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Document generated on: {{ date_today|date:"d/m/Y" }}</p>
+        </div>
     </div>
 </body>
 </html>

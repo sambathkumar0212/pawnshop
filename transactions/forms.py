@@ -7,6 +7,7 @@ from accounts.models import Customer
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Div
 from decimal import Decimal
+from django.utils import timezone
 
 class LoanForm(forms.ModelForm):
     distribution_amount = forms.DecimalField(
@@ -42,7 +43,7 @@ class LoanForm(forms.ModelForm):
     )
     item_description = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3}),
-        help_text='Detailed description of the item including any distinguishing marks'
+        help_text='Detailed description of the item including any distinguishing marks, damaged or broken parts'
     )
     item_category = forms.ModelChoiceField(
         required=False,
@@ -206,16 +207,17 @@ class LoanForm(forms.ModelForm):
 
         # Calculate processing fee amount and distribution amount
         principal_amount = cleaned_data.get('principal_amount')
-        processing_fee_percentage = cleaned_data.get('processing_fee')
-        interest_rate = cleaned_data.get('interest_rate')
-
-        if principal_amount and processing_fee_percentage:
-            # Convert percentage to decimal for calculation
-            processing_fee_amount = principal_amount * (processing_fee_percentage / Decimal('100'))
+        
+        if principal_amount:
+            # Processing fee is fixed at 1% of the principal amount
+            processing_fee_amount = principal_amount * Decimal('0.01')
+            # Round to 2 decimal places to avoid validation error
+            processing_fee_amount = processing_fee_amount.quantize(Decimal('0.01'))
             cleaned_data['processing_fee'] = processing_fee_amount
             cleaned_data['distribution_amount'] = principal_amount - processing_fee_amount
 
         # Calculate total payable amount (principal + interest)
+        interest_rate = cleaned_data.get('interest_rate')
         if principal_amount and interest_rate:
             # Interest rate is annual, convert to decimal
             annual_interest_rate = interest_rate / Decimal('100')
@@ -233,9 +235,9 @@ class LoanForm(forms.ModelForm):
             interest_amount = instance.principal_amount * annual_interest_rate
             instance.total_payable = instance.principal_amount + interest_amount
 
-        # Calculate and set distribution_amount
+        # Set distribution_amount
         if instance.principal_amount and instance.processing_fee:
-            # Convert percentage to decimal for calculation (since processing_fee is stored as percentage)
+            # The processing_fee is already stored as an amount at this point, not a percentage
             instance.distribution_amount = instance.principal_amount - instance.processing_fee
         
         if commit:
@@ -246,7 +248,7 @@ class LoanForm(forms.ModelForm):
                 name=self.cleaned_data['item_name'],
                 description=self.cleaned_data['item_description'],
                 category=self.cleaned_data['item_category'],
-                status='pledged',  # Set status to pledged when used in loan
+                status='pawned',  # Set status to pawned when used in loan
                 branch=instance.branch if instance.branch else self.user.branch,
                 created_by=self.user
             )
@@ -273,6 +275,142 @@ class LoanForm(forms.ModelForm):
                         item.save()
                         LoanItem.objects.create(loan=instance, item=item)
         
+        return instance
+
+class LoanExtensionForm(forms.ModelForm):
+    EXTENSION_PERIOD_CHOICES = [
+        (30, '30 Days (1 Month)'),
+        (60, '60 Days (2 Months)'),
+        (90, '90 Days (3 Months)'),
+    ]
+    
+    extension_period = forms.ChoiceField(
+        choices=EXTENSION_PERIOD_CHOICES,
+        initial=30,
+        label="Extension Period",
+        help_text="Choose the period to extend the loan by"
+    )
+    
+    extension_fee = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        initial=0.00,
+        label="Extension Fee",
+        help_text="Fee charged for extending the loan"
+    )
+    
+    new_grace_period_end = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        label="New Grace Period End Date",
+        help_text="The new grace period end date after extension"
+    )
+
+    class Meta:
+        model = LoanExtension
+        fields = ['extension_date', 'new_due_date', 'fee', 'notes']
+        widgets = {
+            'extension_date': forms.DateInput(attrs={'type': 'date'}),
+            'new_due_date': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 3}),
+        }
+        labels = {
+            'extension_date': 'Extension Date',
+            'new_due_date': 'New Due Date',
+            'fee': 'Extension Fee',
+            'notes': 'Notes'
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.loan = kwargs.pop('loan', None)
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Setup form helper for crispy forms
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        
+        # Set default dates if loan is provided
+        if self.loan:
+            # Map fee to extension_fee for template
+            self.fields['extension_fee'] = self.fields.pop('fee')
+            
+            # Set default values
+            self.initial['extension_date'] = timezone.now().date()
+            self.initial['new_due_date'] = self.loan.due_date + timezone.timedelta(days=30)
+            self.initial['new_grace_period_end'] = self.loan.due_date + timezone.timedelta(days=45)  # 15 days grace period
+            
+            # Calculate default extension fee (0.5% of principal amount)
+            self.initial['extension_fee'] = (self.loan.principal_amount * Decimal('0.005')).quantize(Decimal('0.01'))
+            
+    def clean(self):
+        cleaned_data = super().clean()
+        extension_period = int(cleaned_data.get('extension_period', 30))
+        extension_date = cleaned_data.get('extension_date')
+        
+        if not self.loan:
+            raise ValidationError("No loan specified for extension")
+            
+        # Check if loan is active
+        if self.loan.status != 'active':
+            raise ValidationError(f"Cannot extend a loan with status '{self.loan.status}'. Only active loans can be extended.")
+        
+        # Check if loan is not overdue by more than 30 days
+        today = timezone.now().date()
+        if self.loan.due_date < today:
+            days_overdue = (today - self.loan.due_date).days
+            if days_overdue > 30:
+                raise ValidationError(f"Loan is overdue by {days_overdue} days. Extensions are not allowed for loans overdue by more than 30 days.")
+        
+        # Check if this would exceed the maximum of 3 extensions
+        existing_extensions_count = self.loan.extensions.count()
+        if existing_extensions_count >= 3:
+            raise ValidationError(f"Maximum of 3 extensions allowed per loan. This loan already has {existing_extensions_count} extensions.")
+        
+        # Calculate new due date based on extension period
+        if extension_date and self.loan:
+            new_due_date = self.loan.due_date + timezone.timedelta(days=extension_period)
+            cleaned_data['new_due_date'] = new_due_date
+            
+            # Calculate new grace period end (due date + 15 days)
+            new_grace_period_end = new_due_date + timezone.timedelta(days=15)
+            cleaned_data['new_grace_period_end'] = new_grace_period_end
+            
+        # Validate extension fee (must be at least 0.5% of principal)
+        extension_fee = cleaned_data.get('extension_fee')
+        min_fee = (self.loan.principal_amount * Decimal('0.005')).quantize(Decimal('0.01'))
+        
+        if extension_fee and extension_fee < min_fee:
+            self.add_error('extension_fee', f"Extension fee must be at least 0.5% of the principal amount (₹{min_fee}).")
+        
+        # Map extension_fee back to fee for model
+        if 'extension_fee' in cleaned_data:
+            cleaned_data['fee'] = cleaned_data.pop('extension_fee')
+            
+        # Set previous due date
+        cleaned_data['previous_due_date'] = self.loan.due_date
+        
+        return cleaned_data
+        
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        # Set loan and previous due date
+        instance.loan = self.loan
+        instance.previous_due_date = self.loan.due_date
+        
+        # Set approved_by to current user
+        if self.user:
+            instance.approved_by = self.user
+            
+        if commit:
+            instance.save()
+            
+            # Update the loan with new due date and status
+            self.loan.due_date = instance.new_due_date
+            self.loan.grace_period_end = instance.new_due_date + timezone.timedelta(days=15)
+            self.loan.status = 'extended'
+            self.loan.save()
+            
         return instance
 
 class SaleForm(forms.ModelForm):

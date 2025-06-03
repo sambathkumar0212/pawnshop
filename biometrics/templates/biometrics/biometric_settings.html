@@ -90,18 +90,20 @@
                                 <tr>
                                     <td>{{ branch.name }}</td>
                                     <td>
-                                        {% if branch.biometric_settings.face_recognition_enabled %}
-                                            <span class="badge bg-success">Enabled</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">Disabled</span>
-                                        {% endif %}
+                                        {% with settings=branch.biometric_settings.all|first %}
+                                            {% if settings and settings.face_recognition_enabled %}
+                                                <span class="badge bg-success">Enabled</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Disabled</span>
+                                            {% endif %}
                                     </td>
                                     <td>
-                                        {% if branch.biometric_settings.fingerprint_enabled %}
-                                            <span class="badge bg-success">Enabled</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">Disabled</span>
-                                        {% endif %}
+                                            {% if settings and settings.fingerprint_enabled %}
+                                                <span class="badge bg-success">Enabled</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Disabled</span>
+                                            {% endif %}
+                                        {% endwith %}
                                     </td>
                                     <td>
                                         <a href="{% url 'branch_biometric_settings' branch.id %}" class="btn btn-sm btn-outline-primary">

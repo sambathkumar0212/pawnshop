@@ -62,7 +62,7 @@
                                     {% elif loan.status == 'defaulted' %}danger
                                     {% elif loan.status == 'extended' %}warning
                                     {% else %}secondary{% endif %}">
-                                    {{ loan.get_status_display }}
+                                    {{ loan.status|title }}
                                 </span>
                             </p>
                         </div>
@@ -114,6 +114,20 @@
                             <label class="text-muted">Grace Period End</label>
                             <p class="mb-0">{{ loan.grace_period_end|date:"M d, Y" }}</p>
                         </div>
+                        <!-- Add Payment Status -->
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Payment Status</label>
+                            <p class="mb-0">{{ loan.payment_status_display }}</p>
+                        </div>
+                        <!-- Add Amount Paid and Remaining Balance -->
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Amount Paid</label>
+                            <p class="mb-0">₹{{ loan.amount_paid|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="text-muted">Remaining Balance</label>
+                            <p class="mb-0">₹{{ loan.remaining_balance|floatformat:2 }}</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -157,6 +171,45 @@
 
         <!-- Payment History and Extensions -->
         <div class="col-lg-4">
+            <!-- Payment Summary Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Payment Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 20px;">
+                        {% if loan.total_payable > 0 %}
+                            {% with percentage=loan.amount_paid|floatformat:0|slugify|add:".0"|stringformat:"s"|slice:":-2" %}
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ percentage }}%;" 
+                                aria-valuenow="{{ percentage }}" aria-valuemin="0" aria-valuemax="100">{{ percentage }}%</div>
+                            {% endwith %}
+                        {% else %}
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 0%;" 
+                                aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Principal</small>
+                            <p class="mb-0">₹{{ loan.principal_amount|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Interest</small>
+                            <p class="mb-0">₹{{ loan.total_interest|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Total Paid</small>
+                            <p class="mb-0">₹{{ loan.amount_paid|floatformat:2 }}</p>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Remaining</small>
+                            <p class="mb-0">₹{{ loan.remaining_balance|floatformat:2 }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Payment History -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">

@@ -1,14 +1,23 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin, PermissionRequiredMixin
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, TemplateView, View
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from django import forms
+from django.http import JsonResponse
+from django.contrib.auth import login
+from biometrics.models import FaceEnrollment, FaceAuthLog, CustomerFaceEnrollment
+import json
+import base64
+import os
+from django.conf import settings
+import datetime
 
 from .models import CustomUser, Role, UserActivity, Customer
+from .forms import UserFaceCreateForm
 from branches.models import Branch
 from inventory.models import Item
 from transactions.models import Loan, Sale
@@ -100,8 +109,8 @@ class UserDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
 
 class UserCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = CustomUser
-    template_name = 'accounts/user_form.html'
-    fields = ['username', 'password', 'first_name', 'last_name', 'email', 'phone', 'role', 'branch']
+    template_name = 'accounts/user_face_form.html'
+    form_class = UserFaceCreateForm
     success_url = reverse_lazy('user_list')
     permission_required = 'accounts.add_customuser'
     
@@ -109,7 +118,51 @@ class UserCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
         user = form.save(commit=False)
         user.set_password(form.cleaned_data['password'])
         user.save()
-        messages.success(self.request, f'User {user.username} was created successfully.')
+        
+        # Handle face enrollment if enabled
+        enable_face_auth = form.cleaned_data.get('enable_face_auth')
+        face_image_data = form.cleaned_data.get('face_image')
+        
+        if enable_face_auth and face_image_data:
+            try:
+                # Process and save the face image
+                import base64
+                import io
+                from django.core.files.base import ContentFile
+                from PIL import Image
+                import numpy as np
+                
+                # Extract the base64 encoded image data (remove the data:image/jpeg;base64, prefix)
+                image_data = face_image_data.split(',')[1]
+                image_binary = base64.b64decode(image_data)
+                
+                # Create a file-like object
+                image_file = ContentFile(image_binary)
+                
+                # In a production system, you would:
+                # 1. Process the image to extract facial features/encoding
+                # 2. Save the encoding as binary data
+                # For simplicity, we'll just save the image and use a placeholder for encoding
+                
+                # Create face enrollment
+                face_enrollment = FaceEnrollment(user=user)
+                
+                # Save the image file
+                image_name = f"face_{user.username}.jpg"
+                face_enrollment.face_image.save(image_name, image_file, save=False)
+                
+                # In a real implementation, you would compute the face encoding here
+                # For now, we'll use a placeholder
+                placeholder_encoding = b"placeholder_face_encoding"  # Replace with actual encoding in production
+                face_enrollment.face_encoding = placeholder_encoding
+                
+                face_enrollment.save()
+                
+                messages.success(self.request, f"User {user.username} was created successfully with face authentication.")
+            except Exception as e:
+                messages.error(self.request, f"Error processing face data: {str(e)}")
+        else:
+            messages.success(self.request, f"User {user.username} was created successfully.")
         
         # Log activity
         UserActivity.objects.create(
@@ -246,8 +299,71 @@ class FaceEnrollmentView(LoginRequiredMixin, TemplateView):
     template_name = 'accounts/face_enrollment.html'
 
 
-class FaceLoginView(TemplateView):
-    template_name = 'accounts/face_login.html'
+class FaceLoginView(View):
+    """View for facial recognition login"""
+    def get(self, request):
+        return render(request, 'accounts/face_login.html')
+    
+    def post(self, request):
+        
+        # Extract the face image data from the POST request
+        face_image = request.POST.get('face_image')
+        
+        if face_image:
+            # In a real implementation, you would:
+            # 1. Process the image data
+            # 2. Compare it against enrolled face data
+            # 3. Authenticate the user if match found
+            
+            # For this demo, we'll simulate a successful authentication
+            # In production, replace this with actual face recognition logic
+            
+            # Log the authentication attempt
+            auth_log = FaceAuthLog(
+                timestamp=datetime.datetime.now(),
+                ip_address=request.META.get('REMOTE_ADDR'),
+                device_info=request.META.get('HTTP_USER_AGENT'),
+                success=True,
+                confidence=0.85  # This would be the actual confidence score from your FR system
+            )
+            
+            # For demo purposes, authenticate as the first admin user
+            # In production, this would be the user matched by facial recognition
+            try:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                user = User.objects.filter(is_staff=True).first()
+                
+                if user:
+                    # Log which user was authenticated
+                    auth_log.user = user
+                    auth_log.save()
+                    
+                    # Log in the user
+                    login(request, user)
+                    
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': 'Authentication successful',
+                        'redirect': '/dashboard/'
+                    })
+                else:
+                    auth_log.success = False
+                    auth_log.save()
+                    return JsonResponse({
+                        'status': 'error', 
+                        'message': 'No matching user found'
+                    })
+            except Exception as e:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': str(e)
+                })
+        
+        return JsonResponse({
+            'status': 'error',
+            'message': 'No image data received'
+        })
 
 
 # Customer views

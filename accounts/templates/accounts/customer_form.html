@@ -3,6 +3,37 @@
 
 {% block title %}{% if form.instance.pk %}Edit Customer{% else %}Add New Customer{% endif %} - Pawnshop Management{% endblock %}
 
+{% block extra_head %}
+<style>
+    #camera-container {
+        width: 100%;
+        max-width: 500px;
+        margin: 0 auto;
+        position: relative;
+    }
+    #camera-view {
+        width: 100%;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        display: none;
+    }
+    #camera-controls {
+        text-align: center;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        display: none;
+    }
+    #captured-image {
+        display: none;
+        max-width: 100%;
+        max-height: 300px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -91,13 +122,41 @@
                                 {{ form.id_number|as_crispy_field }}
                             </div>
                             <div class="col-12">
-                                {{ form.id_image|as_crispy_field }}
-                                {% if form.instance.id_image %}
-                                <div class="mt-2">
-                                    <img src="{{ form.instance.id_image.url }}" alt="ID Image" class="img-thumbnail" style="max-height: 200px;">
+                                <div class="mb-3">
+                                    <label class="form-label">ID Image</label>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <button type="button" id="open-camera-btn" class="btn btn-outline-primary mb-2 w-100">
+                                                <i class="fas fa-camera me-2"></i>Take Photo
+                                            </button>
+                                            <div id="camera-container">
+                                                <video id="camera-view" autoplay playsinline></video>
+                                                <div id="camera-controls">
+                                                    <button type="button" id="capture-btn" class="btn btn-primary me-2">
+                                                        <i class="fas fa-camera me-2"></i>Capture
+                                                    </button>
+                                                    <button type="button" id="cancel-camera-btn" class="btn btn-outline-secondary">
+                                                        <i class="fas fa-times me-2"></i>Cancel
+                                                    </button>
+                                                </div>
+                                                <canvas id="capture-canvas" style="display:none;"></canvas>
+                                                <img id="captured-image" alt="Captured ID Image">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-2">Or upload image file:</div>
+                                            {{ form.id_image }}
+                                            {% if form.instance.id_image %}
+                                            <div class="mt-2">
+                                                <img src="{{ form.instance.id_image.url }}" alt="ID Image" class="img-thumbnail" style="max-height: 200px;">
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="camera-image-data" name="camera_image_data">
                                 </div>
-                                {% endif %}
                             </div>
+
                         </div>
 
                         <div class="row mb-4">
@@ -126,4 +185,99 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // DOM elements
+        const openCameraBtn = document.getElementById('open-camera-btn');
+        const cancelCameraBtn = document.getElementById('cancel-camera-btn');
+        const captureBtn = document.getElementById('capture-btn');
+        const cameraView = document.getElementById('camera-view');
+        const cameraControls = document.getElementById('camera-controls');
+        const captureCanvas = document.getElementById('capture-canvas');
+        const capturedImage = document.getElementById('captured-image');
+        const cameraImageData = document.getElementById('camera-image-data');
+        const idImageInput = document.querySelector('[name="id_image"]');
+        
+        let stream = null;
+
+        // Function to start the camera
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                cameraView.srcObject = stream;
+                cameraView.style.display = 'block';
+                cameraControls.style.display = 'block';
+                openCameraBtn.style.display = 'none';
+            } catch (err) {
+                console.error("Error accessing the camera: ", err);
+                alert("Could not access the camera. Please make sure you've granted permission or try using the file upload option.");
+            }
+        }
+
+        // Function to stop the camera
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                cameraView.style.display = 'none';
+                cameraControls.style.display = 'none';
+                openCameraBtn.style.display = 'block';
+            }
+        }
+
+        // Function to capture image from camera
+        function captureImage() {
+            const context = captureCanvas.getContext('2d');
+            
+            // Set canvas dimensions to match the video
+            captureCanvas.width = cameraView.videoWidth;
+            captureCanvas.height = cameraView.videoHeight;
+            
+            // Draw the current video frame to the canvas
+            context.drawImage(cameraView, 0, 0, captureCanvas.width, captureCanvas.height);
+            
+            // Convert canvas to image data URL
+            const imageDataUrl = captureCanvas.toDataURL('image/jpeg');
+            
+            // Display the captured image
+            capturedImage.src = imageDataUrl;
+            capturedImage.style.display = 'block';
+            
+            // Store the image data in the hidden input for form submission
+            cameraImageData.value = imageDataUrl;
+            
+            // Clear any previously selected file
+            if (idImageInput.value) {
+                idImageInput.value = '';
+            }
+            
+            // Stop the camera stream
+            stopCamera();
+        }
+
+        // Event listeners
+        openCameraBtn.addEventListener('click', startCamera);
+        cancelCameraBtn.addEventListener('click', stopCamera);
+        captureBtn.addEventListener('click', captureImage);
+        
+        // Handle form submission with camera image
+        document.querySelector('form').addEventListener('submit', function(e) {
+            // If a file was selected after capturing an image, clear the captured image data
+            if (idImageInput.files && idImageInput.files.length > 0) {
+                cameraImageData.value = '';
+                capturedImage.style.display = 'none';
+            }
+        });
+    });
+</script>
 {% endblock %}

@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.contrib import messages
 from django.utils import timezone
-from django.db.models import Count
+from django.db.models import Count, Avg
 from .models import BiometricSetting, FaceEnrollment, CustomerFaceEnrollment, FaceAuthLog
 from branches.models import Branch
 from django.contrib.auth import get_user_model
@@ -75,6 +75,29 @@ class BiometricSettingsView(LoginRequiredMixin, TemplateView):
         
         # Get global settings (using first branch as default if exists)
         context['settings'] = BiometricSetting.objects.first()
+        
+        # Get all branches with their biometric settings
+        branches = Branch.objects.all()
+        
+        # Ensure each branch has associated biometric settings
+        for branch in branches:
+            # Create biometric settings for branch if they don't exist
+            BiometricSetting.objects.get_or_create(
+                branch=branch,
+                defaults={
+                    'min_confidence': 0.6,
+                    'max_attempts': 3,
+                    'lockout_duration': timezone.timedelta(minutes=30),
+                    'require_liveness': True,
+                    'allow_customer_enrollment': True,
+                    'face_recognition_enabled': False,
+                    'fingerprint_enabled': False,
+                    'face_recognition_required_for_staff': False,
+                    'face_recognition_required_for_customers': False,
+                }
+            )
+        
+        # Now fetch all branches again with their settings properly prefetched
         context['branches'] = Branch.objects.prefetch_related('biometric_settings').all()
 
         # Calculate enrollment statistics
@@ -132,14 +155,173 @@ class BranchBiometricSettingsView(LoginRequiredMixin, TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['branch_id'] = self.kwargs.get('branch_id')
+        branch_id = self.kwargs.get('branch_id')
+        
+        try:
+            branch = Branch.objects.get(id=branch_id)
+            context['branch'] = branch
+            
+            # Get or initialize branch-specific biometric settings
+            branch_settings, created = BiometricSetting.objects.get_or_create(
+                branch=branch,
+                defaults={
+                    'min_confidence': 0.6,
+                    'max_attempts': 3,
+                    'lockout_duration': timezone.timedelta(minutes=30),
+                    'require_liveness': True,
+                    'allow_customer_enrollment': True,
+                    'face_recognition_enabled': True,
+                    'fingerprint_enabled': False,
+                    'face_recognition_required_for_staff': False,
+                    'face_recognition_required_for_customers': False,
+                }
+            )
+            
+            context['branch_settings'] = branch_settings
+            if created:
+                messages.info(self.request, f"Initial biometric settings created for {branch.name}.")
+                
+        except Branch.DoesNotExist:
+            messages.error(self.request, f"Branch with ID {branch_id} not found.")
+            context['branch'] = None
+            context['branch_settings'] = None
+            
         return context
-
+    
+    def post(self, request, *args, **kwargs):
+        branch_id = self.kwargs.get('branch_id')
+        
+        try:
+            branch = Branch.objects.get(id=branch_id)
+            
+            # Get or create branch settings
+            branch_settings, created = BiometricSetting.objects.get_or_create(branch=branch)
+            
+            # Update settings from form data
+            branch_settings.face_recognition_enabled = request.POST.get('face_recognition_enabled') == 'on'
+            branch_settings.face_recognition_required_for_staff = request.POST.get('face_recognition_required_for_staff') == 'on'
+            branch_settings.face_recognition_required_for_customers = request.POST.get('face_recognition_required_for_customers') == 'on'
+            branch_settings.fingerprint_enabled = request.POST.get('fingerprint_enabled') == 'on'
+            branch_settings.require_liveness = request.POST.get('require_liveness') == 'on'
+            branch_settings.allow_customer_enrollment = request.POST.get('allow_customer_enrollment') == 'on'
+            
+            # Handle numeric values
+            if min_confidence := request.POST.get('min_confidence'):
+                branch_settings.min_confidence = float(min_confidence)
+            
+            if max_attempts := request.POST.get('max_attempts'):
+                branch_settings.max_attempts = int(max_attempts)
+            
+            if lockout_minutes := request.POST.get('lockout_duration_minutes'):
+                branch_settings.lockout_duration = timezone.timedelta(minutes=int(lockout_minutes))
+            
+            # Save who updated the settings
+            branch_settings.updated_by = request.user
+            branch_settings.save()
+            
+            messages.success(request, f"Biometric settings for {branch.name} updated successfully.")
+            
+        except Branch.DoesNotExist:
+            messages.error(request, f"Branch with ID {branch_id} not found.")
+        except Exception as e:
+            messages.error(request, f"Error updating branch settings: {str(e)}")
+        
+        return redirect('branch_biometric_settings', branch_id=branch_id)
 
 class BiometricLogListView(LoginRequiredMixin, ListView):
     template_name = 'biometrics/biometric_logs.html'
     context_object_name = 'logs'
+    paginate_by = 20  # Show 20 logs per page
     
     def get_queryset(self):
-        # This would fetch actual biometric logs
-        return []
+        queryset = FaceAuthLog.objects.all().order_by('-timestamp')
+        
+        # Apply filters based on GET parameters
+        if date_from := self.request.GET.get('date_from'):
+            queryset = queryset.filter(timestamp__gte=date_from)
+            
+        if date_to := self.request.GET.get('date_to'):
+            queryset = queryset.filter(timestamp__lte=date_to)
+            
+        if success := self.request.GET.get('success'):
+            queryset = queryset.filter(success=(success == 'true'))
+            
+        if user_type := self.request.GET.get('type'):
+            if user_type == 'staff':
+                queryset = queryset.exclude(user__isnull=True)
+            elif user_type == 'customer':
+                queryset = queryset.exclude(customer__isnull=True)
+                
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Get all logs for calculating statistics (regardless of pagination)
+        all_logs = self.get_queryset()
+        total_logs = all_logs.count()
+        successful_logs = all_logs.filter(success=True).count()
+        
+        # Calculate statistics for dashboard cards
+        context['total_logs'] = total_logs
+        context['success_rate'] = round((successful_logs / total_logs) * 100) if total_logs > 0 else 0
+        
+        # Recent failures (in the last 24 hours)
+        one_day_ago = timezone.now() - timezone.timedelta(days=1)
+        context['recent_failures'] = all_logs.filter(
+            success=False, 
+            timestamp__gte=one_day_ago
+        ).count()
+        
+        # Average confidence score (only for successful authentications)
+        avg_confidence = all_logs.filter(
+            success=True, 
+            confidence__isnull=False
+        ).aggregate(Avg('confidence'))['confidence__avg']
+        
+        context['avg_confidence'] = avg_confidence if avg_confidence else 0
+        
+        return context
+        
+    def render_to_response(self, context, **response_kwargs):
+        # Check if CSV export is requested
+        if self.request.GET.get('export') == 'csv':
+            return self.export_csv(context['logs'])
+        return super().render_to_response(context, **response_kwargs)
+        
+    def export_csv(self, logs):
+        import csv
+        from django.http import HttpResponse
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="biometric_logs.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'Timestamp', 'User Type', 'User/Customer', 'Success', 
+            'Confidence', 'IP Address', 'Device Info'
+        ])
+        
+        for log in logs:
+            # Determine user type and name
+            if log.user:
+                user_type = 'Staff'
+                name = log.user.get_full_name() or log.user.username
+            elif log.customer:
+                user_type = 'Customer'
+                name = log.customer.get_full_name()
+            else:
+                user_type = 'Unknown'
+                name = 'Unknown'
+                
+            writer.writerow([
+                log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                user_type,
+                name,
+                'Success' if log.success else 'Failed',
+                f"{log.confidence:.2f}" if log.confidence else 'N/A',
+                log.ip_address or 'N/A',
+                log.device_info or 'N/A',
+            ])
+            
+        return response

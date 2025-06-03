@@ -62,6 +62,40 @@ class Loan(models.Model):
             return 0
         delta = self.due_date - timezone.now().date()
         return max(0, delta.days)
+        
+    @property
+    def total_interest(self):
+        """Calculate the total interest amount"""
+        return self.total_payable - self.principal_amount - self.processing_fee
+        
+    @property
+    def amount_paid(self):
+        """Calculate the total amount paid so far"""
+        return self.payments.aggregate(models.Sum('amount'))['amount__sum'] or 0
+        
+    @property
+    def remaining_balance(self):
+        """Calculate the remaining amount to be paid"""
+        return self.total_payable - self.amount_paid
+        
+    @property
+    def is_in_grace_period(self):
+        """Check if the loan is in grace period"""
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.due_date < today <= self.grace_period_end and self.status == 'active'
+        
+    @property
+    def payment_status_display(self):
+        """Returns a human-readable payment status"""
+        if self.status == 'repaid':
+            return "Fully Paid"
+        elif self.amount_paid >= self.principal_amount:
+            return "Principal Recovered"
+        elif self.amount_paid > 0:
+            return "Partially Paid"
+        else:
+            return "No Payments"
 
 class LoanItem(models.Model):
     """Model to track items in a loan with their gold details"""

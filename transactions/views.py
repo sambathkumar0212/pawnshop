@@ -9,7 +9,7 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 from io import BytesIO
 from .models import Loan, Payment, LoanExtension, Sale
-from .forms import LoanForm, SaleForm
+from .forms import LoanForm, SaleForm, LoanExtensionForm
 
 # Basic placeholder views for the transactions app
 # These will need to be implemented properly with the correct models
@@ -129,7 +129,52 @@ class LoanUpdateView(LoginRequiredMixin, UpdateView):
 
 
 class LoanExtensionCreateView(LoginRequiredMixin, CreateView):
+    model = LoanExtension
     template_name = 'transactions/loan_extension_form.html'
+    form_class = LoanExtensionForm
+    
+    def get_object_loan(self):
+        loan_identifier = self.kwargs.get('loan_number')
+        
+        # First try to find by loan_number (UUID)
+        try:
+            return Loan.objects.get(loan_number=loan_identifier)
+        except Loan.DoesNotExist:
+            # If not found, try to find by primary key (ID)
+            try:
+                if loan_identifier.isdigit():
+                    return Loan.objects.get(pk=int(loan_identifier))
+            except (Loan.DoesNotExist, ValueError):
+                pass
+            
+            # If we get here, the loan doesn't exist
+            raise Http404("No Loan matches the given query.")
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['loan'] = self.get_object_loan()
+        return context
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['loan'] = self.get_object_loan()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
+    def form_valid(self, form):
+        loan = self.get_object_loan()
+        form.instance.loan = loan
+        form.instance.previous_due_date = loan.due_date
+        form.instance.approved_by = self.request.user
+        
+        # Update the loan status, due date and grace period end
+        loan.status = 'extended'
+        loan.due_date = form.instance.new_due_date
+        loan.grace_period_end = form.cleaned_data.get('new_grace_period_end')
+        loan.save()
+        
+        messages.success(self.request, f'Loan #{loan.loan_number} has been extended successfully.')
+        return super().form_valid(form)
     
     def get_success_url(self):
         return reverse('loan_detail', kwargs={'loan_number': self.kwargs['loan_number']})
@@ -289,6 +334,38 @@ class LoanDocumentView(LoginRequiredMixin, View):
         # Get loan items with gold details
         loan_items = loan.loanitem_set.all()
         
+        # Process customer photo (remove the data:image/jpeg;base64, prefix if present)
+        customer_photo = None
+        if hasattr(loan, 'customer_face_capture') and loan.customer_face_capture:
+            if loan.customer_face_capture.startswith('data:image/jpeg;base64,'):
+                customer_photo = loan.customer_face_capture.replace('data:image/jpeg;base64,', '')
+            else:
+                customer_photo = loan.customer_face_capture
+                
+        # Process item photos (parse JSON string if needed)
+        item_photos = []
+        if hasattr(loan, 'item_photos') and loan.item_photos:
+            import json
+            try:
+                # If stored as JSON string
+                if isinstance(loan.item_photos, str):
+                    photo_list = json.loads(loan.item_photos)
+                    for photo in photo_list:
+                        if photo.startswith('data:image/jpeg;base64,'):
+                            item_photos.append(photo.replace('data:image/jpeg;base64,', ''))
+                        else:
+                            item_photos.append(photo)
+                # If already a list or similar iterable
+                elif hasattr(loan.item_photos, '__iter__'):
+                    for photo in loan.item_photos:
+                        if photo.startswith('data:image/jpeg;base64,'):
+                            item_photos.append(photo.replace('data:image/jpeg;base64,', ''))
+                        else:
+                            item_photos.append(photo)
+            except (json.JSONDecodeError, AttributeError):
+                # If there's an error parsing, leave item_photos empty
+                pass
+        
         # Prepare context for PDF template
         context = {
             'loan': loan,
@@ -296,6 +373,8 @@ class LoanDocumentView(LoginRequiredMixin, View):
             'customer': loan.customer,
             'branch': loan.branch,
             'date_today': timezone.now().date(),
+            'customer_photo': customer_photo,
+            'item_photos': item_photos
         }
         
         # Render the PDF template

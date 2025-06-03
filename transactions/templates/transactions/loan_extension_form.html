@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
-{% block title %}Foreclose Loan - Pawnshop Management{% endblock %}
+{% block title %}Extend Loan - Pawnshop Management{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -9,10 +9,10 @@
         <div class="col">
             <div class="d-flex justify-content-between align-items-center">
                 <h2>
-                    <i class="fas fa-gavel me-2"></i>
-                    Foreclose Loan
+                    <i class="fas fa-calendar-plus me-2"></i>
+                    Extend Loan
                 </h2>
-                <a href="{% url 'loan_detail' loan_number=object.loan_number %}" class="btn btn-outline-secondary">
+                <a href="{% url 'loan_detail' loan_number=loan.loan_number %}" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left me-2"></i>Back to Loan Details
                 </a>
             </div>
@@ -22,51 +22,51 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">Loan Foreclosure Confirmation</h5>
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Loan Extension Details</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <strong>Warning:</strong> Foreclosing a loan means the collateral will be transferred to the pawnshop
-                        as the borrower failed to repay the loan. This action cannot be undone.
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> Extending a loan will create a new due date based on the extension period. 
+                        Additional fees may apply.
                     </div>
 
                     <div class="loan-details mb-4">
-                        <h5>Loan Information</h5>
+                        <h5>Current Loan Information</h5>
                         <table class="table table-bordered">
                             <tr>
                                 <th width="30%">Loan Number</th>
-                                <td>{{ object.loan_number }}</td>
+                                <td>{{ loan.loan_number }}</td>
                             </tr>
                             <tr>
                                 <th>Customer</th>
-                                <td>{{ object.customer }}</td>
+                                <td>{{ loan.customer }}</td>
                             </tr>
                             <tr>
                                 <th>Principal Amount</th>
-                                <td>₹{{ object.principal_amount }}</td>
+                                <td>₹{{ loan.principal_amount }}</td>
                             </tr>
                             <tr>
-                                <th>Issue Date</th>
-                                <td>{{ object.issue_date }}</td>
+                                <th>Item</th>
+                                <td>{{ loan.item_name }}</td>
                             </tr>
                             <tr>
-                                <th>Due Date</th>
-                                <td>{{ object.due_date }}</td>
+                                <th>Current Due Date</th>
+                                <td>{{ loan.due_date }}</td>
                             </tr>
                             <tr>
                                 <th>Grace Period End</th>
-                                <td>{{ object.grace_period_end }}</td>
+                                <td>{{ loan.grace_period_end }}</td>
                             </tr>
                             <tr>
                                 <th>Current Status</th>
-                                <td>{{ object.get_status_display }}</td>
+                                <td>{{ loan.get_status_display }}</td>
                             </tr>
                         </table>
                     </div>
 
-                    <form method="post" id="foreclosureForm" novalidate>
+                    <form method="post" id="extensionForm" novalidate>
                         {% csrf_token %}
                         <input type="hidden" name="face_verification_status" id="faceVerificationStatus" value="">
                         
@@ -108,20 +108,34 @@
                             </div>
                         </div>
                         
-                        <div class="form-group">
-                            {{ form.status|as_crispy_field }}
-                            <div class="form-text text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Select "Foreclosed" to complete this process.
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.extension_period|as_crispy_field }}
                             </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.extension_fee|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.new_due_date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.new_grace_period_end|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            {{ form.notes|as_crispy_field }}
                         </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <a href="{% url 'loan_detail' loan_number=object.loan_number %}" class="btn btn-outline-secondary me-md-2">
+                            <a href="{% url 'loan_detail' loan_number=loan.loan_number %}" class="btn btn-outline-secondary me-md-2">
                                 <i class="fas fa-times me-2"></i>Cancel
                             </a>
-                            <button type="submit" class="btn btn-danger" id="confirmBtn">
-                                <i class="fas fa-gavel me-2"></i>Confirm Foreclosure
+                            <button type="submit" class="btn btn-info text-white" id="confirmBtn">
+                                <i class="fas fa-calendar-plus me-2"></i>Confirm Extension
                             </button>
                         </div>
                     </form>
@@ -145,6 +159,46 @@
         const faceVerificationStatus = document.getElementById('faceVerificationStatus');
         let stream = null;
         let faceVerified = false;
+        
+        // Extension date calculation
+        const extensionPeriodField = document.getElementById('id_extension_period');
+        const newDueDateField = document.getElementById('id_new_due_date');
+        const newGracePeriodEndField = document.getElementById('id_new_grace_period_end');
+        
+        // Listen for changes in extension period
+        if (extensionPeriodField) {
+            extensionPeriodField.addEventListener('change', function() {
+                calculateNewDates();
+            });
+        }
+        
+        // Calculate new dates based on extension period
+        function calculateNewDates() {
+            const extensionPeriod = parseInt(extensionPeriodField.value) || 0;
+            const currentDueDate = new Date('{{ loan.due_date|date:"Y-m-d" }}');
+            
+            if (extensionPeriod > 0) {
+                // Calculate new due date
+                const newDueDate = new Date(currentDueDate);
+                newDueDate.setDate(newDueDate.getDate() + extensionPeriod);
+                
+                // Calculate new grace period (usually 7 days after due date)
+                const newGracePeriod = new Date(newDueDate);
+                newGracePeriod.setDate(newGracePeriod.getDate() + 7);
+                
+                // Format dates for input fields (YYYY-MM-DD)
+                newDueDateField.value = formatDate(newDueDate);
+                newGracePeriodEndField.value = formatDate(newGracePeriod);
+            }
+        }
+        
+        // Format date as YYYY-MM-DD
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
         
         // Toggle face verification section
         enableFaceVerification.addEventListener('change', function() {
@@ -228,7 +282,7 @@
                 type: 'POST',
                 data: {
                     'face_image': imageData,
-                    'customer_id': {{ object.customer.id }},
+                    'customer_id': {{ loan.customer.id }},
                     'csrfmiddlewaretoken': '{{ csrf_token }}'
                 },
                 success: function(response) {
@@ -258,7 +312,7 @@
         }
         
         // Form submission validation
-        $('#foreclosureForm').on('submit', function(e) {
+        $('#extensionForm').on('submit', function(e) {
             // If face verification is enabled but not completed, prevent form submission
             if (enableFaceVerification.checked && !faceVerified) {
                 e.preventDefault();
@@ -266,6 +320,9 @@
                 return false;
             }
         });
+        
+        // Calculate initial dates
+        calculateNewDates();
         
         // Clean up camera when leaving page
         $(window).on('beforeunload', function() {
