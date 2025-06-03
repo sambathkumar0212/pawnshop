@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Foreclose Loan - Pawnshop Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="fas fa-gavel me-2"></i>
+                    Foreclose Loan
+                </h2>
+                <a href="{% url 'loan_detail' loan_number=object.loan_number %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Loan Details
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Loan Foreclosure Confirmation</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Warning:</strong> Foreclosing a loan means the collateral will be transferred to the pawnshop
+                        as the borrower failed to repay the loan. This action cannot be undone.
+                    </div>
+
+                    <div class="loan-details mb-4">
+                        <h5>Loan Information</h5>
+                        <table class="table table-bordered">
+                            <tr>
+                                <th width="30%">Loan Number</th>
+                                <td>{{ object.loan_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>Customer</th>
+                                <td>{{ object.customer }}</td>
+                            </tr>
+                            <tr>
+                                <th>Principal Amount</th>
+                                <td>₹{{ object.principal_amount }}</td>
+                            </tr>
+                            <tr>
+                                <th>Issue Date</th>
+                                <td>{{ object.issue_date }}</td>
+                            </tr>
+                            <tr>
+                                <th>Due Date</th>
+                                <td>{{ object.due_date }}</td>
+                            </tr>
+                            <tr>
+                                <th>Grace Period End</th>
+                                <td>{{ object.grace_period_end }}</td>
+                            </tr>
+                            <tr>
+                                <th>Current Status</th>
+                                <td>{{ object.get_status_display }}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="form-group">
+                            {{ form.status|as_crispy_field }}
+                            <div class="form-text text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Select "Foreclosed" to complete this process.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{% url 'loan_detail' loan_number=object.loan_number %}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-gavel me-2"></i>Confirm Foreclosure
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

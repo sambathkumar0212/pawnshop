@@ -19,6 +19,9 @@
                     </nav>
                 </div>
                 <div class="btn-group">
+                    <a href="{% url 'loan_document' loan.loan_number %}" class="btn btn-secondary" target="_blank">
+                        <i class="fas fa-file-pdf me-2"></i>Download Agreement
+                    </a>
                     {% if loan.status == 'active' %}
                         <a href="{% url 'payment_create' loan.loan_number %}" class="btn btn-success">
                             <i class="fas fa-dollar-sign me-2"></i>Make Payment

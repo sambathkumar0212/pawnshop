@@ -1,9 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, View
 from django.urls import reverse_lazy, reverse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.utils import timezone
+from django.http import Http404, HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from io import BytesIO
 from .models import Loan, Payment, LoanExtension, Sale
 from .forms import LoanForm, SaleForm
 
@@ -56,8 +60,21 @@ class LoanDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'loan'
     
     def get_object(self):
-        loan_number = self.kwargs.get('loan_number')
-        return get_object_or_404(Loan, loan_number=loan_number)
+        loan_identifier = self.kwargs.get('loan_number')
+        
+        # First try to find by loan_number (UUID)
+        try:
+            return Loan.objects.get(loan_number=loan_identifier)
+        except Loan.DoesNotExist:
+            # If not found, try to find by primary key (ID)
+            try:
+                if loan_identifier.isdigit():
+                    return Loan.objects.get(pk=int(loan_identifier))
+            except (Loan.DoesNotExist, ValueError):
+                pass
+            
+            # If we get here, the loan doesn't exist
+            raise Http404("No Loan matches the given query.")
         
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -81,8 +98,21 @@ class LoanUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'transactions/loan_form.html'
     
     def get_object(self):
-        loan_number = self.kwargs.get('loan_number')
-        return get_object_or_404(Loan, loan_number=loan_number)
+        loan_identifier = self.kwargs.get('loan_number')
+        
+        # First try to find by loan_number (UUID)
+        try:
+            return Loan.objects.get(loan_number=loan_identifier)
+        except Loan.DoesNotExist:
+            # If not found, try to find by primary key (ID)
+            try:
+                if loan_identifier.isdigit():
+                    return Loan.objects.get(pk=int(loan_identifier))
+            except (Loan.DoesNotExist, ValueError):
+                pass
+            
+            # If we get here, the loan doesn't exist
+            raise Http404("No Loan matches the given query.")
     
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -106,7 +136,26 @@ class LoanExtensionCreateView(LoginRequiredMixin, CreateView):
 
 
 class LoanForecloseView(LoginRequiredMixin, UpdateView):
+    model = Loan
     template_name = 'transactions/loan_foreclose_form.html'
+    fields = ['status']
+    
+    def get_object(self):
+        loan_identifier = self.kwargs.get('loan_number')
+        
+        # First try to find by loan_number (UUID)
+        try:
+            return Loan.objects.get(loan_number=loan_identifier)
+        except Loan.DoesNotExist:
+            # If not found, try to find by primary key (ID)
+            try:
+                if loan_identifier.isdigit():
+                    return Loan.objects.get(pk=int(loan_identifier))
+            except (Loan.DoesNotExist, ValueError):
+                pass
+            
+            # If we get here, the loan doesn't exist
+            raise Http404("No Loan matches the given query.")
     
     def get_success_url(self):
         return reverse('loan_list')
@@ -117,15 +166,30 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
     template_name = 'transactions/payment_form.html'
     fields = ['amount', 'payment_method', 'payment_date', 'reference_number', 'notes']
     
+    def get_object_loan(self):
+        loan_identifier = self.kwargs.get('loan_number')
+        
+        # First try to find by loan_number (UUID)
+        try:
+            return Loan.objects.get(loan_number=loan_identifier)
+        except Loan.DoesNotExist:
+            # If not found, try to find by primary key (ID)
+            try:
+                if loan_identifier.isdigit():
+                    return Loan.objects.get(pk=int(loan_identifier))
+            except (Loan.DoesNotExist, ValueError):
+                pass
+            
+            # If we get here, the loan doesn't exist
+            raise Http404("No Loan matches the given query.")
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        loan_number = self.kwargs.get('loan_number')
-        context['loan'] = get_object_or_404(Loan, loan_number=loan_number)
+        context['loan'] = self.get_object_loan()
         return context
     
     def form_valid(self, form):
-        loan_number = self.kwargs.get('loan_number')
-        loan = get_object_or_404(Loan, loan_number=loan_number)
+        loan = self.get_object_loan()
         form.instance.loan = loan
         form.instance.received_by = self.request.user
         response = super().form_valid(form)
@@ -201,3 +265,53 @@ class SaleCancelView(LoginRequiredMixin, UpdateView):
 class SaleReceiptView(LoginRequiredMixin, DetailView):
     template_name = 'transactions/sale_receipt.html'
     context_object_name = 'sale'
+
+
+class LoanDocumentView(LoginRequiredMixin, View):
+    """Generate a PDF loan agreement with Indian rules and conditions"""
+    
+    def get(self, request, loan_number):
+        loan_identifier = loan_number
+        
+        # First try to find by loan_number (UUID)
+        try:
+            loan = Loan.objects.get(loan_number=loan_identifier)
+        except Loan.DoesNotExist:
+            # If not found, try to find by primary key (ID)
+            try:
+                if loan_identifier.isdigit():
+                    loan = Loan.objects.get(pk=int(loan_identifier))
+                else:
+                    raise Http404("No Loan matches the given query.")
+            except (Loan.DoesNotExist, ValueError):
+                raise Http404("No Loan matches the given query.")
+        
+        # Get loan items with gold details
+        loan_items = loan.loanitem_set.all()
+        
+        # Prepare context for PDF template
+        context = {
+            'loan': loan,
+            'loan_items': loan_items,
+            'customer': loan.customer,
+            'branch': loan.branch,
+            'date_today': timezone.now().date(),
+        }
+        
+        # Render the PDF template
+        template = get_template('transactions/loan_document_pdf.html')
+        html = template.render(context)
+        result = BytesIO()
+        
+        # Create PDF from HTML content
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        
+        if not pdf.err:
+            # Generate response with PDF content
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            filename = f"loan_agreement_{loan.loan_number}.pdf"
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        
+        # If PDF generation fails
+        return HttpResponse("Error generating PDF", status=400)
