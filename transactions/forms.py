@@ -258,23 +258,16 @@ class LoanForm(forms.ModelForm):
         initial['issue_date'] = timezone.now().date()
         
         # Auto-calculate due date and grace period end based on issue date
-        # Standard scheme: 1 year from issue date
-        # Flexible scheme: 3 months from issue date
         today = timezone.now().date()
-        scheme = self.data.get('scheme', 'standard') if hasattr(self, 'data') and self.data else 'standard'
         
-        if scheme == 'standard':
-            # Standard loan is for 1 year
-            initial['due_date'] = today + timezone.timedelta(days=365)  # 1 year
-        else:
-            # Flexible loan is for 3 months
-            initial['due_date'] = today + timezone.timedelta(days=90)  # 3 months
+        # Both Standard and Flexible schemes use the same due date calculation: 364 days from issue date
+        initial['due_date'] = today + timezone.timedelta(days=364)
             
-        # Grace period is 15 days after due date
-        if 'due_date' in initial:
-            initial['grace_period_end'] = initial['due_date'] + timezone.timedelta(days=15)
+        # Grace period is 5 days after due date for both schemes
+        initial['grace_period_end'] = initial['due_date'] + timezone.timedelta(days=5)
             
-        if 'customer_id' in self.request.GET:
+        # Handle customer_id from request if available
+        if hasattr(self, 'request') and hasattr(self.request, 'GET') and 'customer_id' in self.request.GET:
             initial['customer'] = self.request.GET['customer_id']
             
         return initial
@@ -486,7 +479,7 @@ class LoanExtensionForm(forms.ModelForm):
             # Set default values
             self.initial['extension_date'] = timezone.now().date()
             self.initial['new_due_date'] = self.loan.due_date + timezone.timedelta(days=30)
-            self.initial['new_grace_period_end'] = self.loan.due_date + timezone.timedelta(days=45)  # 15 days grace period
+            self.initial['new_grace_period_end'] = self.loan.due_date + timezone.timedelta(days=35)  # 5 days grace period
             
             # Calculate default extension fee (0.5% of principal amount)
             self.initial['extension_fee'] = (self.loan.principal_amount * Decimal('0.005')).quantize(Decimal('0.01'))
@@ -520,8 +513,8 @@ class LoanExtensionForm(forms.ModelForm):
             new_due_date = self.loan.due_date + timezone.timedelta(days=extension_period)
             cleaned_data['new_due_date'] = new_due_date
             
-            # Calculate new grace period end (due date + 15 days)
-            new_grace_period_end = new_due_date + timezone.timedelta(days=15)
+            # Calculate new grace period end (due date + 5 days)
+            new_grace_period_end = new_due_date + timezone.timedelta(days=5)
             cleaned_data['new_grace_period_end'] = new_grace_period_end
             
         # Validate extension fee (must be at least 0.5% of principal)
@@ -556,7 +549,7 @@ class LoanExtensionForm(forms.ModelForm):
             
             # Update the loan with new due date and status
             self.loan.due_date = instance.new_due_date
-            self.loan.grace_period_end = instance.new_due_date + timezone.timedelta(days=15)
+            self.loan.grace_period_end = instance.new_due_date + timezone.timedelta(days=5)
             self.loan.status = 'extended'
             self.loan.save()
             

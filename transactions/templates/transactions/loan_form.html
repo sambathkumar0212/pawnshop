@@ -763,16 +763,12 @@
                 const issueDateObj = new Date(issueDate);
                 let dueDate = new Date(issueDateObj);
                 
-                // Set due date based on scheme (1 year for standard, 3 months for flexible)
-                if (scheme === 'standard') {
-                    dueDate.setFullYear(dueDate.getFullYear() + 1); // Add 1 year
-                } else {
-                    dueDate.setDate(dueDate.getDate() + 90); // Add 90 days (3 months)
-                }
+                // Set due date to exactly 364 days from issue date for both schemes
+                dueDate.setDate(dueDate.getDate() + 364); // Add 364 days
                 
-                // Set grace period as due date + 15 days
+                // Set grace period as due date + 5 days
                 let gracePeriod = new Date(dueDate);
-                gracePeriod.setDate(gracePeriod.getDate() + 15);
+                gracePeriod.setDate(gracePeriod.getDate() + 5);
                 
                 // Format dates as YYYY-MM-DD for input fields
                 const dueDateFormatted = dueDate.toISOString().split('T')[0];
