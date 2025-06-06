@@ -111,6 +111,23 @@
             font-size: 11px;
             text-align: center;
         }
+        .item-name {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            text-align: left;
+        }
+        .item-description {
+            font-size: 9px;
+            font-style: italic;
+            color: #555;
+            text-align: left;
+        }
+        table.gold-table td.item-cell {
+            text-align: left;
+            vertical-align: middle;
+            padding: 5px 8px;
+        }
     </style>
 </head>
 <body>
@@ -154,15 +171,31 @@
                 <td><b>Interest Rate</b><br>{{ loan.interest_rate|floatformat:2 }}% per annum</td>
             </tr>
             <tr>
+                <td><b>Loan Scheme</b><br>
+                    {% if loan.scheme == 'standard' %}
+                        Standard Scheme (12% interest, minimum 3 months term)
+                    {% elif loan.scheme == 'flexible' %}
+                        Flexible Scheme (24% interest, no interest if repaid within 25 days)
+                    {% else %}
+                        Standard
+                    {% endif %}
+                </td>
+                <td><b>Scheme Terms</b><br>
+                    {% if loan.scheme == 'standard' %}
+                        Cannot be fully repaid before {{ loan.issue_date|date_add_days:90|date:"d/m/Y" }}
+                    {% elif loan.scheme == 'flexible' %}
+                        Zero interest if repaid by {{ loan.issue_date|date_add_days:25|date:"d/m/Y" }}
+                    {% else %}
+                        Standard terms apply
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
                 <td><b>Total Payable Amount</b><br>Rs. {{ loan.total_payable|floatformat:2 }}</td>
                 <td><b>Loan Term</b><br>1 Year</td>
             </tr>
             <tr>
-                <td><b>Issue Date</b><br>{{ loan.issue_date|date:"d/m/Y" }}</td>
-                <td><b>Due Date</b><br>{{ loan.due_date|date:"d/m/Y" }}</td>
-            </tr>
-            <tr>
-                <td colspan="2"><b>Grace Period End</b><br>{{ loan.grace_period_end|date:"d/m/Y" }}</td>
+                <td colspan="2"><b>Due Date</b><br>{{ loan.due_date|date:"d/m/Y" }}</td>
             </tr>
         </table>
         
@@ -173,17 +206,20 @@
                     <th>Gold Karat</th>
                     <th>Gross Weight (g)</th>
                     <th>Net Weight (g)</th>
-                    <th>Value (Rs.)</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in loan_items %}
                 <tr>
-                    <td>{{ item.item.description }}</td>
+                    <td class="item-cell">
+                        <div class="item-name">{{ item.item.name }}</div>
+                        {% if item.item.description %}
+                        <div class="item-description">{{ item.item.description }}</div>
+                        {% endif %}
+                    </td>
                     <td>{{ item.gold_karat }}K</td>
                     <td>{{ item.gross_weight|floatformat:3 }}</td>
                     <td>{{ item.net_weight|floatformat:3 }}</td>
-                    <td>{{ item.net_weight|multiply:item.market_price_22k|floatformat:2 }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -196,8 +232,7 @@
                 The borrower confirms that the gold items pledged are legally owned by the borrower.</li>
                 <li><b>KYC Compliance:</b> The borrower has provided necessary Know Your Customer (KYC) documents as required under RBI
                 guidelines, including proof of identity and address.</li>
-                <li><b>Fair Practices Code:</b> The lender abides by the Fair Practices Code as prescribed by RBI. A copy of the code is available at the
-                branch office.</li>
+                <li><b>Fair Practices Code:</b> The lender abides by the Fair Practices Code as prescribed by RBI.</li>
                 <li><b>Grievance Redressal:</b> Any complaints or grievances can be registered with the branch manager. If not resolved, the borrower
                 can escalate to the designated Grievance Redressal Officer at the head office.</li>
                 <li><b>Declaration:</b> The borrower declares that all information provided is true and correct. The borrower has read and understood all

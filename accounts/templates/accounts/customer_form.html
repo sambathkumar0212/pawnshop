@@ -13,9 +13,11 @@
     }
     #camera-view {
         width: 100%;
+        height: 300px; /* Set explicit height to ensure it's visible */
         border: 1px solid #ddd;
         border-radius: 4px;
         display: none;
+        object-fit: cover; /* Keep aspect ratio and fill the container */
     }
     #camera-controls {
         text-align: center;
@@ -24,6 +26,32 @@
         display: none;
     }
     #captured-image {
+        display: none;
+        max-width: 100%;
+        max-height: 300px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-top: 10px;
+    }
+    #profile-camera-container {
+        width: 100%;
+        max-width: 500px;
+        margin: 0 auto;
+        position: relative;
+    }
+    #profile-camera-view {
+        width: 100%;
+        height: 300px; /* Set explicit height to ensure it's visible */
+        object-fit: cover; /* Keep aspect ratio and fill the container */
+        display: none;
+    }
+    #profile-camera-controls {
+        text-align: center;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        display: none;
+    }
+    #profile-captured-image {
         display: none;
         max-width: 100%;
         max-height: 300px;
@@ -55,7 +83,7 @@
     </div>
 
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-10">
             <div class="card shadow">
                 <div class="card-body">
                     <form method="post" enctype="multipart/form-data" novalidate>
@@ -170,6 +198,51 @@
                             </div>
                         </div>
 
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-portrait me-2"></i>Profile Photo
+                                </h5>
+                            </div>
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <button type="button" id="open-profile-camera-btn" class="btn btn-outline-primary mb-2 w-100">
+                                                <i class="fas fa-camera me-2"></i>Take Profile Photo
+                                            </button>
+                                            <div id="profile-camera-container">
+                                                <video id="profile-camera-view" autoplay playsinline style="display:none; width:100%; height:300px; object-fit:cover;"></video>
+                                                <div id="profile-camera-controls" style="text-align:center; margin:10px 0; display:none;">
+                                                    <button type="button" id="profile-capture-btn" class="btn btn-primary me-2">
+                                                        <i class="fas fa-camera me-2"></i>Capture
+                                                    </button>
+                                                    <button type="button" id="profile-cancel-camera-btn" class="btn btn-outline-secondary">
+                                                        <i class="fas fa-times me-2"></i>Cancel
+                                                    </button>
+                                                </div>
+                                                <canvas id="profile-capture-canvas" style="display:none;"></canvas>
+                                                <img id="profile-captured-image" style="display:none; max-width:100%; max-height:300px; border:1px solid #ddd; border-radius:4px; margin-top:10px;">
+                                                <input type="hidden" id="profile-image-data" name="profile_photo_data">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            {% if form.instance.profile_photo %}
+                                            <div class="text-center">
+                                                <img src="{{ form.instance.profile_photo }}" alt="Customer Profile Photo" class="img-fluid rounded" style="max-height: 300px;">
+                                            </div>
+                                            {% else %}
+                                            <div class="text-center p-4 bg-light rounded">
+                                                <i class="fas fa-user fa-3x text-secondary mb-2"></i>
+                                                <p class="text-muted mb-0">No profile photo available</p>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
                             <a href="{% url 'customer_list' %}" class="btn btn-outline-secondary me-md-2">
                                 Cancel
@@ -190,6 +263,8 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        console.log("Document loaded, initializing camera functionality...");
+        
         // DOM elements
         const openCameraBtn = document.getElementById('open-camera-btn');
         const cancelCameraBtn = document.getElementById('cancel-camera-btn');
@@ -201,23 +276,61 @@
         const cameraImageData = document.getElementById('camera-image-data');
         const idImageInput = document.querySelector('[name="id_image"]');
         
+        const openProfileCameraBtn = document.getElementById('open-profile-camera-btn');
+        const cancelProfileCameraBtn = document.getElementById('profile-cancel-camera-btn');
+        const profileCaptureBtn = document.getElementById('profile-capture-btn');
+        const profileCameraView = document.getElementById('profile-camera-view');
+        const profileCameraControls = document.getElementById('profile-camera-controls');
+        const profileCaptureCanvas = document.getElementById('profile-capture-canvas');
+        const profileCapturedImage = document.getElementById('profile-captured-image');
+        const profileImageData = document.getElementById('profile-image-data');
+        const profilePhotoInput = document.querySelector('[name="profile_photo"]');
+        
         let stream = null;
+        let profileStream = null;
+        
+        // Check if browser supports getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error("Browser doesn't support getUserMedia");
+            openCameraBtn.disabled = true;
+            openCameraBtn.title = "Camera not supported in this browser";
+            openCameraBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Camera Not Supported';
+            return;
+        }
 
         // Function to start the camera
         async function startCamera() {
+            console.log("Attempting to start camera...");
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
-                });
+                // First try environment camera (rear camera)
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    console.log("Rear camera access successful");
+                } catch (envError) {
+                    console.log("Failed to access rear camera, trying default camera", envError);
+                    // If rear camera fails, try any camera
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true
+                    });
+                    console.log("Default camera access successful");
+                }
                 
                 cameraView.srcObject = stream;
                 cameraView.style.display = 'block';
                 cameraControls.style.display = 'block';
                 openCameraBtn.style.display = 'none';
+                
+                // Make sure video is ready and loaded
+                cameraView.onloadedmetadata = function() {
+                    console.log("Camera video stream loaded successfully");
+                    cameraView.play();
+                };
             } catch (err) {
                 console.error("Error accessing the camera: ", err);
                 alert("Could not access the camera. Please make sure you've granted permission or try using the file upload option.");
@@ -226,43 +339,191 @@
 
         // Function to stop the camera
         function stopCamera() {
+            console.log("Stopping camera...");
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach(track => {
+                    console.log("Stopping track:", track.kind);
+                    track.stop();
+                });
                 stream = null;
+                cameraView.srcObject = null;
                 cameraView.style.display = 'none';
                 cameraControls.style.display = 'none';
                 openCameraBtn.style.display = 'block';
+                console.log("Camera stopped successfully");
             }
         }
 
         // Function to capture image from camera
         function captureImage() {
-            const context = captureCanvas.getContext('2d');
-            
-            // Set canvas dimensions to match the video
-            captureCanvas.width = cameraView.videoWidth;
-            captureCanvas.height = cameraView.videoHeight;
-            
-            // Draw the current video frame to the canvas
-            context.drawImage(cameraView, 0, 0, captureCanvas.width, captureCanvas.height);
-            
-            // Convert canvas to image data URL
-            const imageDataUrl = captureCanvas.toDataURL('image/jpeg');
-            
-            // Display the captured image
-            capturedImage.src = imageDataUrl;
-            capturedImage.style.display = 'block';
-            
-            // Store the image data in the hidden input for form submission
-            cameraImageData.value = imageDataUrl;
-            
-            // Clear any previously selected file
-            if (idImageInput.value) {
-                idImageInput.value = '';
+            console.log("Capturing image...");
+            try {
+                if (!cameraView.videoWidth) {
+                    console.error("Video not ready yet");
+                    alert("Camera is not ready. Please wait a moment and try again.");
+                    return;
+                }
+                
+                const context = captureCanvas.getContext('2d');
+                
+                // Set canvas dimensions to match the video
+                captureCanvas.width = cameraView.videoWidth;
+                captureCanvas.height = cameraView.videoHeight;
+                console.log(`Canvas size set to ${captureCanvas.width}x${captureCanvas.height}`);
+                
+                // Draw the current video frame to the canvas
+                context.drawImage(cameraView, 0, 0, captureCanvas.width, captureCanvas.height);
+                
+                // Convert canvas to image data URL
+                const imageDataUrl = captureCanvas.toDataURL('image/jpeg', 0.9);
+                console.log("Image captured and converted to data URL");
+                
+                // Make sure we got data
+                if (!imageDataUrl || imageDataUrl === 'data:,') {
+                    console.error("Failed to get image data URL");
+                    alert("Failed to capture image. Please try again.");
+                    return;
+                }
+                
+                // Display the captured image
+                capturedImage.src = imageDataUrl;
+                capturedImage.style.display = 'block';
+                
+                // Store the image data in the hidden input for form submission
+                cameraImageData.value = imageDataUrl;
+                console.log("Image data stored in hidden input");
+                
+                // Clear any previously selected file
+                if (idImageInput.value) {
+                    idImageInput.value = '';
+                }
+                
+                // Add a success message
+                const successMsg = document.createElement('div');
+                successMsg.className = 'alert alert-success mt-2 mb-0';
+                successMsg.innerHTML = '<i class="fas fa-check-circle me-2"></i>Image captured successfully!';
+                capturedImage.parentNode.appendChild(successMsg);
+                
+                // Stop the camera stream
+                stopCamera();
+            } catch (err) {
+                console.error("Error capturing image:", err);
+                alert("Error capturing image: " + err.message);
             }
-            
-            // Stop the camera stream
-            stopCamera();
+        }
+
+        // Function to start profile camera
+        async function startProfileCamera() {
+            console.log("Attempting to start profile camera...");
+            try {
+                // First try environment camera (rear camera)
+                try {
+                    profileStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    console.log("Rear camera access successful for profile photo");
+                } catch (envError) {
+                    console.log("Failed to access rear camera for profile, trying default camera", envError);
+                    // If rear camera fails, try any camera
+                    profileStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true
+                    });
+                    console.log("Default camera access successful for profile photo");
+                }
+                
+                profileCameraView.srcObject = profileStream;
+                profileCameraView.style.display = 'block';
+                profileCameraControls.style.display = 'block';
+                openProfileCameraBtn.style.display = 'none';
+                
+                // Make sure video is ready and loaded
+                profileCameraView.onloadedmetadata = function() {
+                    console.log("Profile camera video stream loaded successfully");
+                    profileCameraView.play();
+                };
+            } catch (err) {
+                console.error("Error accessing the profile camera: ", err);
+                alert("Could not access the camera. Please make sure you've granted permission or try using the file upload option.");
+            }
+        }
+
+        // Function to stop profile camera
+        function stopProfileCamera() {
+            console.log("Stopping profile camera...");
+            if (profileStream) {
+                profileStream.getTracks().forEach(track => {
+                    console.log("Stopping track:", track.kind);
+                    track.stop();
+                });
+                profileStream = null;
+                profileCameraView.srcObject = null;
+                profileCameraView.style.display = 'none';
+                profileCameraControls.style.display = 'none';
+                openProfileCameraBtn.style.display = 'block';
+                console.log("Profile camera stopped successfully");
+            }
+        }
+
+        // Function to capture profile image from camera
+        function captureProfileImage() {
+            console.log("Capturing profile image...");
+            try {
+                if (!profileCameraView.videoWidth) {
+                    console.error("Profile video not ready yet");
+                    alert("Profile camera is not ready. Please wait a moment and try again.");
+                    return;
+                }
+                
+                const context = profileCaptureCanvas.getContext('2d');
+                
+                // Set canvas dimensions to match the video
+                profileCaptureCanvas.width = profileCameraView.videoWidth;
+                profileCaptureCanvas.height = profileCameraView.videoHeight;
+                console.log(`Profile canvas size set to ${profileCaptureCanvas.width}x${profileCaptureCanvas.height}`);
+                
+                // Draw the current video frame to the canvas
+                context.drawImage(profileCameraView, 0, 0, profileCaptureCanvas.width, profileCaptureCanvas.height);
+                
+                // Convert canvas to image data URL
+                const imageDataUrl = profileCaptureCanvas.toDataURL('image/jpeg', 0.9);
+                console.log("Profile image captured and converted to data URL");
+                
+                // Make sure we got data
+                if (!imageDataUrl || imageDataUrl === 'data:,') {
+                    console.error("Failed to get profile image data URL");
+                    alert("Failed to capture profile image. Please try again.");
+                    return;
+                }
+                
+                // Display the captured profile image
+                profileCapturedImage.src = imageDataUrl;
+                profileCapturedImage.style.display = 'block';
+                
+                // Store the image data in the hidden input for form submission
+                profileImageData.value = imageDataUrl;
+                console.log("Profile image data stored in hidden input");
+                
+                // Clear any previously selected file
+                if (profilePhotoInput.value) {
+                    profilePhotoInput.value = '';
+                }
+                
+                // Add a success message
+                const successMsg = document.createElement('div');
+                successMsg.className = 'alert alert-success mt-2 mb-0';
+                successMsg.innerHTML = '<i class="fas fa-check-circle me-2"></i>Profile image captured successfully!';
+                profileCapturedImage.parentNode.appendChild(successMsg);
+                
+                // Stop the camera stream
+                stopProfileCamera();
+            } catch (err) {
+                console.error("Error capturing profile image:", err);
+                alert("Error capturing profile image: " + err.message);
+            }
         }
 
         // Event listeners
@@ -270,14 +531,49 @@
         cancelCameraBtn.addEventListener('click', stopCamera);
         captureBtn.addEventListener('click', captureImage);
         
+        openProfileCameraBtn.addEventListener('click', startProfileCamera);
+        cancelProfileCameraBtn.addEventListener('click', stopProfileCamera);
+        profileCaptureBtn.addEventListener('click', captureProfileImage);
+        
         // Handle form submission with camera image
         document.querySelector('form').addEventListener('submit', function(e) {
+            console.log("Form submitting...");
+            
             // If a file was selected after capturing an image, clear the captured image data
             if (idImageInput.files && idImageInput.files.length > 0) {
+                console.log("File selected, clearing camera image data");
                 cameraImageData.value = '';
                 capturedImage.style.display = 'none';
+            } else if (cameraImageData.value) {
+                console.log("Using camera image data for submission");
             }
+            
+            // If a file was selected after capturing a profile image, clear the profile captured image data
+            if (profilePhotoInput.files && profilePhotoInput.files.length > 0) {
+                console.log("Profile file selected, clearing profile camera image data");
+                profileImageData.value = '';
+                profileCapturedImage.style.display = 'none';
+            } else if (profileImageData.value) {
+                console.log("Using profile camera image data for submission");
+            }
+            
+            // Log the form data being sent for debugging
+            console.log("Form has camera_image_data:", !!cameraImageData.value);
+            console.log("Form has id_image file:", idImageInput.files && idImageInput.files.length > 0);
+            console.log("Form has profile_image_data:", !!profileImageData.value);
+            console.log("Form has profile_photo file:", profilePhotoInput.files && profilePhotoInput.files.length > 0);
         });
+        
+        // Handle camera errors
+        cameraView.addEventListener('error', function(e) {
+            console.error("Video element error:", e);
+        });
+        
+        profileCameraView.addEventListener('error', function(e) {
+            console.error("Profile video element error:", e);
+        });
+        
+        console.log("Camera functionality initialized");
     });
 </script>
 {% endblock %}

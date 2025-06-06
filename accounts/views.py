@@ -419,6 +419,36 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
     
     def form_valid(self, form):
         form.instance.created_by = self.request.user
+        
+        # Process camera image if available
+        camera_image_data = self.request.POST.get('camera_image_data')
+        if camera_image_data and camera_image_data.startswith('data:image/'):
+            try:
+                # Extract the base64 encoded image data
+                format, imgstr = camera_image_data.split(';base64,')
+                ext = format.split('/')[-1]
+                
+                # Decode base64 image data
+                image_data = base64.b64decode(imgstr)
+                
+                # Create a ContentFile to save to the ImageField
+                from django.core.files.base import ContentFile
+                image_file = ContentFile(image_data, name=f"id_{form.instance.first_name}_{form.instance.last_name}.{ext}")
+                
+                # Assign to the form instance
+                form.instance.id_image = image_file
+            except Exception as e:
+                messages.error(self.request, f"Error processing camera image: {str(e)}")
+        
+        # Process profile photo if available
+        profile_photo_data = self.request.POST.get('profile_photo_data')
+        if profile_photo_data and profile_photo_data.startswith('data:image/'):
+            try:
+                # Store the base64 data directly in the profile_photo field
+                form.instance.profile_photo = profile_photo_data
+            except Exception as e:
+                messages.error(self.request, f"Error processing profile photo: {str(e)}")
+        
         messages.success(self.request, 'Customer was created successfully.')
         return super().form_valid(form)
 
@@ -434,6 +464,35 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         return reverse_lazy('customer_detail', kwargs={'pk': self.object.pk})
     
     def form_valid(self, form):
+        # Process camera image if available
+        camera_image_data = self.request.POST.get('camera_image_data')
+        if camera_image_data and camera_image_data.startswith('data:image/'):
+            try:
+                # Extract the base64 encoded image data
+                format, imgstr = camera_image_data.split(';base64,')
+                ext = format.split('/')[-1]
+                
+                # Decode base64 image data
+                image_data = base64.b64decode(imgstr)
+                
+                # Create a ContentFile to save to the ImageField
+                from django.core.files.base import ContentFile
+                image_file = ContentFile(image_data, name=f"id_{form.instance.first_name}_{form.instance.last_name}.{ext}")
+                
+                # Assign to the form instance
+                form.instance.id_image = image_file
+            except Exception as e:
+                messages.error(self.request, f"Error processing camera image: {str(e)}")
+
+        # Process profile photo if available
+        profile_photo_data = self.request.POST.get('profile_photo_data')
+        if profile_photo_data and profile_photo_data.startswith('data:image/'):
+            try:
+                # Store the base64 data directly in the profile_photo field
+                form.instance.profile_photo = profile_photo_data
+            except Exception as e:
+                messages.error(self.request, f"Error processing profile photo: {str(e)}")
+        
         messages.success(self.request, 'Customer was updated successfully.')
         return super().form_valid(form)
 

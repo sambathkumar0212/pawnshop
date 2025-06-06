@@ -106,7 +106,7 @@
                                 <th>ID</th>
                                 <th>Name</th>
                                 <th>Contact Information</th>
-                                <th>Loans</th>
+                                <th>Active Loans</th>
                                 <th>Registered</th>
                                 <th>Actions</th>
                             </tr>
@@ -126,7 +126,16 @@
                                     </td>
                                     <td>
                                         {% if customer.active_loans_count %}
-                                            <span class="badge bg-primary">{{ customer.active_loans_count }} Active</span>
+                                            {% for loan in customer.loans.all %}
+                                                {% if loan.status == 'active' and loan.item_photos %}
+                                                    <div class="position-relative mb-1" style="width: 48px; height: 48px;" data-bs-toggle="tooltip" title="Loan #{{ loan.loan_number }}">
+                                                        <img src="{{ loan.item_photos|first }}" 
+                                                             alt="Pawned Item" 
+                                                             class="rounded border"
+                                                             style="width: 100%; height: 100%; object-fit: cover;">
+                                                    </div>
+                                                {% endif %}
+                                            {% endfor %}
                                         {% else %}
                                             <span class="badge bg-secondary">No Loans</span>
                                         {% endif %}
@@ -228,6 +237,9 @@
 {% block extra_scripts %}
 <script>
     $(document).ready(function() {
+        // Initialize tooltips
+        $('[data-bs-toggle="tooltip"]').tooltip();
+        
         // Auto-submit form when filter changes
         $('select[name="filter"]').change(function() {
             $(this).closest('form').submit();

@@ -15,11 +15,19 @@ class Loan(models.Model):
         ('foreclosed', 'Foreclosed'),
     ]
     
+    SCHEME_CHOICES = [
+        ('standard', 'Standard (12% - Min 3 months)'),
+        ('flexible', 'Flexible (24% - No interest if repaid within 25 days)'),
+    ]
+    
     # Basic information
     loan_number = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='loans')
     items = models.ManyToManyField('inventory.Item', through='LoanItem', related_name='loans')
     branch = models.ForeignKey('branches.Branch', on_delete=models.CASCADE, related_name='loans')
+    
+    # Scheme type
+    scheme = models.CharField(max_length=20, choices=SCHEME_CHOICES, default='standard')
     
     # Photo information
     customer_face_capture = models.TextField(blank=True, null=True, help_text="Base64-encoded customer photo")
@@ -100,7 +108,68 @@ class Loan(models.Model):
             return "Partially Paid"
         else:
             return "No Payments"
-
+            
+    @property
+    def can_be_repaid(self):
+        """Check if loan can be repaid based on the scheme rules"""
+        from django.utils import timezone
+        today = timezone.now().date()
+        # Standard scheme - can only be repaid after 3 months
+        if self.scheme == 'standard':
+            min_duration = timezone.timedelta(days=90)  # 3 months
+            return (today - self.issue_date) >= min_duration
+        # Flexible scheme - can be repaid anytime
+        return True
+        
+    @property
+    def days_since_issue(self):
+        """Calculate days since loan was issued"""
+        from django.utils import timezone
+        today = timezone.now().date()
+        return (today - self.issue_date).days
+    
+    @property
+    def total_payable_till_date(self):
+        """Calculate total payable amount as of today (principal + interest till date)"""
+        from django.utils import timezone
+        from decimal import Decimal
+        
+        today = timezone.now().date()
+        principal_amount = self.principal_amount
+        days_elapsed = (today - self.issue_date).days
+        
+        # For flexible scheme with early repayment within 25 days
+        if self.scheme == 'flexible' and days_elapsed <= 25:
+            interest_amount = Decimal('0.00')
+        else:
+            # Calculate interest based on scheme and elapsed time
+            # For standard scheme: 12% per year = 0.03287% per day
+            # For flexible scheme: 24% per year = 0.06575% per day
+            daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else Decimal('0.0006575')
+            interest_amount = principal_amount * daily_rate * days_elapsed
+        
+        # Return gross total payable (principal + interest)
+        return principal_amount + interest_amount
+    
+    @property
+    def total_payable_mature(self):
+        """Calculate total payable amount at maturity (principal + full interest till due date)"""
+        # This will be the same as the stored total_payable which is calculated at loan creation
+        return self.total_payable
+        
+    def calculate_interest_amount(self):
+        """Calculate interest amount based on scheme rules"""
+        from django.utils import timezone
+        from decimal import Decimal
+        today = timezone.now().date()
+        
+        # Flexible scheme with no interest if repaid within 25 days
+        if self.scheme == 'flexible' and (today - self.issue_date).days <= 25:
+            return Decimal('0.00')
+            
+        # Otherwise, use the standard interest rate calculation
+        return self.principal_amount * (self.interest_rate / Decimal('100'))
+    
 class LoanItem(models.Model):
     """Model to track items in a loan with their gold details"""
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE)

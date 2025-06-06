@@ -122,6 +122,7 @@
                                 <th>Item</th>
                                 <th>Principal</th>
                                 <th>Interest Rate</th>
+                                <th>Scheme</th>
                                 <th>Start Date</th>
                                 <th>Due Date</th>
                                 <th>Status</th>
@@ -134,46 +135,117 @@
                                     <td>
                                         <div class="d-flex align-items-center">
                                             {% if loan.customer_face_capture %}
-                                                <div class="me-2">
+                                                <div class="position-relative me-2">
                                                     <img src="{{ loan.customer_face_capture }}" 
                                                          alt="Customer Photo" 
-                                                         class="rounded-circle"
-                                                         style="width: 40px; height: 40px; object-fit: cover;">
+                                                         class="rounded-circle customer-photo"
+                                                         style="width: 48px; height: 48px; object-fit: cover; cursor: pointer;"
+                                                         data-bs-toggle="modal" 
+                                                         data-bs-target="#customerModal-{{ loan.id }}">
+                                                    <div class="position-absolute bottom-0 end-0">
+                                                        <span class="badge bg-primary rounded-circle" style="font-size: 0.6rem; width: 18px; height: 18px;">
+                                                            <i class="fas fa-search-plus fa-xs"></i>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            {% else %}
+                                                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" 
+                                                     style="width: 48px; height: 48px;">
+                                                    <i class="fas fa-user text-secondary"></i>
                                                 </div>
                                             {% endif %}
                                             <div>
                                                 <a href="{% url 'customer_detail' loan.customer.id %}">
                                                     {{ loan.customer.first_name }} {{ loan.customer.last_name }}
                                                 </a>
+                                                <small class="d-block text-muted">{{ loan.customer.phone|default:"" }}</small>
                                             </div>
                                         </div>
+                                        
+                                        <!-- Customer Photo Modal -->
+                                        {% if loan.customer_face_capture %}
+                                        <div class="modal fade" id="customerModal-{{ loan.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-sm modal-dialog-centered">
+                                                <div class="modal-content">
+                                                    <div class="modal-header py-2">
+                                                        <h6 class="modal-title">{{ loan.customer.first_name }} {{ loan.customer.last_name }}</h6>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body text-center p-2">
+                                                        <img src="{{ loan.customer_face_capture }}" alt="Customer Photo" class="img-fluid rounded">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
                                     </td>
                                     <td>
-                                        {% for loan_item in loan.loanitem_set.all %}
+                                        {% for loan_item in loan.loanitem_set.all|slice:":1" %}
                                         <div class="d-flex align-items-center mb-1">
                                             {% if loan.item_photos %}
-                                                {% if forloop.first %}
-                                                    <div class="me-2" data-bs-toggle="tooltip" title="View all item images">
-                                                        <img src="{{ loan.item_photos|first_item_photo }}" 
-                                                             alt="Item Photo" 
-                                                             class="rounded"
-                                                             style="width: 40px; height: 40px; object-fit: cover;">
+                                                <div class="position-relative me-2" data-bs-toggle="modal" data-bs-target="#itemModal-{{ loan.id }}">
+                                                    <img src="{{ loan.item_photos|first_item_photo }}" 
+                                                         alt="Item Photo" 
+                                                         class="rounded border"
+                                                         style="width: 48px; height: 48px; object-fit: cover; cursor: pointer;">
+                                                    <div class="position-absolute bottom-0 end-0">
+                                                        <span class="badge bg-info rounded-circle" style="font-size: 0.6rem; width: 18px; height: 18px;">
+                                                            {% with count=loan.item_photos|item_photos_count %}
+                                                            {{ count }}
+                                                            {% endwith %}
+                                                        </span>
                                                     </div>
-                                                {% endif %}
+                                                </div>
                                             {% endif %}
                                             <div>
-                                                <a href="{% url 'item_detail' loan_item.item.id %}">
-                                                    {{ loan_item.item.name }}
-                                                </a>
+                                                <span class="d-block">{{ loan_item.item.name }}</span>
                                                 <small class="text-muted">
-                                                    ({{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g)
+                                                    {{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g
                                                 </small>
                                             </div>
                                         </div>
+                                        
+                                        <!-- Item Photos Modal -->
+                                        {% if loan.item_photos %}
+                                        <div class="modal fade" id="itemModal-{{ loan.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content">
+                                                    <div class="modal-header py-2">
+                                                        <h6 class="modal-title">Gold Item Photos</h6>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <div class="row g-2 item-photos-container" data-loan-id="{{ loan.id }}">
+                                                            <!-- Photos will be loaded here via JavaScript -->
+                                                            <div class="text-center py-3">
+                                                                <div class="spinner-border text-primary" role="status">
+                                                                    <span class="visually-hidden">Loading...</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <!-- Hidden item photos data -->
+                                                        <script type="application/json" class="item-photos-data">
+                                                            {{ loan.item_photos|safe }}
+                                                        </script>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% empty %}
+                                        <span class="text-muted">No items</span>
                                         {% endfor %}
                                     </td>
                                     <td>₹{{ loan.principal_amount|floatformat:2 }}</td>
                                     <td>{{ loan.interest_rate }}%</td>
+                                    <td>
+                                        {% if loan.scheme == 'standard' %}
+                                            <span class="badge bg-info" data-bs-toggle="tooltip" title="12% interest, minimum 3 months">Standard</span>
+                                        {% elif loan.scheme == 'flexible' %}
+                                            <span class="badge bg-warning" data-bs-toggle="tooltip" title="24% interest, no interest if repaid within 25 days">Flexible</span>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ loan.issue_date }}</td>
                                     <td>{{ loan.due_date }}</td>
                                     <td>
@@ -285,10 +357,72 @@
         // Initialize tooltips
         $('[data-bs-toggle="tooltip"]').tooltip();
         
-        // Optional: add item image preview modal functionality if needed
-        $('img[alt="Item Photo"]').click(function() {
-            // You could show a modal with all the item images here
+        // Handle item photos modal
+        $('.modal').on('show.bs.modal', function (event) {
+            const modal = $(this);
+            const modalId = modal.attr('id');
+            
+            // Only process item photo modals
+            if (modalId && modalId.startsWith('itemModal-')) {
+                const loanId = modalId.replace('itemModal-', '');
+                const container = modal.find('.item-photos-container');
+                
+                // Only load if container has data attribute and is not already loaded
+                if (container.attr('data-loan-id') === loanId && !container.hasClass('loaded')) {
+                    // Get item photos data for this loan
+                    const itemPhotos = getItemPhotos(loanId);
+                    
+                    if (itemPhotos && itemPhotos.length > 0) {
+                        // Clear loading spinner
+                        container.empty();
+                        
+                        // Build photo gallery
+                        itemPhotos.forEach((photoUrl, index) => {
+                            container.append(`
+                                <div class="col-6">
+                                    <div class="card position-relative">
+                                        <img src="${photoUrl}" class="card-img-top" alt="Item Photo ${index+1}">
+                                        <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-50 text-white small text-center py-1">
+                                            Photo ${index+1}
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+                        });
+                        
+                        // Mark as loaded
+                        container.addClass('loaded');
+                    } else {
+                        container.html('<div class="col-12 text-center py-3 text-muted">No photos available</div>');
+                    }
+                }
+            }
         });
+        
+        // Function to get item photos for a loan
+        // This would typically be an AJAX call to the server,
+        // but for demonstration we'll parse from data attributes
+        function getItemPhotos(loanId) {
+            // For each loan in the table
+            let photos = [];
+            
+            // Find the row with this loan
+            $(`#itemModal-${loanId}`).each(function() {
+                // Get the raw JSON string
+                const rawData = $(this).find('.item-photos-data').text();
+                
+                if (rawData) {
+                    try {
+                        // Try to parse as JSON
+                        photos = JSON.parse(rawData);
+                    } catch (e) {
+                        console.error('Error parsing item photos:', e);
+                    }
+                }
+            });
+            
+            return photos;
+        }
     });
 </script>
 {% endblock %}

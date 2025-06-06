@@ -59,3 +59,19 @@ def multiply(value, arg):
         return value * arg
     except (ValueError, TypeError):
         return 0
+
+@register.filter
+def subtract(value, arg):
+    """Subtract the arg from the value."""
+    try:
+        return value - arg
+    except (ValueError, TypeError):
+        return value
+        
+@register.filter
+def add(value, arg):
+    """Add the arg to the value."""
+    try:
+        return value + arg
+    except (ValueError, TypeError):
+        return value

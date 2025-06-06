@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load loan_tags %}
 
 {% block title %}{{ customer.full_name }} - Customer Details{% endblock %}
 
@@ -44,6 +45,13 @@
                     <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>Personal Information</h5>
                 </div>
                 <div class="card-body">
+                    {% if customer.profile_photo %}
+                    <div class="text-center mb-4">
+                        <img src="{{ customer.profile_photo }}" alt="{{ customer.full_name }}" class="img-fluid rounded" style="max-height: 200px;">
+                        <p class="text-muted mt-2 mb-0"><i class="fas fa-portrait me-2"></i>Profile Photo</p>
+                    </div>
+                    {% endif %}
+                    
                     <div class="mb-4">
                         <h6 class="text-muted mb-2">Contact Details</h6>
                         {% if customer.email %}
@@ -113,7 +121,7 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>Loan #</th>
+                                    <th>Photo</th>
                                     <th>Item</th>
                                     <th>Principal</th>
                                     <th>Due Date</th>
@@ -125,12 +133,30 @@
                                 {% for loan in active_loans %}
                                 <tr>
                                     <td>
-                                        <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a>
+                                        {% if loan.item_photos %}
+                                            <div class="position-relative" style="width: 48px; height: 48px;" data-bs-toggle="tooltip" title="Loan #{{ loan.loan_number }}">
+                                                <a href="{% url 'loan_detail' loan.loan_number %}">
+                                                    <img src="{{ loan.item_photos|first_item_photo }}" 
+                                                         alt="Item Photo" 
+                                                         class="rounded border"
+                                                         style="width: 100%; height: 100%; object-fit: cover;">
+                                                </a>
+                                                <div class="position-absolute bottom-0 end-0">
+                                                    <span class="badge bg-info rounded-circle" style="font-size: 0.6rem; width: 18px; height: 18px;">
+                                                        {{ loan.item_photos|item_photos_count }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="rounded bg-light d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                                <i class="fas fa-image text-secondary"></i>
+                                            </div>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% for loan_item in loan.loanitem_set.all %}
                                         <div class="mb-1">
-                                            <a href="{% url 'item_detail' loan_item.item.id %}">{{ loan_item.item.name }}</a>
+                                            <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan_item.item.name }}</a>
                                             <small class="text-muted">({{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g)</small>
                                         </div>
                                         {% endfor %}

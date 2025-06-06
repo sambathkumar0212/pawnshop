@@ -20,12 +20,40 @@
     </div>
 
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-10">
             <div class="card shadow">
                 <div class="card-body">
+                    <!-- Add debugging information and error messages at the top of the form -->
+                    {% if messages %}
+                    <div class="mb-4">
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if form.errors %}
+                    <div class="alert alert-danger mb-4">
+                        <h5 class="alert-heading">Please correct the following errors:</h5>
+                        <ul class="mb-0">
+                            {% for field in form %}
+                                {% for error in field.errors %}
+                                <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                {% endfor %}
+                            {% endfor %}
+                            {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    
                     <form method="post" id="loanForm" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
-                        <input type="hidden" name="customer_face_capture" id="customerFaceCapture" value="">
+                        <input type="hidden" name="customer_face_capture" id="customerFaceCapture" value="{% if form.instance.customer_face_capture %}{{ form.instance.customer_face_capture|escapejs }}{% endif %}">
                         <input type="hidden" name="item_photos" id="itemPhotosData" value="">
                         
                         <div class="row mb-4">
@@ -34,11 +62,22 @@
                                     <i class="fas fa-user me-2"></i>Customer & Authentication
                                 </h5>
                             </div>
+                            
+                            <!-- Customer and Biometric Authentication Row -->
                             <div class="col-md-8">
-                                {{ form.customer|as_crispy_field }}
-                                
+                                <div class="row">
+                                    <div class="col-12 mb-3">
+                                        {{ form.customer|as_crispy_field }}
+                                    </div>
+                                    <div class="col-12">
+                                        {{ form.branch|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
                                 <!-- Biometric Authentication Section -->
-                                <div class="card mt-3">
+                                <div class="card h-100">
                                     <div class="card-header bg-light">
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="enableBiometricAuth">
@@ -57,130 +96,141 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                {{ form.branch|as_crispy_field }}
-                            </div>
                         </div>
 
-                        <div class="row mb-4">
+                        <div class="row mb-3">
                             <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-camera me-2"></i>Customer Photo
+                                <h5 class="card-title mb-2 d-flex align-items-center">
+                                    <i class="fas fa-camera me-2"></i>Photos
+                                    <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#photoSection">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
                                 </h5>
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div id="cameraView" class="border rounded mb-2" style="height: 240px; position: relative;">
-                                                    <video id="cameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
-                                                    <canvas id="photoCanvas" style="display:none;"></canvas>
+                                <div id="photoSection" class="collapse show">
+                                    <div class="row g-2">
+                                        <!-- Customer Photo -->
+                                        <div class="col-md-6">
+                                            <div class="card card-sm h-100">
+                                                <div class="card-header py-1 px-2 bg-light">
+                                                    <small><strong>Customer Photo</strong></small>
                                                 </div>
-                                                <div class="d-flex justify-content-center mb-3">
-                                                    <button type="button" class="btn btn-primary" id="captureBtn">
-                                                        <i class="fas fa-camera me-2"></i>Capture Photo
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div id="photoPreview" class="border rounded mb-2 d-flex align-items-center justify-content-center bg-light" style="height: 240px;">
-                                                    <span id="noCaptureText">No photo captured</span>
-                                                    <img id="capturedPhoto" class="img-fluid" style="max-height: 240px; display: none;">
-                                                </div>
-                                                <div class="d-flex justify-content-center">
-                                                    <button type="button" class="btn btn-outline-secondary" id="retakeBtn" disabled>
-                                                        <i class="fas fa-redo me-2"></i>Retake Photo
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-box me-2"></i>Item Information
-                                </h5>
-                            </div>
-                            
-                            <div class="col-12">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        {{ form.item_name|as_crispy_field }}
-                                    </div>
-                                    <div class="col-md-6">
-                                        {{ form.item_category|as_crispy_field }}
-                                    </div>
-                                    <div class="col-12">
-                                        {{ form.item_description|as_crispy_field }}
-                                    </div>
-                                    <div class="col-md-6">
-                                        {{ form.market_price_22k|as_crispy_field }}
-                                    </div>
-                                    <div class="col-md-6">
-                                        {{ form.gold_karat|as_crispy_field }}
-                                    </div>
-                                    <div class="col-md-6">
-                                        {{ form.gross_weight|as_crispy_field }}
-                                    </div>
-                                    <div class="col-md-6">
-                                        {{ form.stone_weight|as_crispy_field }}
-                                    </div>
-                                    <div class="col-12">
-                                        {{ form.net_weight|as_crispy_field }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Gold Item Photos Section -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-images me-2"></i>Gold Item Photos
-                                </h5>
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div id="itemCameraView" class="border rounded mb-2" style="height: 240px; position: relative;">
-                                                    <video id="itemCameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
-                                                    <canvas id="itemPhotoCanvas" style="display:none;"></canvas>
-                                                </div>
-                                                <div class="d-flex justify-content-center mb-3">
-                                                    <button type="button" class="btn btn-primary" id="captureItemBtn">
-                                                        <i class="fas fa-camera me-2"></i>Capture Item Photo
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="border rounded p-2 mb-3 bg-light" style="height: 240px; overflow-y: auto;">
-                                                    <div id="noItemPhotosText" class="text-center text-muted p-5">
-                                                        No item photos captured yet.<br>
-                                                        <small>Take at least 2 photos from different angles</small>
+                                                <div class="card-body p-2">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-6">
+                                                            <div id="cameraView" class="border rounded" style="height: 150px; position: relative;">
+                                                                <video id="cameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                                                                <canvas id="photoCanvas" style="display:none;"></canvas>
+                                                            </div>
+                                                            <div class="d-grid gap-1 mt-1">
+                                                                <button type="button" class="btn btn-sm btn-primary" id="captureBtn">
+                                                                    <i class="fas fa-camera me-1"></i>Capture
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div id="photoPreview" class="border rounded d-flex align-items-center justify-content-center bg-light" style="height: 150px;">
+                                                                {% if form.instance.customer_face_capture %}
+                                                                    <img id="capturedPhoto" class="img-fluid" style="max-height: 150px;" src="{{ form.instance.customer_face_capture }}">
+                                                                {% else %}
+                                                                    <span id="noCaptureText" class="small text-muted">No photo</span>
+                                                                {% endif %}
+                                                            </div>
+                                                            <div class="d-grid gap-1 mt-1">
+                                                                <button type="button" class="btn btn-sm btn-outline-secondary" id="retakeBtn">
+                                                                    <i class="fas fa-redo me-1"></i>Retake
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div id="itemPhotosContainer" class="row g-2"></div>
-                                                </div>
-                                                <div class="d-flex justify-content-center">
-                                                    <span class="badge bg-primary me-2" id="photoCountBadge">0 Photos</span>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearItemPhotosBtn" disabled>
-                                                        <i class="fas fa-trash-alt me-1"></i>Clear All
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="mt-3 small text-muted">
-                                            <ul>
-                                                <li>Take multiple photos from different angles</li>
-                                                <li>Ensure good lighting to capture details</li>
-                                                <li>Include photos of maker's marks, hallmarks or certificates if available</li>
-                                                <li>At least 2 photos are required</li>
-                                            </ul>
+                                        
+                                        <!-- Gold Item Photos -->
+                                        <div class="col-md-6">
+                                            <div class="card card-sm h-100">
+                                                <div class="card-header py-1 px-2 bg-light">
+                                                    <small><strong>Gold Item Photos</strong> <span class="badge bg-danger" id="photoCountBadge">0</span></small>
+                                                </div>
+                                                <div class="card-body p-2">
+                                                    <div class="row g-2">
+                                                        <div class="col-md-6">
+                                                            <div id="itemCameraView" class="border rounded" style="height: 150px; position: relative;">
+                                                                <video id="itemCameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                                                                <canvas id="itemPhotoCanvas" style="display:none;"></canvas>
+                                                            </div>
+                                                            <div class="d-grid gap-1 mt-1">
+                                                                <button type="button" class="btn btn-sm btn-primary" id="captureItemBtn">
+                                                                    <i class="fas fa-camera me-1"></i>Capture Item
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="border rounded p-1 bg-light position-relative" style="height: 150px; overflow-y: auto;">
+                                                                <div id="noItemPhotosText" class="text-center text-muted p-2 small">
+                                                                    <small>No photos available</small>
+                                                                </div>
+                                                                <div id="itemPhotosContainer" class="row g-1">
+                                                                    {% if item_photos_list %}
+                                                                        {% for photo in item_photos_list %}
+                                                                            <div class="col-6">
+                                                                                <div class="position-relative">
+                                                                                    <img src="{{ photo }}" class="img-thumbnail" alt="Item photo">
+                                                                                    <div class="bg-dark bg-opacity-50 text-white position-absolute bottom-0 start-0 end-0 small text-center">
+                                                                                        Photo {{ forloop.counter }}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        {% endfor %}
+                                                                    {% endif %}
+                                                                </div>
+                                                                <button type="button" class="btn btn-sm btn-outline-danger position-absolute bottom-0 end-0 m-1" id="clearItemPhotosBtn" {% if not item_photos_list %}disabled{% endif %}>
+                                                                    <i class="fas fa-trash-alt"></i>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="card-footer p-1 bg-light">
+                                                    <p class="mb-0 small text-muted"><i class="fas fa-info-circle"></i> Take multiple photos from different angles</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Gold Item Details Section -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="card-title mb-3">
+                                    <i class="fas fa-gem me-2"></i>Gold Item Details
+                                </h5>
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.item_name|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.item_category|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.market_price_22k|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.gold_karat|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.gross_weight|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.stone_weight|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.net_weight|as_crispy_field }}
+                            </div>
+                            <div class="col-md-12">
+                                {{ form.item_description|as_crispy_field }}
                             </div>
                         </div>
 
@@ -191,6 +241,12 @@
                                 </h5>
                             </div>
                             <div class="col-md-6">
+                                {{ form.scheme|as_crispy_field }}
+                                <div id="scheme-info" class="alert alert-info small mb-0 mt-2" style="display: none;">
+                                    <span id="scheme-details"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
                                 {{ form.principal_amount|as_crispy_field }}
                             </div>
                             <div class="col-md-6">
@@ -199,11 +255,10 @@
                             <div class="col-md-6">
                                 {{ form.distribution_amount|as_crispy_field }}
                             </div>
-                            <div class="col-md-6">
-                                {{ form.interest_rate|as_crispy_field }}
-                            </div>
+                            <!-- Interest rate field removed from UI -->
+                            <input type="hidden" id="id_interest_rate" name="interest_rate" value="12.00">
                         </div>
-
+                        
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5 class="card-title mb-3">
@@ -244,16 +299,47 @@
         // Camera functionality
         const cameraStream = document.getElementById('cameraStream');
         const photoCanvas = document.getElementById('photoCanvas');
-        const capturedPhoto = document.getElementById('capturedPhoto');
+        const capturedPhoto = document.getElementById('capturedPhoto') || document.createElement('img');
+        capturedPhoto.id = 'capturedPhoto';
+        capturedPhoto.className = 'img-fluid';
+        capturedPhoto.style.maxHeight = '150px';
+        capturedPhoto.style.display = 'none';
+        
         const captureBtn = document.getElementById('captureBtn');
         const retakeBtn = document.getElementById('retakeBtn');
         const noCaptureText = document.getElementById('noCaptureText');
         const customerFaceCapture = document.getElementById('customerFaceCapture');
-        let stream = null;
+        const photoPreview = document.getElementById('photoPreview');
         
-        // Start the camera
-        async function startCamera() {
+        // Make sure photoPreview contains capturedPhoto
+        if (photoPreview && !document.getElementById('capturedPhoto')) {
+            photoPreview.appendChild(capturedPhoto);
+        }
+        
+        let stream = null;
+        let cameraInitialized = false;
+        
+        // Initialize customer face capture from existing data if available
+        {% if form.instance.customer_face_capture %}
+            console.log("Initializing existing customer photo");
+            customerFaceCapture.value = "{{ form.instance.customer_face_capture|escapejs }}";
+            if (capturedPhoto) {
+                capturedPhoto.src = "{{ form.instance.customer_face_capture|escapejs }}";
+                capturedPhoto.style.display = 'block';
+                if (noCaptureText) noCaptureText.style.display = 'none';
+                if (retakeBtn) retakeBtn.disabled = false;
+            }
+        {% endif %}
+        
+        // Start the camera with retry mechanism
+        async function startCamera(retryCount = 0) {
             try {
+                if (retryCount > 3) {
+                    console.error('Failed to start camera after multiple attempts');
+                    showAlert('Could not access camera. Please check camera permissions or try using a different browser.', 'danger');
+                    return;
+                }
+                
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         width: { ideal: 640 },
@@ -261,46 +347,119 @@
                         facingMode: 'user'
                     }
                 });
+                
                 cameraStream.srcObject = stream;
+                cameraStream.onloadedmetadata = function() {
+                    cameraStream.play()
+                        .then(() => {
+                            console.log('Camera started successfully');
+                            cameraInitialized = true;
+                        })
+                        .catch(err => {
+                            console.error('Error playing camera stream:', err);
+                            // Try to recover
+                            setTimeout(() => startCamera(retryCount + 1), 1000);
+                        });
+                };
+                
             } catch (err) {
                 console.error('Error accessing camera:', err);
-                showAlert('Could not access camera. Please check camera permissions.', 'danger');
+                showAlert('Could not access camera. Please ensure you have granted camera permissions.', 'danger');
+                
+                // Try again with a delay
+                if (retryCount < 3) {
+                    console.log(`Retrying camera initialization (attempt ${retryCount + 1})...`);
+                    setTimeout(() => startCamera(retryCount + 1), 1000);
+                }
             }
         }
         
         // Start camera when page loads
         startCamera();
         
+        // Retry button for camera access
+        const addRetryButton = () => {
+            const retryButton = document.createElement('button');
+            retryButton.className = 'btn btn-sm btn-warning mt-1';
+            retryButton.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Retry Camera';
+            retryButton.onclick = () => {
+                retryButton.disabled = true;
+                retryButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Retrying...';
+                startCamera();
+                setTimeout(() => {
+                    retryButton.disabled = false;
+                    retryButton.innerHTML = '<i class="fas fa-sync-alt me-1"></i>Retry Camera';
+                }, 3000);
+            };
+            
+            const cameraContainer = document.getElementById('cameraView');
+            if (cameraContainer && !document.getElementById('retry-camera-btn')) {
+                retryButton.id = 'retry-camera-btn';
+                cameraContainer.appendChild(retryButton);
+            }
+        };
+        
+        // Add retry button after a delay if camera doesn't load
+        setTimeout(() => {
+            if (!cameraInitialized) {
+                addRetryButton();
+            }
+        }, 3000);
+        
         // Capture photo function
         captureBtn.addEventListener('click', function() {
-            // Set the canvas dimensions to match the video
-            photoCanvas.width = cameraStream.videoWidth;
-            photoCanvas.height = cameraStream.videoHeight;
+            if (!cameraStream.srcObject || !cameraInitialized) {
+                showAlert('Camera not ready. Please ensure camera permissions are granted and retry.', 'warning');
+                addRetryButton();
+                return;
+            }
             
-            // Draw the current video frame to the canvas
-            const context = photoCanvas.getContext('2d');
-            context.drawImage(cameraStream, 0, 0, photoCanvas.width, photoCanvas.height);
-            
-            // Convert the canvas to a data URL and display the captured photo
-            const photoDataUrl = photoCanvas.toDataURL('image/jpeg');
-            capturedPhoto.src = photoDataUrl;
-            capturedPhoto.style.display = 'block';
-            noCaptureText.style.display = 'none';
-            
-            // Save the photo data in the hidden input
-            customerFaceCapture.value = photoDataUrl;
-            
-            // Enable the retake button
-            retakeBtn.disabled = false;
+            try {
+                // Set the canvas dimensions to match the video
+                photoCanvas.width = cameraStream.videoWidth || 640;
+                photoCanvas.height = cameraStream.videoHeight || 480;
+                
+                if (photoCanvas.width === 0 || photoCanvas.height === 0) {
+                    console.error('Invalid canvas dimensions:', photoCanvas.width, photoCanvas.height);
+                    showAlert('Cannot capture photo. Camera stream not properly initialized.', 'danger');
+                    return;
+                }
+                
+                // Draw the current video frame to the canvas
+                const context = photoCanvas.getContext('2d');
+                context.drawImage(cameraStream, 0, 0, photoCanvas.width, photoCanvas.height);
+                
+                // Convert the canvas to a data URL and display the captured photo
+                const photoDataUrl = photoCanvas.toDataURL('image/jpeg');
+                capturedPhoto.src = photoDataUrl;
+                capturedPhoto.style.display = 'block';
+                if (noCaptureText) noCaptureText.style.display = 'none';
+                
+                // Save the photo data in the hidden input
+                customerFaceCapture.value = photoDataUrl;
+                
+                // Enable the retake button
+                if (retakeBtn) retakeBtn.disabled = false;
+                
+                // Show success message
+                showAlert('Customer photo captured successfully!', 'success');
+            } catch (err) {
+                console.error('Error capturing photo:', err);
+                showAlert('Failed to capture photo. Please try again.', 'danger');
+            }
         });
         
         // Retake photo function
         retakeBtn.addEventListener('click', function() {
-            // Clear the captured photo
+            // Just hide the preview but don't clear the value
             capturedPhoto.style.display = 'none';
-            noCaptureText.style.display = 'block';
-            customerFaceCapture.value = '';
-            retakeBtn.disabled = true;
+            if (noCaptureText) noCaptureText.style.display = 'block';
+            
+            // Important: Don't clear the customerFaceCapture value yet
+            // This ensures the original photo is still submitted if no new photo is taken
+            
+            // Show alert that a new photo should be captured
+            showAlert('Ready to capture new customer photo. Click the Capture button.', 'info');
         });
         
         // Biometric verification functionality
@@ -347,29 +506,6 @@
                 verifyBiometricBtn.classList.remove('btn-outline-primary');
                 verifyBiometricBtn.classList.add('btn-success');
             }, 1500);
-            
-            // In production, you'd make an AJAX request to verify biometrics:
-            /*
-            $.ajax({
-                url: '/api/verify-biometric/',
-                type: 'POST',
-                data: {
-                    'customer_id': customerId,
-                    'csrfmiddlewaretoken': '{{ csrf_token }}'
-                },
-                success: function(response) {
-                    if (response.verified) {
-                        biometricVerified = true;
-                        showBiometricStatus('Biometric verification successful!', 'success');
-                    } else {
-                        showBiometricStatus('Biometric verification failed: ' + response.message, 'danger');
-                    }
-                },
-                error: function(xhr, textStatus, errorThrown) {
-                    showBiometricStatus('Error: ' + errorThrown, 'danger');
-                }
-            });
-            */
         }
         
         // Display biometric status
@@ -377,17 +513,72 @@
             biometricStatus.innerHTML = `<div class="alert alert-${type} mb-3">${message}</div>`;
         }
         
+        // Function to display alert message
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Insert at the top of the form
+            const form = document.querySelector('form');
+            form.insertBefore(alertDiv, form.firstChild);
+            
+            // Auto dismiss after 5 seconds
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }, 5000);
+        }
+        
         // Gold Item Photo Capture Functionality
         const itemCameraStream = document.getElementById('itemCameraStream');
         const itemPhotoCanvas = document.getElementById('itemPhotoCanvas');
         const captureItemBtn = document.getElementById('captureItemBtn');
         const itemPhotosContainer = document.getElementById('itemPhotosContainer');
-        const noItemPhotosText = document.getElementById('noItemPhotosText');
-        const clearItemPhotosBtn = document.getElementById('clearItemPhotosBtn');
+        const noItemPhotosText = document.getElementById('noItemPhotosText') || document.createElement('div');
+        const clearItemPhotosBtn = document.getElementById('clearItemPhotosBtn') || document.createElement('button');
         const photoCountBadge = document.getElementById('photoCountBadge');
         const itemPhotosData = document.getElementById('itemPhotosData');
         let itemStream = null;
         let itemPhotos = [];
+        
+        // Initialize item photos from existing data if available
+        {% if item_photos_list %}
+            console.log("Initializing existing item photos");
+            
+            try {
+                {% for photo in item_photos_list %}
+                    itemPhotos.push({
+                        id: 'existing-item-photo-{{ forloop.counter }}',
+                        dataUrl: '{{ photo|escapejs }}'
+                    });
+                {% endfor %}
+                
+                // Update the hidden input with the existing photos
+                updateItemPhotosData();
+                
+                // Update the display
+                if (itemPhotos.length > 0 && noItemPhotosText) {
+                    noItemPhotosText.style.display = 'none';
+                }
+                
+                if (clearItemPhotosBtn) {
+                    clearItemPhotosBtn.disabled = false;
+                }
+                
+                // Update the photo count badge
+                if (photoCountBadge) {
+                    photoCountBadge.textContent = `${itemPhotos.length} Photos`;
+                    photoCountBadge.className = 'badge me-2 ' + 
+                        (itemPhotos.length < 2 ? 'bg-danger' : 'bg-success');
+                }
+            } catch (error) {
+                console.error("Error initializing item photos:", error);
+            }
+        {% endif %}
         
         // Start the item camera
         async function startItemCamera() {
@@ -429,7 +620,7 @@
             updateItemPhotosData();
             
             // Enable the clear button
-            clearItemPhotosBtn.disabled = false;
+            if (clearItemPhotosBtn) clearItemPhotosBtn.disabled = false;
         });
         
         // Add an item photo to the collection
@@ -438,7 +629,7 @@
             itemPhotos.push({ id: photoId, dataUrl: photoDataUrl });
             
             // Hide the "no photos" text if this is the first photo
-            if (itemPhotos.length === 1) {
+            if (itemPhotos.length === 1 && noItemPhotosText) {
                 noItemPhotosText.style.display = 'none';
             }
             
@@ -456,14 +647,16 @@
                     </div>
                 </div>
             `;
-            itemPhotosContainer.appendChild(thumbnailCol);
-            
-            // Add event listener to delete button
-            const deleteBtn = thumbnailCol.querySelector('.delete-photo');
-            deleteBtn.addEventListener('click', function() {
-                const photoId = this.getAttribute('data-photo-id');
-                deleteItemPhoto(photoId, this.closest('.col-6'));
-            });
+            if (itemPhotosContainer) {
+                itemPhotosContainer.appendChild(thumbnailCol);
+                
+                // Add event listener to delete button
+                const deleteBtn = thumbnailCol.querySelector('.delete-photo');
+                deleteBtn.addEventListener('click', function() {
+                    const photoId = this.getAttribute('data-photo-id');
+                    deleteItemPhoto(photoId, this.closest('.col-6'));
+                });
+            }
             
             // Update the photo count badge
             updatePhotoCountBadge();
@@ -478,9 +671,9 @@
             itemPhotos = itemPhotos.filter(photo => photo.id !== photoId);
             
             // Show the "no photos" text if this was the last photo
-            if (itemPhotos.length === 0) {
+            if (itemPhotos.length === 0 && noItemPhotosText) {
                 noItemPhotosText.style.display = 'block';
-                clearItemPhotosBtn.disabled = true;
+                if (clearItemPhotosBtn) clearItemPhotosBtn.disabled = true;
             }
             
             // Update the photos data in the hidden input
@@ -499,77 +692,112 @@
         
         // Update the photo count badge
         function updatePhotoCountBadge() {
-            photoCountBadge.textContent = `${itemPhotos.length} Photos`;
-            photoCountBadge.className = 'badge me-2 ' + 
-                (itemPhotos.length < 2 ? 'bg-danger' : 'bg-success');
+            if (photoCountBadge) {
+                photoCountBadge.textContent = `${itemPhotos.length} Photos`;
+                photoCountBadge.className = 'badge me-2 ' + 
+                    (itemPhotos.length < 2 ? 'bg-danger' : 'bg-success');
+            }
         }
         
         // Clear all item photos
-        clearItemPhotosBtn.addEventListener('click', function() {
-            // Confirm before clearing
-            if (confirm('Are you sure you want to clear all item photos?')) {
-                // Clear the photos container
-                itemPhotosContainer.innerHTML = '';
-                
-                // Reset the photos array
-                itemPhotos = [];
-                
-                // Show the "no photos" text
-                noItemPhotosText.style.display = 'block';
-                
-                // Clear the hidden input
-                itemPhotosData.value = '';
-                
-                // Disable the clear button
-                clearItemPhotosBtn.disabled = true;
-                
-                // Update the photo count badge
-                updatePhotoCountBadge();
-            }
-        });
-        
-        // Form validation before submit
-        $('#loanForm').on('submit', function(e) {
-            // Check customer photo capture
-            if (!customerFaceCapture.value) {
-                e.preventDefault();
-                showAlert('Please capture a customer photo before proceeding', 'warning');
-                return false;
-            }
-            
-            // Check biometric verification if enabled
-            if (enableBiometricAuth.checked && !biometricVerified) {
-                e.preventDefault();
-                showAlert('Please complete biometric verification before proceeding', 'warning');
-                return false;
-            }
-            
-            // Check if at least 2 item photos were captured
-            if (itemPhotos.length < 2) {
-                e.preventDefault();
-                showAlert('Please capture at least 2 photos of the gold item from different angles', 'warning');
-                return false;
-            }
-        });
-        
-        // Display alerts
-        function showAlert(message, type) {
-            const alertHtml = `
-                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-                    ${message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            `;
-            
-            // Insert the alert at the top of the form
-            $('#loanForm').prepend(alertHtml);
-            
-            // Auto-dismiss after 5 seconds
-            setTimeout(() => {
-                $('.alert').alert('close');
-            }, 5000);
+        if (clearItemPhotosBtn) {
+            clearItemPhotosBtn.addEventListener('click', function() {
+                // Confirm before clearing
+                if (confirm('Are you sure you want to clear all item photos?')) {
+                    // Clear the photos container
+                    if (itemPhotosContainer) itemPhotosContainer.innerHTML = '';
+                    
+                    // Reset the photos array
+                    itemPhotos = [];
+                    
+                    // Show the "no photos" text
+                    if (noItemPhotosText) noItemPhotosText.style.display = 'block';
+                    
+                    // Clear the hidden input
+                    itemPhotosData.value = '';
+                    
+                    // Disable the clear button
+                    clearItemPhotosBtn.disabled = true;
+                    
+                    // Update the photo count badge
+                    updatePhotoCountBadge();
+                }
+            });
         }
-
+        
+        // Add scheme handling
+        function updateSchemeInfo() {
+            const scheme = $('#id_scheme').val();
+            const schemeInfo = $('#scheme-info');
+            const schemeDetails = $('#scheme-details');
+            let interestRate = 0;
+            let schemeText = '';
+            
+            if (scheme === 'standard') {
+                interestRate = 12.00;
+                schemeText = '<strong>Standard Scheme:</strong> 12% interest rate, can only be closed after 3 months from loan date.';
+                schemeInfo.removeClass('alert-info alert-warning').addClass('alert-info');
+            } else if (scheme === 'flexible') {
+                interestRate = 24.00;
+                schemeText = '<strong>Flexible Scheme:</strong> 24% interest rate, but no interest if closed within 25 days from loan date.';
+                schemeInfo.removeClass('alert-info alert-warning').addClass('alert-warning');
+            }
+            
+            // Update interest rate field
+            $('#id_interest_rate').val(interestRate);
+            
+            // Update scheme info display
+            schemeDetails.html(schemeText);
+            schemeInfo.show();
+            
+            // Update due dates based on scheme
+            updateDueDates();
+        }
+        
+        // Function to update due dates based on loan date and scheme
+        function updateDueDates() {
+            const issueDate = $('#id_issue_date').val();
+            const scheme = $('#id_scheme').val();
+            
+            if (issueDate) {
+                const issueDateObj = new Date(issueDate);
+                let dueDate = new Date(issueDateObj);
+                
+                // Set due date based on scheme (1 year for standard, 3 months for flexible)
+                if (scheme === 'standard') {
+                    dueDate.setFullYear(dueDate.getFullYear() + 1); // Add 1 year
+                } else {
+                    dueDate.setDate(dueDate.getDate() + 90); // Add 90 days (3 months)
+                }
+                
+                // Set grace period as due date + 15 days
+                let gracePeriod = new Date(dueDate);
+                gracePeriod.setDate(gracePeriod.getDate() + 15);
+                
+                // Format dates as YYYY-MM-DD for input fields
+                const dueDateFormatted = dueDate.toISOString().split('T')[0];
+                const gracePeriodFormatted = gracePeriod.toISOString().split('T')[0];
+                
+                // Set the values
+                $('#id_due_date').val(dueDateFormatted);
+                $('#id_grace_period_end').val(gracePeriodFormatted);
+            }
+        }
+        
+        // Set up scheme change handler
+        $('#id_scheme').on('change', updateSchemeInfo);
+        
+        // Set up loan date change handler
+        $('#id_issue_date').on('change', updateDueDates);
+        
+        // Run on page load to set initial values
+        updateSchemeInfo();
+        
+        // If loan date is already set on page load, update due dates accordingly
+        if ($('#id_issue_date').val()) {
+            updateDueDates();
+        }
+        
         // Original loan form JS code
         const KARAT_PURITY = {
             '24': 0.999,
@@ -590,7 +818,7 @@
                 };
                 clearTimeout(timeout);
                 timeout = setTimeout(later, wait);
-            };
+            }
         }
 
         // Calculate net weight when gross weight or stone weight changes
@@ -600,143 +828,110 @@
             const netWeight = Math.max(0, grossWeight - stoneWeight);
             $('#id_net_weight').val(netWeight.toFixed(3));
             
-            // Calculate and set principal amount automatically
-            const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;
-            const selectedKarat = $('#id_gold_karat').val();
-            if (marketPrice && selectedKarat && netWeight) {
-                const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
-                const goldValue = marketPrice * netWeight * purityRatio;
-                const suggestedPrincipal = goldValue * 0.75; // Set to 75% of gold value
-                $('#id_principal_amount').val(suggestedPrincipal.toFixed(2)).trigger('input');
-                
-                // Show notification message
-                const messageDiv = $('<div class="alert alert-info mt-2" role="alert">')
-                    .text('Principal amount has been automatically set to 75% of the gold value.')
-                    .insertAfter('#id_principal_amount');
-                    
-                // Remove the message after 3 seconds
-                setTimeout(() => {
-                    messageDiv.fadeOut('slow', function() {
-                        $(this).remove();
-                    });
-                }, 3000);
-            }
+            // Auto-recalculate principal amount whenever net weight changes
+            calculateGoldValue();
         };
 
-        // Function to update principal amount message
-        const updatePrincipalMessage = debounce(function() {
+        // Calculate gold value and suggest principal amount
+        const calculateGoldValue = debounce(function() {
             const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;
             const selectedKarat = $('#id_gold_karat').val();
             const netWeight = parseFloat($('#id_net_weight').val()) || 0;
-            const principalField = $('#id_principal_amount');
-            const principalGroup = principalField.closest('.form-group');
-            const currentPrincipal = parseFloat(principalField.val()) || 0;
             
-            // Remove existing messages
-            $('.principal-message').remove();
-
-            // Create new message container
-            const messageDiv = $('<div class="principal-message text-muted small"></div>');
-            principalField.after(messageDiv);
-
-            if (marketPrice && selectedKarat && netWeight) {
+            // Remove any existing suggestion messages
+            $('.gold-value-message').remove();
+            
+            if (marketPrice && selectedKarat && netWeight > 0) {
                 const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
                 const goldValue = marketPrice * netWeight * purityRatio;
-                const maxPrincipal = goldValue * 0.85;
-                const minPrincipal = goldValue * 0.50;
+                
+                // Calculate suggested principal (75% of gold value)
+                const suggestedPrincipal = Math.round(goldValue * 0.75);
+                
+                // Calculate minimum and maximum allowed values
+                const minPrincipal = Math.round(goldValue * 0.5);
+                const maxPrincipal = Math.round(goldValue * 0.85);
 
-                // Always show the allowed range
-                messageDiv.html(`<i class="fas fa-info-circle"></i> Allowed principal range: ₹${minPrincipal.toFixed(2)} (50%) to ₹${maxPrincipal.toFixed(2)} (85%)`);
-
-                // Update field constraints
-                principalField
-                    .attr('min', minPrincipal)
-                    .attr('max', maxPrincipal)
-                    .attr('data-min-value', minPrincipal)
-                    .attr('data-max-value', maxPrincipal);
-
-                // Add validation message if needed
-                if (currentPrincipal && (currentPrincipal < minPrincipal || currentPrincipal > maxPrincipal)) {
-                    principalField.addClass('is-invalid');
-                    $('<div class="invalid-feedback"></div>')
-                        .text(currentPrincipal > maxPrincipal 
-                            ? `Principal amount cannot exceed ₹${maxPrincipal.toFixed(2)}`
-                            : `Principal amount must be at least ₹${minPrincipal.toFixed(2)}`)
-                        .insertAfter(messageDiv);
-                } else {
-                    principalField.removeClass('is-invalid');
-                }
+                // Automatically fill in the suggested principal amount
+                $('#id_principal_amount').val(suggestedPrincipal);
+                
+                // Trigger the distribution amount calculation
+                calculateDistributionAmount();
+                
+                // Create a compact info message with mild custom styling
+                const messageDiv = $('<div class="gold-value-message small mt-1"></div>')
+                    .css('color', '#5470b0')  // Mild blue color
+                    .html(`<i class="fas fa-info-circle"></i> Gold value: ₹${goldValue.toFixed(0)} | Principal set to ₹${suggestedPrincipal} (75%) | Range: ₹${minPrincipal}-₹${maxPrincipal}`);
+                
+                // Insert after the principal amount field
+                messageDiv.insertAfter('#div_id_principal_amount .form-text');
             }
-        }, 250); // 250ms debounce
+        }, 300);
 
         // Calculate distribution amount when principal or processing fee changes
         const calculateDistributionAmount = function() {
             const principal = parseFloat($('#id_principal_amount').val()) || 0;
+            // Round principal to whole number
+            $('#id_principal_amount').val(Math.round(principal));
+            
             // Calculate processing fee as 1% of principal amount
             const processingFeePercentage = 0.01; // Fixed at 1%
-            const processingFeeAmount = principal * processingFeePercentage;
+            const processingFeeAmount = Math.round(principal * processingFeePercentage);
             
             // Display the processing fee amount instead of percentage
             $('#id_processing_fee')
-                .val(processingFeeAmount.toFixed(2))
-                .prop('readonly', true);
+                .val(processingFeeAmount);
             
             const distributionAmount = principal - processingFeeAmount;
             
             $('#id_distribution_amount')
-                .val(distributionAmount.toFixed(2))
-                .prop('readonly', true);
+                .val(Math.round(distributionAmount));
         };
 
         // Set up event handlers
         $('#id_gross_weight, #id_stone_weight').on('input', calculateNetWeight);
-        $('#id_market_price_22k, #id_gold_karat, #id_net_weight').on('input', function() {
-            calculateNetWeight();
-            updatePrincipalMessage();
-        });
+        $('#id_market_price_22k, #id_gold_karat, #id_net_weight').on('input', calculateGoldValue);
         $('#id_principal_amount')
-            .on('input', function() {
-                calculateDistributionAmount();
-                updatePrincipalMessage();
-            })
+            .on('input', calculateDistributionAmount)
             .trigger('input'); // Trigger on page load
 
-        // Calculate due date when issue date changes
-        const calculateDueDate = function() {
-            const issueDate = new Date($('#id_issue_date').val());
-            if (issueDate) {
-                const dueDate = new Date(issueDate);
-                dueDate.setDate(dueDate.getDate() + 364);
-                $('#id_due_date').val(dueDate.toISOString().split('T')[0]);
+        // Validate principal amount against min/max
+        $('#id_principal_amount').on('change', function() {
+            const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;
+            const selectedKarat = $('#id_gold_karat').val();
+            const netWeight = parseFloat($('#id_net_weight').val()) || 0;
+            const principal = parseFloat($(this).val()) || 0;
+            
+            // Remove any existing error messages
+            $('.principal-error').remove();
+            
+            if (marketPrice && selectedKarat && netWeight > 0) {
+                const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
+                const goldValue = marketPrice * netWeight * purityRatio;
+                const minPrincipal = Math.round(goldValue * 0.5);
+                const maxPrincipal = Math.round(goldValue * 0.85);
+                
+                if (principal < minPrincipal || principal > maxPrincipal) {
+                    const errorMsg = $('<div class="principal-error text-danger small mt-1"></div>')
+                        .text(principal < minPrincipal 
+                            ? `Principal must be at least ₹${minPrincipal} (50% of gold value)`
+                            : `Principal cannot exceed ₹${maxPrincipal} (85% of gold value)`);
+                    
+                    $(this).after(errorMsg);
+                }
             }
-        };
-
-        // Set up issue date change handler
-        $('#id_issue_date').on('change', calculateDueDate);
-        if ($('#id_issue_date').val()) {
-            calculateDueDate();
-        }
-
-        // Calculate grace period end when due date changes
-        const calculateGracePeriod = function() {
-            const dueDate = new Date($('#id_due_date').val());
-            if (dueDate) {
-                const gracePeriodEnd = new Date(dueDate);
-                gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 6);
-                $('#id_grace_period_end').val(gracePeriodEnd.toISOString().split('T')[0]);
+        });
+        
+        // Add form submission handling
+        $('#loanForm').on('submit', function(event) {
+            // Ensure customer face capture is properly included
+            if (customerFaceCapture.value) {
+                // Log the image data length to console for debugging
+                console.log("Submitting customer face capture, data length:", customerFaceCapture.value.length);
+            } else {
+                console.log("No customer face capture data to submit");
             }
-        };
-
-        // Set up due date change handler
-        $('#id_due_date').on('change', calculateGracePeriod);
-        if ($('#id_due_date').val()) {
-            calculateGracePeriod();
-        }
-
-        // Initial calculations
-        calculateNetWeight();
-        updatePrincipalMessage();
-        calculateDistributionAmount();
+        });
         
         // Clean up when leaving the page
         $(window).on('beforeunload', function() {

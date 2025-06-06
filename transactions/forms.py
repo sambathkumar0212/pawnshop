@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.db import models
 from .models import Loan, Payment, LoanExtension, Sale, LoanItem
 from inventory.models import Item, Category
 from inventory.forms import ItemForm
@@ -14,8 +15,14 @@ class LoanForm(forms.ModelForm):
         disabled=True,
         required=False,
         max_digits=10,
-        decimal_places=2,
+        decimal_places=0,  # Changed to 0 decimal places for integer
         help_text="Amount to be distributed after processing fee"
+    )
+
+    scheme = forms.ChoiceField(
+        choices=Loan.SCHEME_CHOICES,
+        initial='standard',
+        help_text="Select loan scheme: Standard (12%) or Flexible (24%)"
     )
 
     KARAT_CHOICES = [
@@ -42,12 +49,12 @@ class LoanForm(forms.ModelForm):
         help_text='Enter the name or description of the gold item'
     )
     item_description = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 3}),
+        label='Item Description',
         help_text='Detailed description of the item including any distinguishing marks, damaged or broken parts'
     )
     item_category = forms.ModelChoiceField(
         required=False,
-        queryset=Category.objects.filter(name__icontains='Gold'),
+        queryset=Category.objects.all(),  # Will filter in __init__
         label='Ornament Type',
         help_text="Select the type of gold ornament"
     )
@@ -74,6 +81,7 @@ class LoanForm(forms.ModelForm):
         required=False,
         max_digits=7,
         decimal_places=3,
+        widget=forms.NumberInput(attrs={'style': 'width: 50%;'}),  # Added style to make width 50%
         help_text="Weight of pure gold content in grams"
     )
     stone_weight = forms.DecimalField(
@@ -85,12 +93,13 @@ class LoanForm(forms.ModelForm):
     interest_rate = forms.DecimalField(
         max_digits=5,
         decimal_places=2,
-        initial=12.00,  # Set default to 12%
-        help_text="Interest rate per year (1% per month)"
+        disabled=True,  # We'll set this programmatically based on scheme
+        required=False,  # Add this line to make it not required for form submission
+        help_text="Interest rate per year"
     )
     processing_fee = forms.DecimalField(
         max_digits=10,
-        decimal_places=2,
+        decimal_places=0,  # Changed to 0 decimal places for integer
         initial=0.01,  # Default 1%
         help_text="Processing fee percentage (default 1%)"
     )
@@ -98,7 +107,7 @@ class LoanForm(forms.ModelForm):
     class Meta:
         model = Loan
         fields = [
-            'customer', 'principal_amount', 'processing_fee', 'interest_rate',
+            'customer', 'scheme', 'principal_amount', 'processing_fee', 'interest_rate',
             'issue_date', 'due_date', 'grace_period_end', 'branch'
         ]
         widgets = {
@@ -106,14 +115,74 @@ class LoanForm(forms.ModelForm):
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             'grace_period_end': forms.DateInput(attrs={'type': 'date'})
         }
-
+        labels = {
+            'issue_date': 'Loan Date',
+        }
+        
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # Update principal_amount field to use integer values
+        self.fields['principal_amount'] = forms.DecimalField(
+            max_digits=10,
+            decimal_places=0,  # Changed to 0 decimal places for integer
+            help_text="₹ Loan amount in Rupees"
+        )
+        
         # Configure customer field
         self.fields['customer'].queryset = Customer.objects.all().order_by('first_name', 'last_name')
         self.fields['customer'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
+
+        # Define top priority ornament types and Tamil Nadu relevant gold ornament categories
+        top_categories = [
+            'Chain', 
+            'Chain with Dollar', 
+            'Chain without Dollar', 
+            'Ring'
+        ]
+        
+        tamilnadu_categories = [
+            'Thali (Mangalsutra)', 'Jimikki (Earrings)', 'Mothiram (Rings)', 
+            'Valai (Bangles)', 'Malai (Necklaces)', 'Koppu (Studs)',
+            'Odiyanam (Waist Belt)', 'Thodu (Ear Hoops)', 'Vanki (Armlet)',
+            'Kolusu (Anklet)', 'Metti (Toe Ring)', 'Jadai Nagam (Hair Ornament)'
+        ]
+        
+        # Create categories in order, starting with the top categories
+        all_categories = top_categories + tamilnadu_categories
+        category_ids = []
+        
+        # Create the top categories first
+        for category_name in top_categories:
+            category, created = Category.objects.get_or_create(
+                name=category_name,
+                defaults={'description': f'Gold ornament: {category_name}'}
+            )
+            category_ids.append(category.id)
+        
+        # Then create or get the Tamil Nadu categories
+        for category_name in tamilnadu_categories:
+            category, created = Category.objects.get_or_create(
+                name=category_name,
+                defaults={'description': f'Traditional Tamil Nadu gold ornament: {category_name}'}
+            )
+            category_ids.append(category.id)
+        
+        # Order the categories to ensure top categories appear first
+        self.fields['item_category'].queryset = Category.objects.filter(id__in=category_ids).order_by(
+            models.Case(
+                *[models.When(name=name, then=pos) for pos, name in enumerate(all_categories)]
+            )
+        )
+        
+        # Set Chain as default
+        chain_category = Category.objects.filter(name='Chain').first()
+        if chain_category:
+            self.fields['item_category'].initial = chain_category
+            
+        self.fields['item_category'].label = 'Ornament Type'
+        self.fields['item_category'].help_text = 'Select the type of gold ornament'
 
         # Filter available items
         available_items = Item.objects.exclude(
@@ -162,14 +231,12 @@ class LoanForm(forms.ModelForm):
                 Column('gold_karat', css_class='col-md-6'),
             ),
             Row(
-                Column('gross_weight', css_class='col-md-6'),
-                Column('stone_weight', css_class='col-md-6'),
+                Column('gross_weight', css_class='col-md-4'),
+                Column('stone_weight', css_class='col-md-4'),
+                Column('net_weight', css_class='col-md-4'),
             ),
             Row(
-                Column('net_weight', css_class='col-md-12'),
-            ),
-            Row(
-                Column('item_description', css_class='col-12'),
+                Column('item_description', css_class='col-md-6'),
             ),
             Row(
                 Column('principal_amount', css_class='col-md-4'),
@@ -185,6 +252,32 @@ class LoanForm(forms.ModelForm):
                 Column('grace_period_end', css_class='col-md-4'),
             ),
         )
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['issue_date'] = timezone.now().date()
+        
+        # Auto-calculate due date and grace period end based on issue date
+        # Standard scheme: 1 year from issue date
+        # Flexible scheme: 3 months from issue date
+        today = timezone.now().date()
+        scheme = self.data.get('scheme', 'standard') if hasattr(self, 'data') and self.data else 'standard'
+        
+        if scheme == 'standard':
+            # Standard loan is for 1 year
+            initial['due_date'] = today + timezone.timedelta(days=365)  # 1 year
+        else:
+            # Flexible loan is for 3 months
+            initial['due_date'] = today + timezone.timedelta(days=90)  # 3 months
+            
+        # Grace period is 15 days after due date
+        if 'due_date' in initial:
+            initial['grace_period_end'] = initial['due_date'] + timezone.timedelta(days=15)
+            
+        if 'customer_id' in self.request.GET:
+            initial['customer'] = self.request.GET['customer_id']
+            
+        return initial
 
     def clean(self):
         cleaned_data = super().clean()
@@ -246,7 +339,9 @@ class LoanForm(forms.ModelForm):
         
         # Calculate and set total_payable
         if instance.principal_amount and instance.interest_rate:
-            annual_interest_rate = instance.interest_rate / Decimal('100')
+            # Convert interest_rate to Decimal if it's not already
+            interest_rate = Decimal(str(instance.interest_rate))
+            annual_interest_rate = interest_rate / Decimal('100')
             interest_amount = instance.principal_amount * annual_interest_rate
             instance.total_payable = instance.principal_amount + interest_amount
 
@@ -310,6 +405,26 @@ class LoanForm(forms.ModelForm):
                         LoanItem.objects.create(loan=instance, item=item)
         
         return instance
+
+    def clean_scheme(self):
+        scheme = self.cleaned_data.get('scheme')
+        if not scheme:
+            # If somehow scheme is empty, default to standard
+            scheme = 'standard'
+            
+        interest_rate = None
+        if scheme == 'standard':
+            interest_rate = Decimal('12.00')
+        elif scheme == 'flexible':
+            interest_rate = Decimal('24.00')
+        else:
+            # If it's an invalid value, default to standard
+            scheme = 'standard'
+            interest_rate = Decimal('12.00')
+
+        # Set interest rate in cleaned_data
+        self.cleaned_data['interest_rate'] = interest_rate
+        return scheme
 
 class LoanExtensionForm(forms.ModelForm):
     EXTENSION_PERIOD_CHOICES = [

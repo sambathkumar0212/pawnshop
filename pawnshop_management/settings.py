@@ -57,6 +57,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'pawnshop_management.middleware.DatabaseConnectionMiddleware',  # Custom middleware for database connections
 ]
 
 ROOT_URLCONF = 'pawnshop_management.urls'
