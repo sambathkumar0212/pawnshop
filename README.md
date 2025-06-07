@@ -100,6 +100,32 @@ Example Gunicorn command:
 gunicorn pawnshop_management.wsgi:application --bind 0.0.0.0:8000
 ```
 
+## Deployment on Render
+
+1. **Push to GitHub**  
+   Make sure your code is pushed to a GitHub repository.
+
+2. **Create a Render Web Service**  
+   - Log in to [Render](https://render.com).
+   - Select "New" and then "Web Service".
+   - Connect your GitHub account and select the repository containing this project.
+
+3. **Configure Render Settings**  
+   - **Build Command:**  
+     ```
+     pip install -r requirements.txt && python manage.py migrate
+     ```
+   - **Start Command:**  
+     ```
+     gunicorn pawnshop_management.wsgi:application --bind 0.0.0.0:$PORT
+     ```
+   - **Environment Variables:**  
+     Set the necessary variables from your `.env.example` (e.g., `SECRET_KEY`, `ALLOWED_HOSTS`, database settings, etc.) in Render's dashboard.
+
+4. **Deploy**  
+   Render will automatically build and deploy your Django application.  
+   
+
 ## License
 
 [Insert License Information]
