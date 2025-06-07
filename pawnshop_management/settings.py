@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',  # Bootstrap 5 template for crispy forms
     'django_filters',
+    'corsheaders',  # Added to enable django‑cors‑headers
     
     # Custom apps
     'accounts',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Must appear at the top for proper CORS handling
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # For static file serving
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -195,3 +197,10 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# Configure CORS settings
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    'http://10.0.2.2:8000',          # For Android emulator loopback
+    'http://<your_dev_machine_ip>:8000',  # For real devices on your dev network
+]
