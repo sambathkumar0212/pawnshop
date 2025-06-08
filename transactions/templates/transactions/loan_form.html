@@ -322,7 +322,9 @@
         // Initialize customer face capture from existing data if available
         {% if form.instance.customer_face_capture %}
             console.log("Initializing existing customer photo");
-            customerFaceCapture.value = "{{ form.instance.customer_face_capture|escapejs }}";
+            if (customerFaceCapture) {
+                customerFaceCapture.value = "{{ form.instance.customer_face_capture|escapejs }}";
+            }
             if (capturedPhoto) {
                 capturedPhoto.src = "{{ form.instance.customer_face_capture|escapejs }}";
                 capturedPhoto.style.display = 'block';

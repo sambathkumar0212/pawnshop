@@ -10,6 +10,7 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from .models import Loan, Payment, LoanExtension, Sale
 from .forms import LoanForm, SaleForm, LoanExtensionForm
+from .utils import ManagerPermissionMixin
 
 # Basic placeholder views for the transactions app
 # These will need to be implemented properly with the correct models
@@ -120,29 +121,78 @@ class LoanDetailView(LoginRequiredMixin, DetailView):
         # Add loan extensions
         context['extensions'] = loan.extensions.order_by('-extension_date')
         
-        # Add loan items with gold details - ensure proper querying
-        loan_items = loan.loanitem_set.all().select_related('item')
+        # Get the loan items by the loan's primary key (ID) directly from LoanItem model
+        from .models import LoanItem
+        loan_items = LoanItem.objects.filter(loan_id=loan.id).select_related('item')
         context['loan_items'] = loan_items
         
         # Debug log the items to make sure they're being fetched
-        print(f"Found {loan_items.count()} loan items: {[item.item.name for item in loan_items]}")
+        print(f"Found {loan_items.count()} loan items for loan ID {loan.id}: {[item.item.name for item in loan_items]}")
         
-        # Process item photos for the template
+        # Process item photos for the template - IMPROVED VERSION
         if loan.item_photos:
             import json
             try:
+                # First, check if it's a valid JSON string
                 if isinstance(loan.item_photos, str):
-                    photo_list = json.loads(loan.item_photos)
+                    # Clean up any potential whitespace or extra quotes
+                    cleaned_json = loan.item_photos.strip()
+                    
+                    # If the string is wrapped in extra quotes, remove them
+                    if (cleaned_json.startswith('"') and cleaned_json.endswith('"')) or \
+                       (cleaned_json.startswith("'") and cleaned_json.endswith("'")):
+                        cleaned_json = cleaned_json[1:-1]
+                    
+                    # Try to parse the JSON
+                    photo_list = json.loads(cleaned_json)
+                    
+                    # Handle the case where we get a string instead of a list
+                    if isinstance(photo_list, str):
+                        # It might be a JSON string within a JSON string
+                        try:
+                            photo_list = json.loads(photo_list)
+                        except json.JSONDecodeError:
+                            # If it's not valid JSON, use it as a single item in a list
+                            photo_list = [photo_list]
+                    
+                    # Ensure it's a list
+                    if not isinstance(photo_list, list):
+                        photo_list = [str(photo_list)]
+                    
+                    # Debug output
+                    print(f"Successfully parsed item photos. Found {len(photo_list)} photos")
+                    print(f"First photo sample: {photo_list[0][:30]}..." if photo_list else "No photos found")
+                    
                     context['item_photos_list'] = photo_list
-                elif hasattr(loan.item_photos, '__iter__'):
-                    context['item_photos_list'] = list(loan.item_photos)
-            except (json.JSONDecodeError, AttributeError):
-                context['item_photos_list'] = []
+                elif isinstance(loan.item_photos, list):
+                    # If it's already a list, use it directly
+                    context['item_photos_list'] = loan.item_photos
+                else:
+                    # If it's neither a string nor a list, convert to string representation
+                    context['item_photos_list'] = [str(loan.item_photos)]
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}")
+                # Last resort: try with ast.literal_eval for string representations of lists
+                try:
+                    import ast
+                    if loan.item_photos.startswith('[') and loan.item_photos.endswith(']'):
+                        photo_list = ast.literal_eval(loan.item_photos)
+                        context['item_photos_list'] = photo_list
+                        print(f"Parsed with ast: {len(photo_list)} photos")
+                    else:
+                        # Handle as a single item
+                        context['item_photos_list'] = [loan.item_photos]
+                except Exception as e2:
+                    print(f"Fallback parsing failed: {e2}")
+                    context['item_photos_list'] = [loan.item_photos]
+        else:
+            print("No item photos found for this loan")
+            context['item_photos_list'] = []
         
         return context
 
 
-class LoanUpdateView(LoginRequiredMixin, UpdateView):
+class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
     model = Loan
     form_class = LoanForm
     template_name = 'transactions/loan_form.html'
@@ -185,15 +235,65 @@ class LoanUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         loan = self.get_object()
         
-        # Process item photos for the template
+        # Process item photos for the template - Using the IMPROVED VERSION from LoanDetailView
         if loan.item_photos:
             import json
             try:
+                # First, check if it's a valid JSON string
                 if isinstance(loan.item_photos, str):
-                    context['item_photos_list'] = json.loads(loan.item_photos)
-            except json.JSONDecodeError:
-                print("Error decoding item_photos JSON")
-                context['item_photos_list'] = []
+                    # Clean up any potential whitespace or extra quotes
+                    cleaned_json = loan.item_photos.strip()
+                    
+                    # If the string is wrapped in extra quotes, remove them
+                    if (cleaned_json.startswith('"') and cleaned_json.endswith('"')) or \
+                       (cleaned_json.startswith("'") and cleaned_json.endswith("'")):
+                        cleaned_json = cleaned_json[1:-1]
+                    
+                    # Try to parse the JSON
+                    photo_list = json.loads(cleaned_json)
+                    
+                    # Handle the case where we get a string instead of a list
+                    if isinstance(photo_list, str):
+                        # It might be a JSON string within a JSON string
+                        try:
+                            photo_list = json.loads(photo_list)
+                        except json.JSONDecodeError:
+                            # If it's not valid JSON, use it as a single item in a list
+                            photo_list = [photo_list]
+                    
+                    # Ensure it's a list
+                    if not isinstance(photo_list, list):
+                        photo_list = [str(photo_list)]
+                    
+                    # Debug output
+                    print(f"Successfully parsed item photos for edit. Found {len(photo_list)} photos")
+                    print(f"First photo sample: {photo_list[0][:30]}..." if photo_list else "No photos found")
+                    
+                    context['item_photos_list'] = photo_list
+                elif isinstance(loan.item_photos, list):
+                    # If it's already a list, use it directly
+                    context['item_photos_list'] = loan.item_photos
+                else:
+                    # If it's neither a string nor a list, convert to string representation
+                    context['item_photos_list'] = [str(loan.item_photos)]
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error in edit view: {e}")
+                # Last resort: try with ast.literal_eval for string representations of lists
+                try:
+                    import ast
+                    if loan.item_photos.startswith('[') and loan.item_photos.endswith(']'):
+                        photo_list = ast.literal_eval(loan.item_photos)
+                        context['item_photos_list'] = photo_list
+                        print(f"Parsed with ast in edit view: {len(photo_list)} photos")
+                    else:
+                        # Handle as a single item
+                        context['item_photos_list'] = [loan.item_photos]
+                except Exception as e2:
+                    print(f"Fallback parsing failed in edit view: {e2}")
+                    context['item_photos_list'] = [loan.item_photos]
+        else:
+            print("No item photos found for this loan in edit view")
+            context['item_photos_list'] = []
                 
         return context
     
@@ -235,6 +335,9 @@ class LoanUpdateView(LoginRequiredMixin, UpdateView):
                 form.instance.item_photos = item_photos_data
             except json.JSONDecodeError:
                 print("Invalid item_photos JSON format, not saving")
+        
+        # Record who updated the loan
+        form.instance.last_updated_by = self.request.user
         
         response = super().form_valid(form)
         messages.success(self.request, f'Loan #{form.instance.loan_number} has been updated successfully.')
@@ -670,7 +773,7 @@ class LoanDocumentView(LoginRequiredMixin, View):
                     photo_list = json.loads(loan.item_photos)
                     for photo in photo_list:
                         if photo.startswith('data:image/jpeg;base64,'):
-                            item_photos.append(photo.replace('data:image/jpeg;base64, ' , ''))
+                            item_photos.append(photo.replace('data:image/jpeg;base64,', ''))
                         else:
                             item_photos.append(photo)
                 # If already a list or similar iterable
@@ -706,7 +809,26 @@ class LoanDocumentView(LoginRequiredMixin, View):
         if not pdf.err:
             # Generate response with PDF content
             response = HttpResponse(result.getvalue(), content_type='application/pdf')
-            filename = f"loan_agreement_{loan.loan_number}.pdf"
+            
+            # Generate filename with customer name and loan item name only (no loan ID)
+            customer_name = f"{loan.customer.first_name}_{loan.customer.last_name}"
+            
+            # Get the first item name as part of the filename
+            item_name = "NoItem"
+            if loan_items:
+                # If there are multiple items, use the first one's name
+                first_item = loan_items.first()
+                if first_item and first_item.item:
+                    # Clean the item name to make it URL-safe
+                    item_name = first_item.item.name.replace(' ', '_')
+            
+            # Format the filename: CustomerName_ItemName.pdf (removed loan number)
+            filename = f"{customer_name}_{item_name}.pdf"
+            
+            # Make the filename URL-safe (replace special characters)
+            import re
+            filename = re.sub(r'[^\w\-_.]', '_', filename)
+            
             response['Content-Disposition'] = f'attachment; filename="{filename}"'
             return response
         

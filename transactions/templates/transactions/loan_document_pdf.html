@@ -128,6 +128,81 @@
             vertical-align: middle;
             padding: 5px 8px;
         }
+        .customer-photo {
+            width: 120px;
+            height: 140px;
+            border: 1px solid #000;
+            overflow: hidden;
+        }
+        .customer-photo img {
+            width: 100%;
+            height: auto;
+        }
+        table.photos-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        table.photos-table td {
+            padding: 8px;
+            text-align: center;
+            vertical-align: top;
+            width: 25%; /* 4 photos per row instead of 5 */
+        }
+        .item-photo {
+            width: 90px;
+            height: 90px;
+            border: 1px solid #000;
+            overflow: hidden;
+            display: inline-block;
+            margin: 0 auto;
+        }
+        .item-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .photo-label {
+            font-size: 9px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 3px;
+        }
+        /* New styles for enhanced fields */
+        .highlight-cell {
+            background-color: #f2f2f2;
+        }
+        .important-field {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .financial-value {
+            color: #00458B;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .date-value {
+            color: #8B0000;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .loan-number {
+            font-size: 16px;
+            font-weight: bold;
+            color: #000;
+            border: 2px solid #000;
+            padding: 2px 5px;
+            display: inline-block;
+        }
+        .summary-box {
+            border: 2px solid #000;
+            padding: 5px;
+            background-color: #F8F8F8;
+        }
+        .customer-name {
+            font-size: 15px; 
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -143,12 +218,29 @@
         
         <table class="data-table">
             <tr>
-                <td width="50%"><b>Loan Number</b><br>{{ loan.loan_number }}</td>
-                <td width="50%"><b>Date of Agreement</b><br>{{ loan.issue_date|date:"d/m/Y" }}</td>
+                <td width="50%" class="highlight-cell"><b>Loan Number</b><br><span class="loan-number">{{ loan.loan_number }}</span></td>
+                <td width="50%" rowspan="2" style="vertical-align: top;">
+                    <b>Customer Photo</b><br>
+                    <div class="customer-photo">
+                    {% if customer_photo %}
+                        <img src="data:image/jpeg;base64,{{ customer_photo }}" alt="Customer Photo">
+                    {% else %}
+                        <p style="text-align: center; margin-top: 50px;">No photo available</p>
+                    {% endif %}
+                    </div>
+                </td>
             </tr>
             <tr>
-                <td><b>Borrower Name</b><br>{{ customer.full_name }}</td>
-                <td><b>ID Proof Number</b><br>{{ customer.id_number }}</td>
+                <td class="highlight-cell">
+                    <b>Borrower Name</b><br><span class="customer-name">{{ customer.full_name }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td><b>ID Proof Number</b><br><span class="important-field">{{ customer.id_number }}</span></td>
+                <td>
+                    <b>Phone Number</b><br>{% if customer.phone %}{{ customer.phone }}{% else %}None{% endif %}<br>
+                    <b>Email</b><br>{% if customer.email %}{{ customer.email }}{% else %}None{% endif %}
+                </td>
             </tr>
             <tr>
                 <td><b>Address</b><br>
@@ -157,21 +249,23 @@
                     {% if customer.state %}, {{ customer.state }}{% endif %}
                     {% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}
                 </td>
-                <td>
-                    <b>Phone Number</b><br>{% if customer.phone %}{{ customer.phone }}{% else %}None{% endif %}<br>
-                    <b>Email</b><br>{% if customer.email %}{{ customer.email }}{% else %}None{% endif %}
-                </td>
+                <td class="highlight-cell"><b>Principal Amount</b><br><span class="financial-value">Rs. {{ loan.principal_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
-                <td><b>Principal Amount</b><br>Rs. {{ loan.principal_amount|floatformat:2 }}</td>
                 <td><b>Processing Fee</b><br>Rs. {{ loan.processing_fee|floatformat:2 }}</td>
+                <td><b>Distribution Amount</b><br><span class="important-field">Rs. {{ loan.distribution_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
-                <td><b>Distribution Amount</b><br>Rs. {{ loan.distribution_amount|floatformat:2 }}</td>
-                <td><b>Interest Rate</b><br>{{ loan.interest_rate|floatformat:2 }}% per annum</td>
+                <td><b>Interest Rate</b><br>{{ loan.interest_rate|floatformat:2 }}% per annum<br>
+                    <span style="font-size: 9px;">
+                        (Monthly: {% if loan.scheme == 'standard' %}Rs. 1 per Rs. 100{% elif loan.scheme == 'flexible' %}Rs. 2 per Rs. 100{% endif %})
+                    </span>
+                </td>
+                <td class="highlight-cell"><b>Total Payable Amount</b><br><span class="financial-value">Rs. {{ loan.total_payable|floatformat:2 }}</span></td>
             </tr>
             <tr>
-                <td><b>Loan Scheme</b><br>
+                <td class="highlight-cell"><b>Loan Scheme</b><br>
+                    <span class="important-field">
                     {% if loan.scheme == 'standard' %}
                         Standard Scheme (12% interest, minimum 3 months term)
                     {% elif loan.scheme == 'flexible' %}
@@ -179,6 +273,7 @@
                     {% else %}
                         Standard
                     {% endif %}
+                    </span>
                 </td>
                 <td><b>Scheme Terms</b><br>
                     {% if loan.scheme == 'standard' %}
@@ -191,11 +286,8 @@
                 </td>
             </tr>
             <tr>
-                <td><b>Total Payable Amount</b><br>Rs. {{ loan.total_payable|floatformat:2 }}</td>
-                <td><b>Loan Term</b><br>1 Year</td>
-            </tr>
-            <tr>
-                <td colspan="2"><b>Due Date</b><br>{{ loan.due_date|date:"d/m/Y" }}</td>
+                <td><b>Loan Date</b><br><span class="date-value">{{ loan.issue_date|date:"d/m/Y" }}</span></td>
+                <td class="highlight-cell"><b>Due Date</b><br><span class="date-value">{{ loan.due_date|date:"d/m/Y" }}</span></td>
             </tr>
         </table>
         
@@ -224,6 +316,23 @@
                 {% endfor %}
             </tbody>
         </table>
+        
+        {% if item_photos %}
+        <h3 style="font-size: 14px; margin-top: 20px;">Pledged Gold Item Photos</h3>
+        <table class="photos-table">
+            <tr>
+                {% for photo in item_photos %}
+                <td>
+                    <div class="item-photo">
+                        <img src="data:image/jpeg;base64,{{ photo }}" alt="Gold Item {{ forloop.counter }}">
+                    </div>
+                    <div class="photo-label">Item {{ forloop.counter }}</div>
+                </td>
+                {% if forloop.counter|divisibleby:4 and not forloop.last %}</tr><tr>{% endif %}
+                {% endfor %}
+            </tr>
+        </table>
+        {% endif %}
         
         <div class="terms-section">
             <h3>TERMS AND CONDITIONS</h3>

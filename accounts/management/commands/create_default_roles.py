@@ -1,162 +1,145 @@
 from django.core.management.base import BaseCommand
-from django.contrib.auth.models import Permission
-from accounts.models import Role
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from django.db import transaction
+from django.apps import apps
 
 class Command(BaseCommand):
-    help = 'Creates default roles with appropriate permissions'
+    help = 'Creates default roles (groups) for the pawnshop management system'
 
-    def handle(self, *args, **kwargs):
-        with transaction.atomic():
-            # Define roles and their descriptions
-            roles = {
-                'Regional Manager': {
-                    'description': 'Oversees multiple branches, ensuring compliance, profitability, and customer satisfaction.',
-                    'permissions': [
-                        # Branch management
-                        'view_branch', 'change_branch', 'add_branch', 'delete_branch',
-                        'view_branchsettings', 'change_branchsettings',
-                        # Staff management
-                        'view_customuser', 'change_customuser', 'add_customuser', 'delete_customuser',
-                        'view_role', 'change_role',
-                        # Financial management
-                        'view_report', 'add_report', 'change_report',
-                        # Access to all operations
-                        'view_loan', 'change_loan', 'add_loan', 'delete_loan',
-                        'view_payment', 'change_payment', 'add_payment', 'delete_payment',
-                        'view_item', 'change_item', 'add_item', 'delete_item',
-                        'view_customer', 'change_customer', 'add_customer', 'delete_customer',
-                    ]
-                },
-                'Branch Manager': {
-                    'description': 'Responsible for day-to-day operations, staff supervision, and financial performance of a specific branch.',
-                    'permissions': [
-                        # Branch operations
-                        'view_branch', 'change_branchsettings',
-                        # Staff management
-                        'view_customuser', 'change_customuser',
-                        # Operations management
-                        'view_loan', 'change_loan', 'add_loan',
-                        'view_payment', 'add_payment',
-                        'view_item', 'change_item', 'add_item',
-                        'view_customer', 'change_customer', 'add_customer',
-                        'view_report',
-                    ]
-                },
-                'Sales Associate': {
-                    'description': 'Interacts with customers, assesses and appraises items, processes loans, and manages inventory.',
-                    'permissions': [
-                        'view_item', 'add_item', 'change_item',
-                        'view_customer', 'add_customer', 'change_customer',
-                        'view_loan', 'add_loan',
-                        'view_payment', 'add_payment',
-                        'add_appraisal', 'view_appraisal',
-                    ]
-                },
-                'Customer Service Representative': {
-                    'description': 'Handles inquiries, resolves issues, and provides support to customers.',
-                    'permissions': [
-                        'view_customer', 'add_customer', 'change_customer',
-                        'view_loan', 'view_payment', 'view_item',
-                    ]
-                },
-                'Appraiser': {
-                    'description': 'Determines the fair market value of items offered as collateral.',
-                    'permissions': [
-                        'view_item', 'change_item',
-                        'add_appraisal', 'change_appraisal', 'view_appraisal',
-                        'view_customer',
-                    ]
-                },
-                'Inventory Specialist': {
-                    'description': 'Manages the storage, tracking, and sale of items held by the pawnshop.',
-                    'permissions': [
-                        'view_item', 'change_item', 'add_item',
-                        'view_category', 'add_category', 'change_category',
-                        'view_customer',
-                    ]
-                },
-                'Accountant': {
-                    'description': 'Manages financial records, compliance, and reporting.',
-                    'permissions': [
-                        'view_loan', 'view_payment',
-                        'view_report', 'add_report',
-                        'view_branch',
-                    ]
-                },
-                'Security Personnel': {
-                    'description': 'Ensures the safety and security of the pawnshop and its items.',
-                    'permissions': [
-                        'view_item',
-                        'view_customer',
-                        'view_branch',
-                    ]
-                },
-                'Administrative Assistant': {
-                    'description': 'Supports various administrative tasks.',
-                    'permissions': [
-                        'view_customer',
-                        'view_item',
-                        'view_loan',
-                        'view_payment',
-                        'view_report',
-                    ]
-                },
-                'IT Support': {
-                    'description': 'Manages technology infrastructure and software for branches.',
-                    'permissions': [
-                        'view_branch', 'view_branchsettings',
-                        'view_customuser',
-                        'view_biometricsetting', 'change_biometricsetting',
-                    ]
-                },
-                'Marketing Manager': {
-                    'description': 'Drives business growth and attracts customers.',
-                    'permissions': [
-                        'view_customer',
-                        'view_item',
-                        'view_report',
-                        'view_branch',
-                    ]
-                },
-                'Compliance Officer': {
-                    'description': 'Ensures adherence to regulations and legal requirements.',
-                    'permissions': [
-                        'view_loan', 'view_payment',
-                        'view_customer', 'view_item',
-                        'view_report', 'add_report',
-                        'view_branch', 'view_branchsettings',
-                    ]
-                },
-                'HR Manager': {
-                    'description': 'Manages employee-related tasks and payroll.',
-                    'permissions': [
-                        'view_customuser', 'change_customuser', 'add_customuser',
-                        'view_role',
-                        'view_branch',
-                    ]
-                },
+    def handle(self, *args, **options):
+        # Define roles with descriptions and permissions
+        roles = [
+            {
+                'name': 'Administrator',
+                'description': 'Full system access with all permissions',
+                'permissions': 'all'  # Special case: all permissions
+            },
+            {
+                'name': 'Branch Manager',
+                'description': 'Manages branch operations, staff, and reporting',
+                'permissions': [
+                    # Auth permissions
+                    {'app': 'auth', 'model': 'user', 'codenames': ['view', 'add', 'change']},
+                    {'app': 'auth', 'model': 'group', 'codenames': ['view']},
+                    # Core business permissions
+                    {'app': 'loans', 'model': '*', 'codenames': ['view', 'add', 'change', 'delete']},
+                    {'app': 'inventory', 'model': '*', 'codenames': ['view', 'add', 'change', 'delete']},
+                    {'app': 'customers', 'model': '*', 'codenames': ['view', 'add', 'change', 'delete']},
+                    {'app': 'transactions', 'model': '*', 'codenames': ['view', 'add', 'change']},
+                    {'app': 'reports', 'model': '*', 'codenames': ['view']},
+                    {'app': 'settings', 'model': '*', 'codenames': ['view', 'change']},
+                ]
+            },
+            {
+                'name': 'Loan Officer',
+                'description': 'Handles pawn loans, valuations, and customer interactions',
+                'permissions': [
+                    {'app': 'loans', 'model': '*', 'codenames': ['view', 'add', 'change']},
+                    {'app': 'inventory', 'model': 'item', 'codenames': ['view', 'add', 'change']},
+                    {'app': 'customers', 'model': '*', 'codenames': ['view', 'add', 'change']},
+                    {'app': 'transactions', 'model': 'payment', 'codenames': ['view', 'add']},
+                ]
+            },
+            {
+                'name': 'Cashier',
+                'description': 'Processes payments, buyouts, and basic customer transactions',
+                'permissions': [
+                    {'app': 'loans', 'model': '*', 'codenames': ['view']},
+                    {'app': 'inventory', 'model': 'item', 'codenames': ['view']},
+                    {'app': 'customers', 'model': '*', 'codenames': ['view']},
+                    {'app': 'transactions', 'model': '*', 'codenames': ['view', 'add']},
+                ]
+            },
+            {
+                'name': 'Inventory Manager',
+                'description': 'Manages inventory, auctions, and item tracking',
+                'permissions': [
+                    {'app': 'inventory', 'model': '*', 'codenames': ['view', 'add', 'change', 'delete']},
+                    {'app': 'loans', 'model': '*', 'codenames': ['view']},
+                ]
+            },
+            {
+                'name': 'Accountant',
+                'description': 'Handles financial reports, audits, and accounting tasks',
+                'permissions': [
+                    {'app': 'transactions', 'model': '*', 'codenames': ['view']},
+                    {'app': 'loans', 'model': '*', 'codenames': ['view']},
+                    {'app': 'reports', 'model': '*', 'codenames': ['view']},
+                ]
+            },
+            {
+                'name': 'Customer Service',
+                'description': 'Handles customer inquiries and basic transactions',
+                'permissions': [
+                    {'app': 'customers', 'model': '*', 'codenames': ['view', 'add', 'change']},
+                    {'app': 'loans', 'model': '*', 'codenames': ['view']},
+                    {'app': 'transactions', 'model': 'payment', 'codenames': ['view']},
+                ]
+            },
+            {
+                'name': 'Appraiser',
+                'description': 'Specializes in item valuation and authenticity verification',
+                'permissions': [
+                    {'app': 'inventory', 'model': 'item', 'codenames': ['view', 'change']},
+                    {'app': 'loans', 'model': 'pawnitem', 'codenames': ['view', 'change']},
+                ]
             }
+        ]
 
-            # Create roles and assign permissions
-            for role_name, role_data in roles.items():
-                role, created = Role.objects.get_or_create(
-                    name=role_name,
-                    defaults={'description': role_data['description']}
-                )
+        # Create or update each role
+        for role_data in roles:
+            role, created = Group.objects.get_or_create(name=role_data['name'])
+            
+            # Add description to role (if your Group model supports it)
+            if hasattr(role, 'description'):
+                role.description = role_data['description']
+                role.save()
+            
+            # Clear existing permissions
+            role.permissions.clear()
+            
+            # Handle 'all' permissions special case
+            if role_data['permissions'] == 'all':
+                all_perms = Permission.objects.all()
+                role.permissions.add(*all_perms)
+                self.stdout.write(f"Added all {all_perms.count()} permissions to {role.name}")
+                continue
                 
-                if not created:
-                    role.description = role_data['description']
-                    role.save()
-
-                # Get all permissions for this role
-                permissions = Permission.objects.filter(codename__in=role_data['permissions'])
-                role.permissions.set(permissions)
-
-                action = 'Created' if created else 'Updated'
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f'{action} role "{role_name}" with {permissions.count()} permissions'
-                    )
-                )
+            # Add specific permissions
+            for perm_group in role_data['permissions']:
+                app = perm_group['app']
+                model = perm_group['model']
+                codenames = perm_group['codenames']
+                
+                # Handle wildcard model case
+                if model == '*':
+                    # Get all models in the app
+                    app_models = [
+                        model.__name__.lower() 
+                        for model in apps.get_app_config(app).get_models()
+                    ]
+                    for model_name in app_models:
+                        self._add_permissions(role, app, model_name, codenames)
+                else:
+                    self._add_permissions(role, app, model, codenames)
+            
+            status = "Created" if created else "Updated"
+            self.stdout.write(f"{status} role: {role.name} with {role.permissions.count()} permissions")
+    
+    def _add_permissions(self, role, app, model, codenames):
+        """Helper to add permissions for a specific model"""
+        try:
+            content_type = ContentType.objects.get(app_label=app, model=model)
+            for action in codenames:
+                perm_codename = f"{action}_{model}"
+                try:
+                    perm = Permission.objects.get(content_type=content_type, codename=perm_codename)
+                    role.permissions.add(perm)
+                except Permission.DoesNotExist:
+                    self.stdout.write(self.style.WARNING(
+                        f"Permission {perm_codename} does not exist for {app}.{model}"
+                    ))
+        except ContentType.DoesNotExist:
+            self.stdout.write(self.style.WARNING(
+                f"Content type for {app}.{model} does not exist"
+            ))

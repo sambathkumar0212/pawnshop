@@ -17,7 +17,7 @@ from django.conf import settings
 import datetime
 
 from .models import CustomUser, Role, UserActivity, Customer
-from .forms import UserFaceCreateForm
+from .forms import UserFaceCreateForm, UserUpdateForm
 from branches.models import Branch
 from inventory.models import Item
 from transactions.models import Loan, Sale
@@ -178,23 +178,14 @@ class UserCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
 class UserUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = CustomUser
     template_name = 'accounts/user_form.html'
-    fields = ['first_name', 'last_name', 'email', 'phone', 'role', 'branch', 'is_active']
+    form_class = UserUpdateForm
     success_url = reverse_lazy('user_list')
     permission_required = 'accounts.change_customuser'
     
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        form.fields['username'] = forms.CharField(
-            disabled=True,
-            initial=self.object.username,
-            help_text='Username cannot be changed after creation'
-        )
-        # Ensure role and branch fields are initialized with current values
-        if self.object.role:
-            form.fields['role'].initial = self.object.role.id
-        if self.object.branch:
-            form.fields['branch'].initial = self.object.branch.id
-        return form
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # Add any additional context needed for the form
+        return kwargs
     
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -207,7 +198,6 @@ class UserUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
             description=f'Updated user: {self.object.username}',
             ip_address=self.request.META.get('REMOTE_ADDR')
         )
-        
         return response
 
 
@@ -240,7 +230,7 @@ class RoleListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'accounts.view_role'
 
 
-class RoleCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class RoleCreateView(LoginRequiredMixin, CreateView):
     model = Role
     template_name = 'accounts/role_form.html'
     fields = ['name', 'description', 'permissions']
@@ -248,7 +238,7 @@ class RoleCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     permission_required = 'accounts.add_role'
 
 
-class RoleUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class RoleUpdateView(LoginRequiredMixin, UpdateView):
     model = Role
     template_name = 'accounts/role_form.html'
     fields = ['name', 'description', 'permissions']
@@ -417,8 +407,61 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
     success_url = reverse_lazy('customer_list')
     permission_required = 'accounts.add_customer'
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add fieldset information for better UI organization
+        context['fieldsets'] = [
+            {'title': 'Personal Information', 'fields': ['first_name', 'last_name', 'email', 'phone']},
+            {'title': 'Address', 'fields': ['address', 'city', 'state', 'zip_code']},
+            {'title': 'Identification', 'fields': ['id_type', 'id_number', 'id_image']},
+            {'title': 'Additional Information', 'fields': ['notes']}
+        ]
+        context['show_camera_capture'] = True
+        context['show_profile_photo'] = True
+        context['page_title'] = 'Add New Customer'
+        context['submit_text'] = 'Create Customer'
+        # Add camera configuration
+        context['camera_config'] = {
+            'width': 640,
+            'height': 480,
+            'image_format': 'jpeg',
+            'jpeg_quality': 90,
+            'target_field': 'id_image',
+            'camera_id_field': 'camera_image_data'
+        }
+        # Add debug flag
+        context['debug_mode'] = settings.DEBUG
+        return context
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Improve form widgets
+        form.fields['first_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'First Name'})
+        form.fields['last_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Last Name'})
+        form.fields['email'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Email Address'})
+        form.fields['phone'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Phone Number', 'type': 'tel'})
+        form.fields['address'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Street Address'})
+        form.fields['city'].widget.attrs.update({'class': 'form-control', 'placeholder': 'City'})
+        form.fields['state'].widget.attrs.update({'class': 'form-control', 'placeholder': 'State/Province'})
+        form.fields['zip_code'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Zip/Postal Code'})
+        form.fields['notes'].widget.attrs.update({'class': 'form-control', 'rows': 3, 'placeholder': 'Additional notes about the customer'})
+        
+        # Make ID image optional in the form since we're using camera capture
+        form.fields['id_image'].required = False
+        
+        # Add hidden fields for camera data
+        form.fields['camera_image_data'] = forms.CharField(required=False, widget=forms.HiddenInput())
+        form.fields['profile_photo_data'] = forms.CharField(required=False, widget=forms.HiddenInput())
+        
+        return form
+    
     def form_valid(self, form):
         form.instance.created_by = self.request.user
+        
+        # Log received form data for debugging (only field names for privacy)
+        if settings.DEBUG:
+            print(f"Form data received: {list(self.request.POST.keys())}")
+            print(f"Files received: {list(self.request.FILES.keys())}")
         
         # Process camera image if available
         camera_image_data = self.request.POST.get('camera_image_data')
@@ -437,8 +480,21 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
                 
                 # Assign to the form instance
                 form.instance.id_image = image_file
+                
+                # Log success message
+                messages.success(self.request, "ID image captured successfully.")
+                
+                if settings.DEBUG:
+                    print("Successfully processed camera image")
             except Exception as e:
-                messages.error(self.request, f"Error processing camera image: {str(e)}")
+                messages.error(self.request, f"Error processing ID image: {str(e)}")
+                if settings.DEBUG:
+                    print(f"Error processing camera image: {str(e)}")
+        else:
+            if settings.DEBUG and 'camera_image_data' in self.request.POST:
+                print("Camera image data was received but in incorrect format")
+            elif settings.DEBUG:
+                print("No camera image data was received")
         
         # Process profile photo if available
         profile_photo_data = self.request.POST.get('profile_photo_data')
@@ -449,8 +505,17 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
             except Exception as e:
                 messages.error(self.request, f"Error processing profile photo: {str(e)}")
         
-        messages.success(self.request, 'Customer was created successfully.')
+        messages.success(self.request, f'Customer {form.instance.first_name} {form.instance.last_name} was created successfully.')
         return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        # Add more helpful error messages
+        messages.error(self.request, 'Please correct the errors below.')
+        for field, errors in form.errors.items():
+            for error in errors:
+                field_name = form.fields[field].label or field
+                messages.error(self.request, f"{field_name}: {error}")
+        return super().form_invalid(form)
 
 
 class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
@@ -482,7 +547,7 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
                 # Assign to the form instance
                 form.instance.id_image = image_file
             except Exception as e:
-                messages.error(self.request, f"Error processing camera image: {str(e)}")
+                messages.error(self.request, f"Error processing ID image: {str(e)}")
 
         # Process profile photo if available
         profile_photo_data = self.request.POST.get('profile_photo_data')
@@ -493,7 +558,7 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
             except Exception as e:
                 messages.error(self.request, f"Error processing profile photo: {str(e)}")
         
-        messages.success(self.request, 'Customer was updated successfully.')
+        messages.success(self.request, f'Customer {form.instance.first_name} {form.instance.last_name} was updated successfully.')
         return super().form_valid(form)
 
 

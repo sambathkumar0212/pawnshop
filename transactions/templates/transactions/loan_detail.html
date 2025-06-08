@@ -34,9 +34,11 @@
                             <i class="fas fa-hand-holding-usd me-2"></i>Foreclose
                         </a>
                     {% endif %}
-                    <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-primary">
-                        <i class="fas fa-edit me-2"></i>Edit
-                    </a>
+                    {% if user.is_superuser or user.role and user.role.name|lower in 'manager,admin,director,supervisor,head'|split:',' %}
+                        <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-primary">
+                            <i class="fas fa-edit me-2"></i>Edit
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -398,6 +400,8 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        console.log("Loan detail page loaded, initializing photo handlers");
+        
         // Handle item photo click to show in modal
         const photoThumbnails = document.querySelectorAll('.item-photo-thumbnail');
         const modalPhotoImg = document.getElementById('modalPhotoImg');
@@ -405,26 +409,19 @@
         photoThumbnails.forEach(thumbnail => {
             thumbnail.addEventListener('click', function() {
                 const photoUrl = this.getAttribute('data-photo-url');
+                console.log("Opening photo in modal:", photoUrl.substring(0, 30) + "...");
                 modalPhotoImg.src = photoUrl;
             });
         });
-
-        // Parse item photos from JSON string if needed
-        const displayItemPhotos = function() {
-            try {
-                {% if loan.item_photos %}
-                const photoContainer = document.querySelector('.item-photos-gallery');
-                if (!photoContainer) return;
-                
-                // Check if item_photos is already parsed in the template
-                // If not, we can parse it here
-                {% endif %}
-            } catch (e) {
-                console.error("Error processing item photos:", e);
-            }
-        };
         
-        displayItemPhotos();
+        // Debug the item photos data
+        const photoContainer = document.querySelector('.item-photos-gallery');
+        if (photoContainer) {
+            const photoCount = photoContainer.querySelectorAll('.item-photo-thumbnail').length;
+            console.log(`Found ${photoCount} photos in the gallery`);
+        } else {
+            console.log("Photo container not found");
+        }
     });
 </script>
 {% endblock %}

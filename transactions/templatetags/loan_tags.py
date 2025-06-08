@@ -75,3 +75,8 @@ def add(value, arg):
         return value + arg
     except (ValueError, TypeError):
         return value
+
+@register.filter
+def split(value, arg):
+    """Split the value by the delimiter."""
+    return value.split(arg)

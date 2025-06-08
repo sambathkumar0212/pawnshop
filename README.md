@@ -140,3 +140,13 @@ psql -d postgres
 
 ## To exit
 \q
+
+## roles and access 
+Administrator - Full system access
+Branch Manager - Branch operations and staff management
+Loan Officer - Loan processing and valuations
+Cashier - Payment processing
+Inventory Manager - Item tracking and inventory
+Accountant - Financial reporting and analysis
+Customer Service - Customer support
+Appraiser - Item valuation specialist
