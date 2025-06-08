@@ -82,20 +82,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# # Database
+# # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3'),
+#         'NAME': os.environ.get('DATABASE_NAME', BASE_DIR / 'db.sqlite3'),
+#         'USER': os.environ.get('DATABASE_USER', ''),
+#         'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
+#         'HOST': os.environ.get('DATABASE_HOST', ''),
+#         'PORT': os.environ.get('DATABASE_PORT', ''),
+#     }
+# }
+
+import environ
+
+# Initialize environment variables
+env = environ.Env()
+environ.Env.read_env()
 
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DATABASE_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.environ.get('DATABASE_USER', ''),
-        'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
-        'HOST': os.environ.get('DATABASE_HOST', ''),
-        'PORT': os.environ.get('DATABASE_PORT', ''),
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('DB_NAME'),
+        'USER': env('DB_USER'),
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('DB_HOST'),
+        'PORT': env('DB_PORT'),
     }
 }
-
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
