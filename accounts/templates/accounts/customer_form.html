@@ -54,6 +54,8 @@
     .fieldset-title {
         font-weight: bold;
         margin-bottom: 15px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #eee;
     }
     
     #id-image-preview {
@@ -70,7 +72,7 @@
 <div class="container mt-4">
     <h2>{{ page_title|default:"Customer Information" }}</h2>
     
-    <form method="post" enctype="multipart/form-data" novalidate>
+    <form method="post" enctype="multipart/form-data" novalidate id="customer-form">
         {% csrf_token %}
         
         {% if form.errors %}
@@ -80,28 +82,114 @@
         {% endif %}
         
         <!-- Hidden fields for camera data -->
-        {{ form.camera_image_data }}
-        {{ form.profile_photo_data }}
+        <input type="hidden" name="camera_image_data" id="camera_image_data">
+        <input type="hidden" name="profile_photo_data" id="profile_photo_data">
         
         {% if fieldsets %}
             {% for fieldset in fieldsets %}
             <div class="fieldset">
                 <div class="fieldset-title">{{ fieldset.title }}</div>
-                {% for field_name in fieldset.fields %}
-                    <div class="form-group mb-3">
-                        {% if field_name == 'id_image' and show_camera_capture %}
+                
+                {% if fieldset.title == 'Personal Information' %}
+                    <!-- Two-column layout for Personal Information section -->
+                    <div class="row">
+                        {% for field_name in fieldset.fields %}
+                            <div class="col-md-6 mb-3">
+                                <label for="id_{{ field_name }}">{{ field_name|title }}</label>
+                                {{ form|get_field:field_name }}
+                                {% if form|get_field:field_name and form|get_field:field_name.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form|get_field:field_name.errors }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% elif fieldset.title == 'Address' %}
+                    <!-- Two-column layout for Address section -->
+                    <div class="row">
+                        <div class="col-12 mb-3">
+                            <label for="id_address">Address</label>
+                            {{ form.address }}
+                            {% if form.address.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.address.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="id_city">City</label>
+                            {{ form.city }}
+                            {% if form.city.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.city.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="id_state">State/Province</label>
+                            {{ form.state }}
+                            {% if form.state.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.state.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="id_zip_code">Zip/Postal Code</label>
+                            {{ form.zip_code }}
+                            {% if form.zip_code.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.zip_code.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% elif fieldset.title == 'Identification' %}
+                    <!-- Multi-column layout for Identification section -->
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="id_id_type">ID Type</label>
+                            {{ form.id_type }}
+                            {% if form.id_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.id_type.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label for="id_id_number">ID Number</label>
+                            {{ form.id_number }}
+                            {% if form.id_number.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.id_number.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
                             <label for="id_id_image">ID Image</label>
                             <div class="input-group">
-                                {{ form.id_image }}
+                                <input type="file" name="id_image" id="id_id_image" class="form-control" accept="image/*">
                                 <button type="button" id="capture-id-button" class="btn btn-primary">Capture ID Image</button>
                             </div>
-                            <img id="id-image-preview" src="#" alt="ID Image Preview">
+                            <div class="mt-2">
+                                <img id="id-image-preview" src="#" alt="ID Image Preview" style="max-width: 100%; max-height: 200px; display: none; border: 1px solid #ddd;">
+                            </div>
                             {% if form.id_image.errors %}
                             <div class="invalid-feedback d-block">
                                 {{ form.id_image.errors }}
                             </div>
                             {% endif %}
-                        {% else %}
+                        </div>
+                    </div>
+                {% else %}
+                    <!-- Default layout for other sections -->
+                    {% for field_name in fieldset.fields %}
+                        <div class="form-group mb-3">
                             <label for="id_{{ field_name }}">{{ field_name|title }}</label>
                             {{ form|get_field:field_name }}
                             {% if form|get_field:field_name and form|get_field:field_name.errors %}
@@ -109,9 +197,10 @@
                                 {{ form|get_field:field_name.errors }}
                             </div>
                             {% endif %}
-                        {% endif %}
-                    </div>
-                {% endfor %}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+                
             </div>
             {% endfor %}
         {% else %}
@@ -130,8 +219,8 @@
         <video id="camera-video" autoplay playsinline></video>
         <div class="camera-controls">
             <button id="take-picture-button" class="btn btn-primary">Take Picture</button>
-            <button id="retake-picture-button" class="btn btn-warning">Retake</button>
-            <button id="confirm-picture-button" class="btn btn-success">Confirm</button>
+            <button id="retake-picture-button" class="btn btn-warning" style="display: none;">Retake</button>
+            <button id="confirm-picture-button" class="btn btn-success" style="display: none;">Confirm</button>
             <button id="cancel-picture-button" class="btn btn-danger">Cancel</button>
         </div>
     </div>
@@ -139,12 +228,43 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'accounts/js/camera-capture.js' %}"></script>
-
-{% if debug_mode %}
+<script src="{% static 'accounts/js/camera-capture.js' %}?v=2"></script>
 <script>
-    // Debug information
-    console.log("Camera config:", {{ camera_config|safe }});
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("DOM fully loaded");
+        
+        // Debug info for troubleshooting
+        console.log("Checking camera capture elements:");
+        const cameraBtn = document.getElementById('capture-id-button');
+        console.log("Capture ID button found:", cameraBtn !== null);
+        
+        const cameraVideoEl = document.getElementById('camera-video');
+        console.log("Camera video element found:", cameraVideoEl !== null);
+        
+        const imagePreview = document.getElementById('id-image-preview');
+        console.log("Image preview found:", imagePreview !== null);
+        
+        const imageDataField = document.getElementById('camera_image_data');
+        console.log("Image data field found:", imageDataField !== null);
+        
+        {% if form.instance.id_image %}
+        // Show existing image if available
+        if (imagePreview) {
+            imagePreview.src = "{{ form.instance.id_image.url }}";
+            imagePreview.style.display = 'block';
+            console.log("Loaded existing image preview");
+        }
+        {% endif %}
+        
+        // Display user agent and browser info for debugging
+        console.log("Browser info:", navigator.userAgent);
+        
+        // Check if camera API is available
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            console.log("Camera API is available");
+        } else {
+            console.warn("Camera API not available in this browser");
+        }
+    });
 </script>
-{% endif %}
 {% endblock %}

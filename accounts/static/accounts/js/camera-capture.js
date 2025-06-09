@@ -1,157 +1,196 @@
 /**
- * Camera Capture Utility for Customer Forms
- * This script handles the camera capture functionality for ID and profile images
+ * Simple Camera Capture Utility for Customer Forms
+ * Version 2.0 - Complete rewrite for better reliability
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if we're on a page with camera capture functionality
+    console.log('Camera capture script v2 initialized');
+    
+    // Core elements
+    const captureButton = document.getElementById('capture-id-button');
     const cameraContainer = document.getElementById('camera-container');
-    if (!cameraContainer) return;
-    
-    // Get references to camera elements
-    const cameraButton = document.getElementById('capture-id-button');
     const cameraVideo = document.getElementById('camera-video');
-    const captureButton = document.getElementById('take-picture-button');
-    const retakeButton = document.getElementById('retake-picture-button');
-    const confirmButton = document.getElementById('confirm-picture-button');
-    const cancelButton = document.getElementById('cancel-picture-button');
-    const cameraImageDataField = document.querySelector('input[name="camera_image_data"]');
+    const takePictureButton = document.getElementById('take-picture-button');
+    const retakePictureButton = document.getElementById('retake-picture-button');
+    const confirmPictureButton = document.getElementById('confirm-picture-button');
+    const cancelPictureButton = document.getElementById('cancel-picture-button');
     const idImagePreview = document.getElementById('id-image-preview');
+    const hiddenImageField = document.getElementById('camera_image_data');
     
-    // Variables to track state
-    let stream = null;
-    
-    // Function to open the camera
-    function openCamera() {
-        // Show the camera container
-        cameraContainer.style.display = 'block';
-        
-        // Request camera access
-        navigator.mediaDevices.getUserMedia({
-            video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'environment' // Use back camera if available
-            },
-            audio: false
-        })
-        .then(function(mediaStream) {
-            stream = mediaStream;
-            cameraVideo.srcObject = stream;
-            cameraVideo.play();
-            
-            // Show/hide appropriate buttons
-            if (captureButton) captureButton.style.display = 'block';
-            if (retakeButton) retakeButton.style.display = 'none';
-            if (confirmButton) confirmButton.style.display = 'none';
-            
-            console.log('Camera opened successfully');
-        })
-        .catch(function(err) {
-            console.error('Error accessing camera:', err);
-            alert('Unable to access the camera: ' + err.message);
-        });
+    // Exit if not on a page with camera functionality
+    if (!captureButton || !cameraContainer) {
+        console.log('Camera capture elements not found on this page');
+        return;
     }
     
-    // Function to close the camera
-    function closeCamera() {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-        }
-        
-        cameraContainer.style.display = 'none';
-        console.log('Camera closed');
-    }
+    console.log('Camera capture elements found, setting up event handlers');
     
-    // Function to capture an image from the video stream
-    function captureImage() {
-        if (!stream) return;
-        
-        // Create a canvas to capture the image
-        const canvas = document.createElement('canvas');
-        canvas.width = cameraVideo.videoWidth;
-        canvas.height = cameraVideo.videoHeight;
-        
-        // Draw the current video frame to the canvas
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
-        
-        // Get the image data URL
-        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        
-        // Show the captured image in the preview
-        if (idImagePreview) {
-            idImagePreview.src = imageDataUrl;
-            idImagePreview.style.display = 'block';
-        }
-        
-        // Update UI
-        if (captureButton) captureButton.style.display = 'none';
-        if (retakeButton) retakeButton.style.display = 'block';
-        if (confirmButton) confirmButton.style.display = 'block';
-        
-        // Store the image data in the hidden field
-        if (cameraImageDataField) {
-            cameraImageDataField.value = imageDataUrl;
-            console.log('Image data stored in form field');
-        } else {
-            console.error('Camera image data field not found!');
-        }
-    }
+    // Global variables
+    let mediaStream = null;
     
-    // Set up event listeners
-    if (cameraButton) {
-        cameraButton.addEventListener('click', function(e) {
+    // Initialize camera UI
+    function setupCamera() {
+        // Button to open camera
+        captureButton.addEventListener('click', function(e) {
             e.preventDefault();
             openCamera();
         });
-    }
-    
-    if (captureButton) {
-        captureButton.addEventListener('click', function(e) {
+        
+        // Take picture button
+        takePictureButton.addEventListener('click', function(e) {
             e.preventDefault();
-            captureImage();
+            takePicture();
         });
+        
+        // Retake picture button
+        retakePictureButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Reset UI for taking another picture
+            takePictureButton.style.display = 'inline-block';
+            retakePictureButton.style.display = 'none';
+            confirmPictureButton.style.display = 'none';
+            // Clear any previous image
+            if (idImagePreview) {
+                idImagePreview.style.display = 'none';
+            }
+        });
+        
+        // Confirm picture button
+        confirmPictureButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            closeCamera();
+        });
+        
+        // Cancel button
+        cancelPictureButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Clear the preview and hidden field
+            if (idImagePreview) {
+                idImagePreview.style.display = 'none';
+            }
+            if (hiddenImageField) {
+                hiddenImageField.value = '';
+            }
+            closeCamera();
+        });
+        
+        console.log('Camera event handlers initialized');
     }
     
-    if (retakeButton) {
-        retakeButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            // Clear the stored image
-            if (cameraImageDataField) cameraImageDataField.value = '';
-            if (idImagePreview) idImagePreview.style.display = 'none';
+    // Open camera function
+    function openCamera() {
+        console.log('Attempting to open camera...');
+        
+        // Show camera container
+        cameraContainer.style.display = 'block';
+        
+        // Reset UI state
+        takePictureButton.style.display = 'inline-block';
+        retakePictureButton.style.display = 'none';
+        confirmPictureButton.style.display = 'none';
+        
+        // Request camera access with explicit error handling
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment', // Prefer back camera
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            })
+            .then(function(stream) {
+                mediaStream = stream;
+                
+                // Connect stream to video element
+                cameraVideo.srcObject = stream;
+                cameraVideo.onloadedmetadata = function() {
+                    cameraVideo.play()
+                    .then(() => console.log('Camera started successfully'))
+                    .catch(err => console.error('Error starting video:', err));
+                };
+                
+                console.log('Camera access granted');
+            })
+            .catch(function(error) {
+                console.error('Error accessing camera:', error);
+                alert('Could not access camera: ' + error.message);
+                cameraContainer.style.display = 'none';
+            });
+        } else {
+            console.error('getUserMedia not supported in this browser');
+            alert('Camera access is not supported in this browser. Please try a different browser.');
+            cameraContainer.style.display = 'none';
+        }
+    }
+    
+    // Take picture function
+    function takePicture() {
+        console.log('Taking picture...');
+        
+        if (!mediaStream) {
+            console.error('No active camera stream');
+            return;
+        }
+        
+        try {
+            // Create canvas at video dimensions
+            const canvas = document.createElement('canvas');
+            canvas.width = cameraVideo.videoWidth;
+            canvas.height = cameraVideo.videoHeight;
             
-            // Show capture button again
-            if (captureButton) captureButton.style.display = 'block';
-            if (retakeButton) retakeButton.style.display = 'none';
-            if (confirmButton) confirmButton.style.display = 'none';
-        });
+            // Draw current video frame to canvas
+            const context = canvas.getContext('2d');
+            context.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+            
+            // Get image as data URL
+            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            
+            // Update preview image
+            idImagePreview.src = imageDataUrl;
+            idImagePreview.style.display = 'block';
+            
+            // Store in hidden field
+            hiddenImageField.value = imageDataUrl;
+            
+            // Update UI
+            takePictureButton.style.display = 'none';
+            retakePictureButton.style.display = 'inline-block';
+            confirmPictureButton.style.display = 'inline-block';
+            
+            console.log('Picture taken successfully');
+        } catch (error) {
+            console.error('Error taking picture:', error);
+            alert('Error taking picture: ' + error.message);
+        }
     }
     
-    if (confirmButton) {
-        confirmButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            closeCamera();
-        });
+    // Close camera function
+    function closeCamera() {
+        console.log('Closing camera...');
+        
+        // Stop all tracks in the stream
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(function(track) {
+                track.stop();
+            });
+            mediaStream = null;
+        }
+        
+        // Hide camera container
+        cameraContainer.style.display = 'none';
+        
+        console.log('Camera closed');
     }
     
-    if (cancelButton) {
-        cancelButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            // Clear any captured image
-            if (cameraImageDataField) cameraImageDataField.value = '';
-            if (idImagePreview) idImagePreview.style.display = 'none';
-            closeCamera();
-        });
-    }
-    
-    // Cleanup when leaving the page
+    // Cleanup on page unload
     window.addEventListener('beforeunload', function() {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
         }
     });
     
-    console.log('Camera capture script loaded');
+    // Initialize camera UI
+    setupCamera();
+    console.log('Camera capture script v2 initialized successfully');
 });

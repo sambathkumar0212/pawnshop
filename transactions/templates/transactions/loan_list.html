@@ -120,6 +120,7 @@
                             <tr>
                                 <th>Customer</th>
                                 <th>Item</th>
+                                <th>Total Items</th>
                                 <th>Principal</th>
                                 <th>Interest Rate</th>
                                 <th>Scheme</th>
@@ -235,6 +236,19 @@
                                         
                                         {% empty %}
                                         <span class="text-muted">No items</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% for loan_item in loan.loanitem_set.all|slice:":1" %}
+                                            {% with total_items=loan_item.item.name|calculate_total_items %}
+                                                {% if total_items > 0 %}
+                                                    <span class="badge bg-success">{{ total_items }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        {% empty %}
+                                            <span class="text-muted">-</span>
                                         {% endfor %}
                                     </td>
                                     <td>₹{{ loan.principal_amount|floatformat:2 }}</td>

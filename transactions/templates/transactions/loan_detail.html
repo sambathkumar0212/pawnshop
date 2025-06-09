@@ -257,8 +257,28 @@
         <div class="col-lg-6">
             <!-- Pawned Items -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="fas fa-box me-2"></i>Pawned Items</h5>
+                    
+                    <!-- Calculate total items from all items -->
+                    {% with total_count=0 %}
+                        {% for item in loan_items %}
+                            {% with item_count=item.item.name|calculate_total_items %}
+                                {% if item_count > 0 %}
+                                    <!-- Calculate new total -->
+                                    {% with new_total=total_count|add:item_count %}
+                                        <!-- Reassign total_count -->
+                                        {% with total_count=new_total %}{% endwith %}
+                                        
+                                        <!-- Show the aggregated count for the last item -->
+                                        {% if forloop.last %}
+                                            <span class="badge bg-success fs-6">Total Items: {{ new_total }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            {% endwith %}
+                        {% endfor %}
+                    {% endwith %}
                 </div>
                 <div class="card-body">
                     {% if loan.item_photos %}
@@ -295,6 +315,7 @@
                             <thead>
                                 <tr>
                                     <th>Item</th>
+                                    <th>Total Items</th>
                                     <th>Gold Karat</th>
                                     <th>Gross Weight</th>
                                     <th>Net Weight</th>
@@ -308,6 +329,15 @@
                                         <a href="{% url 'item_detail' item.item.id %}">{{ item.item.name }}</a>
                                         <small class="d-block text-muted">{{ item.item.description|truncatechars:30 }}</small>
                                     </td>
+                                    <td>
+                                        {% with total_items=item.item.name|calculate_total_items %}
+                                            {% if total_items > 0 %}
+                                                <span class="badge bg-success">{{ total_items }}</span>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
                                     <td>{{ item.gold_karat }}K</td>
                                     <td>{{ item.gross_weight }}g</td>
                                     <td>{{ item.net_weight }}g</td>
@@ -315,7 +345,7 @@
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-3">
+                                    <td colspan="6" class="text-center text-muted py-3">
                                         <i class="fas fa-exclamation-circle me-2"></i>No item details available
                                     </td>
                                 </tr>

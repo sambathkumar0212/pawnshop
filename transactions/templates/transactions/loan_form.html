@@ -210,14 +210,26 @@
                             </div>
                             <div class="col-md-6">
                                 {{ form.item_name|as_crispy_field }}
+                                <!-- Total Items Count Display -->
+                                <div id="totalItemsDisplay" class="mb-3" style="display: none;">
+                                    <label class="form-label">Total Items Count</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-success text-white">
+                                            <i class="fas fa-list-ol"></i>
+                                        </span>
+                                        <input type="text" class="form-control" id="calculatedTotalItems" readonly>
+                                    </div>
+                                    <div class="form-text text-muted">
+                                        <small><i class="fas fa-info-circle"></i> Automatically calculated from item name (format: "ring-6, chain-1")</small>
+                                    </div>
+                                </div>
+                                <!-- Item Description (moved from below) -->
+                                {{ form.item_description|as_crispy_field }}
                             </div>
                             <div class="col-md-6">
                                 {{ form.item_category|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
+                                <!-- Other item details like market price, karat, weight, etc. -->
                                 {{ form.market_price_22k|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
                                 {{ form.gold_karat|as_crispy_field }}
                             </div>
                             <div class="col-md-4">
@@ -228,9 +240,6 @@
                             </div>
                             <div class="col-md-4">
                                 {{ form.net_weight|as_crispy_field }}
-                            </div>
-                            <div class="col-md-12">
-                                {{ form.item_description|as_crispy_field }}
                             </div>
                         </div>
 
@@ -939,6 +948,59 @@
             }
             if (itemStream) {
                 itemStream.getTracks().forEach(track => track.stop());
+            }
+        });
+        
+        // Item name change handler to update total items count
+        $('#id_item_name').on('input', function() {
+            const itemNameValue = $(this).val();
+            const totalItemsDisplay = $('#totalItemsDisplay');
+            const calculatedTotalItems = $('#calculatedTotalItems');
+            
+            if (itemNameValue) {
+                // Parse the item name value to count items (format: "ring-6, chain-1")
+                let totalCount = 0;
+                const items = itemNameValue.split(',').map(item => item.trim()).filter(item => item);
+                
+                items.forEach(item => {
+                    if (item.includes('-')) {
+                        const parts = item.split('-');
+                        if (parts.length > 1) {
+                            const count = parseInt(parts[1]);
+                            if (!isNaN(count)) {
+                                totalCount += count;
+                            }
+                        }
+                    }
+                });
+                
+                // Update the total items count display with parsed count
+                calculatedTotalItems.val(totalCount > 0 ? totalCount : '0');
+                
+                // Show/hide the display based on if we found parseable items
+                if (totalCount > 0) {
+                    totalItemsDisplay.show();
+                    calculatedTotalItems.parent().removeClass('has-error').addClass('has-success');
+                } else {
+                    if (itemNameValue.includes('-')) {
+                        // If there's a hyphen but no valid count, show zero with warning
+                        totalItemsDisplay.show();
+                        calculatedTotalItems.parent().removeClass('has-success').addClass('has-error');
+                    } else {
+                        // If no hyphen format detected, hide the counter
+                        totalItemsDisplay.hide();
+                    }
+                }
+            } else {
+                // Hide the total items count display if input is empty
+                totalItemsDisplay.hide();
+            }
+        });
+        
+        // Trigger the calculation on page load if item name is already filled
+        $(document).ready(function() {
+            if ($('#id_item_name').val()) {
+                $('#id_item_name').trigger('input');
             }
         });
     });

@@ -80,3 +80,36 @@ def add(value, arg):
 def split(value, arg):
     """Split the value by the delimiter."""
     return value.split(arg)
+
+@register.filter
+def calculate_total_items(item_name):
+    """
+    Parse item name to extract and sum numbers after hyphens for multiple items.
+    Format expected: "ring-6, chain-1, dollar-1, thodu-2" would return 10
+    """
+    try:
+        # Split items by comma (and optional space)
+        items = [item.strip() for item in item_name.split(',')]
+        
+        # Initialize total count
+        total = 0
+        
+        # Process each item
+        for item in items:
+            # Check if the item contains a hyphen
+            if '-' in item:
+                # Split by hyphen and get the second part (the count)
+                parts = item.split('-', 1)
+                if len(parts) > 1:
+                    try:
+                        # Try to convert the count to integer and add it
+                        count = int(parts[1].strip())
+                        total += count
+                    except ValueError:
+                        # Skip if not a valid number
+                        continue
+                        
+        return total
+    except Exception:
+        # Return 0 if any error occurs
+        return 0

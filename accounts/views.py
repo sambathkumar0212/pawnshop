@@ -78,9 +78,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'loanitem_set__item'
         ).order_by('-created_at')[:5]
         
-        context['recent_sales'] = Sale.objects.filter(
-            branch_filter
-        ).select_related('item').order_by('-created_at')[:5]
+        # Get recent customers instead of recent sales
+        context['recent_customers'] = Customer.objects.order_by('-created_at')[:5]
         
         # Branch information
         context['branches'] = branches
@@ -388,13 +387,48 @@ class CustomerDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
         context = super().get_context_data(**kwargs)
         customer = self.get_object()
         
-        # Get related items and loans
+        # Get related items
         if hasattr(customer, 'items'):
             context['items'] = customer.items.all()
         
+        # Get all loans related to the customer
         if hasattr(customer, 'loans'):
-            context['loans'] = customer.loans.all()
-            context['active_loans'] = customer.loans.filter(status='active')
+            context['loans'] = customer.loans.all().order_by('-created_at')
+            
+            # Get active loans with prefetched data for efficiency
+            active_loans = customer.loans.filter(status='active').order_by('-due_date')
+            
+            # Process each active loan to ensure it has the required item photos
+            for loan in active_loans:
+                # If loan already has item_photos field with data, use that
+                if loan.item_photos and not isinstance(loan.item_photos, list):
+                    try:
+                        import json
+                        # Try to parse the JSON string to a list of photo URLs
+                        loan.item_photos = json.loads(loan.item_photos)
+                    except (json.JSONDecodeError, TypeError):
+                        # Initialize as empty list if parsing fails
+                        loan.item_photos = []
+                elif not hasattr(loan, 'item_photos') or not loan.item_photos:
+                    # Initialize item_photos as empty list if it doesn't exist or is empty
+                    loan.item_photos = []
+                
+                # Get the loan items and their associated photos
+                loan_items = loan.loanitem_set.select_related('item').all()
+                
+                # If item_photos is still empty, try to get photos from the related items
+                if not loan.item_photos:
+                    for loan_item in loan_items:
+                        # Try to get photos from the item's images
+                        item_images = loan_item.item.images.all()
+                        
+                        if item_images.exists():
+                            # Add image URLs to the loan's item_photos list
+                            for img in item_images:
+                                if img.image:
+                                    loan.item_photos.append(img.image.url)
+            
+            context['active_loans'] = active_loans
         
         return context
 
@@ -440,7 +474,7 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         form.fields['last_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Last Name'})
         form.fields['email'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Email Address'})
         form.fields['phone'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Phone Number', 'type': 'tel'})
-        form.fields['address'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Street Address'})
+        form.fields['address'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Street Address', 'rows': 2})
         form.fields['city'].widget.attrs.update({'class': 'form-control', 'placeholder': 'City'})
         form.fields['state'].widget.attrs.update({'class': 'form-control', 'placeholder': 'State/Province'})
         form.fields['zip_code'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Zip/Postal Code'})
@@ -527,6 +561,54 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
     
     def get_success_url(self):
         return reverse_lazy('customer_detail', kwargs={'pk': self.object.pk})
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add fieldset information for better UI organization
+        context['fieldsets'] = [
+            {'title': 'Personal Information', 'fields': ['first_name', 'last_name', 'email', 'phone']},
+            {'title': 'Address', 'fields': ['address', 'city', 'state', 'zip_code']},
+            {'title': 'Identification', 'fields': ['id_type', 'id_number', 'id_image']},
+            {'title': 'Additional Information', 'fields': ['notes']}
+        ]
+        context['show_camera_capture'] = True
+        context['show_profile_photo'] = True
+        context['page_title'] = 'Edit Customer'
+        context['submit_text'] = 'Update Customer'
+        # Add camera configuration
+        context['camera_config'] = {
+            'width': 640,
+            'height': 480,
+            'image_format': 'jpeg',
+            'jpeg_quality': 90,
+            'target_field': 'id_image',
+            'camera_id_field': 'camera_image_data'
+        }
+        # Add debug flag
+        context['debug_mode'] = settings.DEBUG
+        return context
+    
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Improve form widgets
+        form.fields['first_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'First Name'})
+        form.fields['last_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Last Name'})
+        form.fields['email'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Email Address'})
+        form.fields['phone'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Phone Number', 'type': 'tel'})
+        form.fields['address'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Street Address', 'rows': 2})
+        form.fields['city'].widget.attrs.update({'class': 'form-control', 'placeholder': 'City'})
+        form.fields['state'].widget.attrs.update({'class': 'form-control', 'placeholder': 'State/Province'})
+        form.fields['zip_code'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Zip/Postal Code'})
+        form.fields['notes'].widget.attrs.update({'class': 'form-control', 'rows': 3, 'placeholder': 'Additional notes about the customer'})
+        
+        # Make ID image optional in the form since we're using camera capture
+        form.fields['id_image'].required = False
+        
+        # Add hidden fields for camera data
+        form.fields['camera_image_data'] = forms.CharField(required=False, widget=forms.HiddenInput())
+        form.fields['profile_photo_data'] = forms.CharField(required=False, widget=forms.HiddenInput())
+        
+        return form
     
     def form_valid(self, form):
         # Process camera image if available
