@@ -208,7 +208,15 @@ class LoanForm(forms.ModelForm):
                 self.fields['item_name'].initial = loan_item.item.name
                 self.fields['item_description'].initial = loan_item.item.description
                 self.fields['item_category'].initial = loan_item.item.category
-                self.fields['gold_karat'].initial = loan_item.gold_karat
+                
+                # Convert Decimal to string for gold_karat field
+                if loan_item.gold_karat:
+                    # Convert to string and remove decimal part if it's .00
+                    karat_str = str(loan_item.gold_karat)
+                    if karat_str.endswith('.00'):
+                        karat_str = karat_str.split('.')[0]
+                    self.fields['gold_karat'].initial = karat_str
+                
                 self.fields['gross_weight'].initial = loan_item.gross_weight
                 self.fields['net_weight'].initial = loan_item.net_weight
                 self.fields['stone_weight'].initial = loan_item.stone_weight
