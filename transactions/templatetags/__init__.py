@@ -1,1 +1,1 @@
-# This file is intentionally empty to make the directory a Python package
+# Empty file to make directory a Python package

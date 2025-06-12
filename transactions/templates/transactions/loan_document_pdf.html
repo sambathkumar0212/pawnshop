@@ -111,65 +111,114 @@
             font-size: 11px;
             text-align: center;
         }
+        /* Item display improvements */
         .item-name {
-            font-size: 14px;
+            font-size: 11px;
             font-weight: bold;
             margin-bottom: 2px;
             text-align: left;
+            word-break: break-word;
+            line-height: 1.1;
+            hyphens: auto;
         }
         .item-description {
-            font-size: 9px;
+            font-size: 8px;
             font-style: italic;
-            color: #555;
+            color: #333;
             text-align: left;
+            overflow: hidden;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: break-all; /* Force breaks within words if needed */
+            line-height: 1;
+            max-width: 100%;
+            display: block;
+            margin-bottom: 1px;
+            hyphens: auto;
+        }
+        /* Responsive font sizing for description based on content length */
+        .long-description {
+            font-size: 7px;
+            line-height: 0.9;
+        }
+        .very-long-description {
+            font-size: 6px;
+            line-height: 0.8;
         }
         table.gold-table td.item-cell {
             text-align: left;
-            vertical-align: middle;
-            padding: 5px 8px;
-        }
-        .customer-photo {
-            width: 75px;
-            height: 85px;
-            border: 1px solid #000;
-            overflow: hidden;
-            padding: 0;
-            margin: 0;
-        }
-        .customer-photo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        table.photos-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-        }
-        table.photos-table td {
-            padding: 8px;
-            text-align: center;
             vertical-align: top;
-            width: 25%; /* 4 photos per row */
+            padding: 6px;
+            width: 40%; /* Increased width for item description */
+            max-width: 40%;
+            word-break: break-word;
+            border-right: 1px solid #000;
+            overflow-wrap: break-word;
         }
-        .item-photo {
-            width: 90px;
-            height: 90px;
-            border: 1px solid #000;
-            overflow: hidden;
-            display: inline-block;
-            margin: 0 auto;
+        /* Compact gold table columns with special handling for karat */
+        table.gold-table th.compact-header {
+            padding: 5px 2px;
+            font-size: 10px;
+            background-color: #f8f8f8;
+            width: 15%; /* Standard width for compact headers */
         }
-        .item-photo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        table.gold-table th.karat-header {
+            padding: 4px 1px;
+            font-size: 10px;
+            background-color: #f8f8f8;
+            width: 10%; /* Extra narrow for karat */
         }
-        .photo-label {
-            font-size: 9px;
+        table.gold-table td.compact-cell {
+            padding: 4px 2px;
+            font-size: 10px;
+            width: 15%; /* Standard width for compact cells */
+        }
+        table.gold-table td.karat-cell {
+            padding: 4px 1px;
+            font-size: 10px;
+            width: 10%; /* Extra narrow for karat */
+            min-width: 10%;
+        }
+        /* Add a subtle highlight to item rows for better readability */
+        table.gold-table tbody tr:nth-child(even) {
+            background-color: #fbfbfb;
+        }
+        .terms-section h3 {
+            font-size: 13px;
             font-weight: bold;
+            margin: 15px 0 10px 0;
+        }
+        .terms-list {
+            padding-left: 25px;
+            margin: 5px 0;
+            font-size: 11px;
+        }
+        .terms-list li {
+            margin-bottom: 6px;
+            text-align: justify;
+        }
+        .signatures {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .signature-box-left {
+            width: 45%;
+        }
+        .signature-box-right {
+            width: 45%;
+            text-align: right;
+        }
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-top: 40px;
+            margin-bottom: 5px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 11px;
             text-align: center;
-            margin-top: 3px;
         }
         /* Simplified styles for enhanced fields */
         .highlight-cell {
@@ -184,6 +233,11 @@
         }
         .date-value {
             color: #8B0000;
+            font-weight: bold;
+        }
+        .distribution-amount {
+            color: #006400; /* Dark green color */
+            font-size: 10px;
             font-weight: bold;
         }
         .customer-name {
@@ -205,6 +259,57 @@
         .scheme-details {
             font-size: 10px;
             margin-top: 1px;
+        }
+        /* Photos table styles - reduced size */
+        table.photos-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        table.photos-table td {
+            padding: 4px;
+            text-align: center;
+            vertical-align: top;
+            width: 20%; /* 5 photos per row instead of 4 */
+        }
+        .item-photo {
+            width: 60px; /* Reduced from 90px */
+            height: 60px; /* Reduced from 90px */
+            border: 1px solid #000;
+            overflow: hidden;
+            display: inline-block;
+            margin: 0 auto;
+        }
+        .item-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .photo-label {
+            font-size: 8px; /* Reduced from 9px */
+            font-weight: bold;
+            text-align: center;
+            margin-top: 2px;
+        }
+        /* Set smaller photo section title */
+        .photo-section-title {
+            font-size: 12px; 
+            margin-top: 15px;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .customer-photo {
+            width: 55px; /* Reduced from 75px */
+            height: 65px; /* Reduced from 85px */
+            border: 1px solid #000;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+        }
+        .customer-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
     </style>
 </head>
@@ -260,7 +365,7 @@
             </tr>
             <tr>
                 <td><b>Processing Fee</b><br>Rs. {{ loan.processing_fee|floatformat:2 }}</td>
-                <td><b>Distribution Amount</b><br><span class="important-field">Rs. {{ loan.distribution_amount|floatformat:2 }}</span></td>
+                <td><b>Distribution Amount</b><br><span class="distribution-amount">Rs. {{ loan.distribution_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
                 <td><b>Interest Rate</b><br>{{ loan.interest_rate|floatformat:2 }}% per annum<br>
@@ -298,10 +403,10 @@
             <thead>
                 <tr>
                     <th>Item Description</th>
-                    <th>Gold Karat</th>
-                    <th>Gross Weight (g)</th>
-                    <th>Net Weight (g)</th>
-                    <th>Total Items Count</th>
+                    <th class="karat-header">Gold Karat</th>
+                    <th class="compact-header">Gross Weight (g)</th>
+                    <th class="compact-header">Net Weight (g)</th>
+                    <th class="compact-header">Total Items Count</th>
                 </tr>
             </thead>
             <tbody>
@@ -310,13 +415,23 @@
                     <td class="item-cell">
                         <div class="item-name">{{ item.item.name }}</div>
                         {% if item.item.description %}
-                        <div class="item-description">{{ item.item.description }}</div>
+                            {% with desc_length=item.item.description|length %}
+                                {% if desc_length > 100 %}
+                                <div class="item-description very-long-description">
+                                {% elif desc_length > 50 %}
+                                <div class="item-description long-description">
+                                {% else %}
+                                <div class="item-description">
+                                {% endif %}
+                                    {{ item.item.description|linebreaksbr }}
+                                </div>
+                            {% endwith %}
                         {% endif %}
                     </td>
-                    <td>{{ item.gold_karat }}K</td>
-                    <td>{{ item.gross_weight|floatformat:3 }}</td>
-                    <td>{{ item.net_weight|floatformat:3 }}</td>
-                    <td>{% with total_items=item.item.name|calculate_total_items %}
+                    <td class="karat-cell">{{ item.gold_karat }}K</td>
+                    <td class="compact-cell">{{ item.gross_weight|floatformat:3 }}</td>
+                    <td class="compact-cell">{{ item.net_weight|floatformat:3 }}</td>
+                    <td class="compact-cell">{% with total_items=item.item.name|calculate_total_items %}
                             {% if total_items > 0 %}
                                 <strong>{{ total_items }}</strong>
                             {% else %}
@@ -330,7 +445,7 @@
         </table>
         
         {% if item_photos and item_photos|length > 0 %}
-        <h3 style="font-size: 14px; margin-top: 20px;">Pledged Gold Item Photos</h3>
+        <h3 class="photo-section-title">Pledged Gold Item Photos</h3>
         <table class="photos-table">
             <tr>
                 {% for photo in item_photos %}
@@ -340,7 +455,7 @@
                     </div>
                     <div class="photo-label">Item {{ forloop.counter }}</div>
                 </td>
-                {% if forloop.counter|divisibleby:4 and not forloop.last %}</tr><tr>{% endif %}
+                {% if forloop.counter|divisibleby:5 and not forloop.last %}</tr><tr>{% endif %}
                 {% endfor %}
             </tr>
         </table>
@@ -356,6 +471,7 @@
                 <li><b>Fair Practices Code:</b> The lender abides by the Fair Practices Code as prescribed by RBI.</li>
                 <li><b>Grievance Redressal:</b> Any complaints or grievances can be registered with the branch manager. If not resolved, the borrower
                 can escalate to the designated Grievance Redressal Officer at the head office.</li>
+                <li><b>Receipt Requirement:</b> The borrower <span style="color: #8B0000; font-weight: bold;">must present this original loan agreement document</span> when closing the loan and collecting the pledged gold items. No release of pledged items will be processed without verification of this document along with valid ID proof.</li>
                 <li><b>Declaration:</b> The borrower declares that all information provided is true and correct. The borrower has read and understood all
                 the terms and conditions mentioned herein.</li>
             </ol>
@@ -364,6 +480,8 @@
         <div class="signatures">
             <div class="signature-box-left">
                 <div class="signature-line"></div>
+                <p>&nbsp;</p>
+                <p>&nbsp;</p>
                 <p><b>Borrower Signature</b><br>{{ customer.full_name }}</p>
             </div>
             

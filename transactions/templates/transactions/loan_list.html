@@ -82,9 +82,10 @@
                     <select name="status" id="status" class="form-select">
                         <option value="">All Statuses</option>
                         <option value="active" {% if selected_status == 'active' %}selected{% endif %}>Active</option>
-                        <option value="paid" {% if selected_status == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="repaid" {% if selected_status == 'repaid' %}selected{% endif %}>Repaid</option>
                         <option value="defaulted" {% if selected_status == 'defaulted' %}selected{% endif %}>Defaulted</option>
                         <option value="extended" {% if selected_status == 'extended' %}selected{% endif %}>Extended</option>
+                        <option value="foreclosed" {% if selected_status == 'foreclosed' %}selected{% endif %}>Foreclosed</option>
                     </select>
                 </div>
                 <div class="col-md-3">

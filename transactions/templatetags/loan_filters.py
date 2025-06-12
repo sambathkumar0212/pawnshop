@@ -2,6 +2,7 @@ from django import template
 from decimal import Decimal
 from datetime import timedelta
 import re
+from num2words import num2words
 
 register = template.Library()
 
@@ -48,3 +49,13 @@ def calculate_total_items(item_name):
                 pass
     
     return total_count
+
+@register.filter
+def number_to_words(value):
+    """Convert a number to words in Indian format"""
+    try:
+        # Convert to float and format to handle decimals properly
+        amount = float(value)
+        return num2words(amount, lang='en_IN').title()
+    except (ValueError, TypeError):
+        return ''

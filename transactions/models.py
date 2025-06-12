@@ -3,172 +3,219 @@ from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from accounts.models import Customer  # Import Customer from accounts app
 import uuid
-
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
+from decimal import Decimal
+import datetime
+import json
+from .utils import item_photo_path
 
 class Loan(models.Model):
     """Pawn loan model"""
-    STATUS_CHOICES = [
+    # Loan status choices
+    STATUS_CHOICES = (
         ('active', 'Active'),
         ('repaid', 'Repaid'),
         ('defaulted', 'Defaulted'),
         ('extended', 'Extended'),
         ('foreclosed', 'Foreclosed'),
-    ]
+        ('cancelled', 'Cancelled'),
+    )
     
-    SCHEME_CHOICES = [
-        ('standard', 'Standard (12% - Min 3 months)'),
-        ('flexible', 'Flexible (24% - No interest if repaid within 25 days)'),
-    ]
+    # Loan scheme choices
+    SCHEME_CHOICES = (
+        ('standard', 'Standard (12% p.a.)'),
+        ('flexible', 'Flexible (24% p.a.)'),
+    )
     
-    # Basic information
-    loan_number = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
-    customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='loans')
-    items = models.ManyToManyField('inventory.Item', through='LoanItem', related_name='loans')
-    branch = models.ForeignKey('branches.Branch', on_delete=models.CASCADE, related_name='loans')
-    
-    # Scheme type
+    # Basic loan information
+    loan_number = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    customer = models.ForeignKey('accounts.Customer', on_delete=models.PROTECT, related_name='loans')
+    branch = models.ForeignKey('branches.Branch', on_delete=models.PROTECT, related_name='loans')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     scheme = models.CharField(max_length=20, choices=SCHEME_CHOICES, default='standard')
     
-    # Photo information
-    customer_face_capture = models.TextField(blank=True, null=True, help_text="Base64-encoded customer photo")
-    item_photos = models.TextField(blank=True, null=True, help_text="JSON string of Base64-encoded item photos")
+    # Financial details
+    principal_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,  # Changed to 0 for integers
+        validators=[MinValueValidator(0)]
+    )
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=12.00)
+    processing_fee = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,  # Changed to 0 for integers
+        validators=[MinValueValidator(0)]
+    )
+    distribution_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=0,  # Changed to 0 for integers
+        validators=[MinValueValidator(0)]
+    )
     
-    # Financial information
-    principal_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    processing_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    distribution_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    interest_rate = models.DecimalField(max_digits=5, decimal_places=2)
-    total_payable = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    # Dates
+    # Important dates
     issue_date = models.DateField()
     due_date = models.DateField()
     grace_period_end = models.DateField()
     
-    # Status
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    # Customer verification and photos
+    customer_face_capture = models.TextField(blank=True, null=True, help_text="Base64-encoded customer photo")
+    item_photos = models.JSONField(default=list, blank=True, help_text="List of photo URLs or base64 data")
     
-    # Management
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, 
-                                  null=True, related_name='loans_created')
+    # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_loans'
+    )
+    last_updated = models.DateTimeField(auto_now=True)
+    last_updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='updated_loans'
+    )
+    notes = models.TextField(blank=True)
 
     class Meta:
         verbose_name = _('loan')
         verbose_name_plural = _('loans')
         ordering = ['-created_at']
-    
+        permissions = [
+            ("can_approve_loan", "Can approve loan"),
+            ("can_extend_loan", "Can extend loan"),
+            ("can_foreclose_loan", "Can foreclose loan"),
+        ]
+
     def __str__(self):
-        return f"Loan #{self.loan_number} - {self.customer}"
-    
-    @property
-    def is_overdue(self):
-        from django.utils import timezone
-        return self.due_date < timezone.now().date() and self.status == 'active'
-    
-    @property
-    def days_remaining(self):
-        from django.utils import timezone
-        if self.status != 'active':
-            return 0
-        delta = self.due_date - timezone.now().date()
-        return max(0, delta.days)
+        return f"Loan #{self.loan_number} - {self.customer.full_name}"
+
+    def save(self, *args, **kwargs):
+        # Handle base64 photos
+        if isinstance(self.item_photos, str) and self.item_photos.startswith('data:image/'):
+            # Convert base64 to file and update item_photos
+            from django.core.files.base import ContentFile
+            import base64
+            import os
+            
+            try:
+                # Extract image format and data
+                format, imgstr = self.item_photos.split(';base64,')
+                ext = format.split('/')[-1]
+                
+                # Decode base64
+                image_data = base64.b64decode(imgstr)
+                
+                # Generate filename and save
+                filename = f"{uuid.uuid4()}.{ext}"
+                file_path = item_photo_path(self, filename)
+                file_path = os.path.join('media', file_path)
+                
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                # Write file
+                with open(file_path, 'wb') as f:
+                    f.write(image_data)
+                
+                # Update item_photos with URL
+                self.item_photos = [f"/media/inventory_images/loan_{self.loan_number}/{filename}"]
+                
+            except Exception as e:
+                print(f"Error processing base64 image: {e}")
+                # Default to empty list if there's an error
+                if not isinstance(self.item_photos, list):
+                    self.item_photos = []
         
-    @property
-    def total_interest(self):
-        """Calculate the total interest amount"""
-        return self.total_payable - self.principal_amount - self.processing_fee
+        # Convert item_photos to JSON if it's a list
+        if isinstance(self.item_photos, list):
+            try:
+                self.item_photos = json.dumps(self.item_photos)
+            except Exception as e:
+                print(f"Error converting item_photos to JSON: {e}")
+                self.item_photos = "[]"  # Default to empty JSON array
         
+        # Ensure item_photos is a valid JSON string
+        if isinstance(self.item_photos, str) and not self.item_photos.startswith('data:image/'):
+            try:
+                # Validate JSON format
+                json.loads(self.item_photos)
+            except json.JSONDecodeError:
+                # If not valid JSON, reset to empty array
+                print("Invalid JSON in item_photos, resetting to empty array")
+                self.item_photos = "[]"
+        
+        super().save(*args, **kwargs)
+
     @property
     def amount_paid(self):
-        """Calculate the total amount paid so far"""
-        return self.payments.aggregate(models.Sum('amount'))['amount__sum'] or 0
-        
+        """Calculate total amount paid on this loan"""
+        return self.payments.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+
     @property
     def remaining_balance(self):
-        """Calculate the remaining amount to be paid"""
-        return self.total_payable - self.amount_paid
-        
-    @property
-    def is_in_grace_period(self):
-        """Check if the loan is in grace period"""
-        from django.utils import timezone
-        today = timezone.now().date()
-        return self.due_date < today <= self.grace_period_end and self.status == 'active'
-        
-    @property
-    def payment_status_display(self):
-        """Returns a human-readable payment status"""
-        if self.status == 'repaid':
-            return "Fully Paid"
-        elif self.amount_paid >= self.principal_amount:
-            return "Principal Recovered"
-        elif self.amount_paid > 0:
-            return "Partially Paid"
-        else:
-            return "No Payments"
-            
-    @property
-    def can_be_repaid(self):
-        """Check if loan can be repaid based on the scheme rules"""
-        from django.utils import timezone
-        today = timezone.now().date()
-        # Standard scheme - can only be repaid after 3 months
-        if self.scheme == 'standard':
-            min_duration = timezone.timedelta(days=90)  # 3 months
-            return (today - self.issue_date) >= min_duration
-        # Flexible scheme - can be repaid anytime
-        return True
-        
+        """Calculate remaining balance including interest"""
+        return max(Decimal('0.00'), self.total_payable_mature - self.amount_paid)
+
     @property
     def days_since_issue(self):
-        """Calculate days since loan was issued"""
-        from django.utils import timezone
-        today = timezone.now().date()
-        return (today - self.issue_date).days
-    
+        """Calculate number of days since loan was issued"""
+        if not self.issue_date:
+            return 0
+        return (timezone.now().date() - self.issue_date).days
+
+    @property
+    def days_remaining(self):
+        """Calculate number of days remaining until due date"""
+        if not self.due_date:
+            return 0
+        remaining = (self.due_date - timezone.now().date()).days
+        return max(0, remaining)
+
+    @property
+    def is_overdue(self):
+        """Check if loan is overdue"""
+        if not self.due_date:
+            return False
+        return timezone.now().date() > self.due_date and self.status == 'active'
+
     @property
     def total_payable_till_date(self):
-        """Calculate total payable amount as of today (principal + interest till date)"""
-        from django.utils import timezone
-        from decimal import Decimal
+        """Calculate total amount payable including interest till today"""
+        if self.status != 'active':
+            return Decimal('0.00')
         
-        today = timezone.now().date()
-        principal_amount = self.principal_amount
-        days_elapsed = (today - self.issue_date).days
+        days_elapsed = self.days_since_issue
         
-        # For flexible scheme with early repayment within 25 days
+        # For flexible scheme, no interest if paid within 25 days
         if self.scheme == 'flexible' and days_elapsed <= 25:
-            interest_amount = Decimal('0.00')
-        else:
-            # Calculate interest based on scheme and elapsed time
-            # For standard scheme: 12% per year = 0.03287% per day
-            # For flexible scheme: 24% per year = 0.06575% per day
-            daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else Decimal('0.0006575')
-            interest_amount = principal_amount * daily_rate * days_elapsed
+            return self.principal_amount
         
-        # Return gross total payable (principal + interest)
-        return principal_amount + interest_amount
-    
+        # Calculate interest based on scheme
+        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else Decimal('0.0006575')
+        interest = self.principal_amount * daily_rate * days_elapsed
+        
+        return self.principal_amount + interest
+
     @property
     def total_payable_mature(self):
-        """Calculate total payable amount at maturity (principal + full interest till due date)"""
-        # This will be the same as the stored total_payable which is calculated at loan creation
-        return self.total_payable
-        
-    def calculate_interest_amount(self):
-        """Calculate interest amount based on scheme rules"""
-        from django.utils import timezone
-        from decimal import Decimal
-        today = timezone.now().date()
-        
-        # Flexible scheme with no interest if repaid within 25 days
-        if self.scheme == 'flexible' and (today - self.issue_date).days <= 25:
+        """Calculate total amount payable at maturity"""
+        if not self.due_date or self.status != 'active':
             return Decimal('0.00')
-            
-        # Otherwise, use the standard interest rate calculation
-        return self.principal_amount * (self.interest_rate / Decimal('100'))
+        
+        total_days = (self.due_date - self.issue_date).days
+        
+        # For flexible scheme, no interest if paid within 25 days
+        if self.scheme == 'flexible' and total_days <= 25:
+            return self.principal_amount
+        
+        # Calculate interest based on scheme
+        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else Decimal('0.0006575')
+        interest = self.principal_amount * daily_rate * total_days
+        
+        return self.principal_amount + interest
     
 class LoanItem(models.Model):
     """Model to track items in a loan with their gold details"""
@@ -203,7 +250,7 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateField()
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
-    reference_number = models.CharField(max_length=100, blank=True, null=True)
+    reference_number = models.CharField(max_length=255, blank=True, null=True)  # Increased from 100 to 255
     received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, 
                                   null=True, related_name='payments_received')
     notes = models.TextField(blank=True, null=True)
@@ -261,7 +308,7 @@ class Sale(models.Model):
     
     # Payment
     payment_method = models.CharField(max_length=20, choices=Payment.PAYMENT_METHOD_CHOICES)
-    reference_number = models.CharField(max_length=100, blank=True, null=True)
+    reference_number = models.CharField(max_length=255, blank=True, null=True)  # Increased from 100 to 255
     
     # Status
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')

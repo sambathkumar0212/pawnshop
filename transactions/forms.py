@@ -7,7 +7,7 @@ from inventory.forms import ItemForm
 from accounts.models import Customer
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Div
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
 class LoanForm(forms.ModelForm):
@@ -15,8 +15,11 @@ class LoanForm(forms.ModelForm):
         disabled=True,
         required=False,
         max_digits=10,
-        decimal_places=0,  # Changed to 0 decimal places for integer
-        help_text="Amount to be distributed after processing fee"
+        decimal_places=0,
+        help_text="Amount to be distributed after processing fee",
+        widget=forms.NumberInput(attrs={
+            'data-show-words': 'true'  # Custom attribute to identify fields that need words display
+        })
     )
 
     scheme = forms.ChoiceField(
@@ -46,14 +49,18 @@ class LoanForm(forms.ModelForm):
     # Item fields for new items
     item_name = forms.CharField(
         label='Item Name',
-        help_text='Enter the name or description of the gold item'
+        help_text='Enter the name or description of the gold item',
+        max_length=255,
+        required=True
     )
     item_description = forms.CharField(
+        required=False,  # Making it optional
         label='Item Description',
-        help_text='Detailed description of the item including any distinguishing marks, damaged or broken parts'
+        help_text='Optional: Detailed description of the item including any distinguishing marks or damaged parts',
+        widget=forms.Textarea(attrs={'rows': 3})
     )
     item_category = forms.ModelChoiceField(
-        required=False,
+        required=True,
         queryset=Category.objects.all(),  # Will filter in __init__
         label='Ornament Type',
         help_text="Select the type of gold ornament"
@@ -107,13 +114,15 @@ class LoanForm(forms.ModelForm):
     class Meta:
         model = Loan
         fields = [
-            'customer', 'scheme', 'principal_amount', 'processing_fee', 'interest_rate',
-            'issue_date', 'due_date', 'grace_period_end', 'branch'
+            'customer', 'branch', 'scheme', 'principal_amount', 'processing_fee',
+            'distribution_amount', 'interest_rate', 'issue_date', 'due_date',
+            'grace_period_end', 'notes'
         ]
         widgets = {
             'issue_date': forms.DateInput(attrs={'type': 'date'}),
             'due_date': forms.DateInput(attrs={'type': 'date'}),
-            'grace_period_end': forms.DateInput(attrs={'type': 'date'})
+            'grace_period_end': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 3}),
         }
         labels = {
             'issue_date': 'Loan Date',
@@ -123,45 +132,71 @@ class LoanForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # Set default dates for new loans
+        if not self.instance.pk:  # Only for new loans
+            today = timezone.now().date()
+            self.fields['issue_date'].initial = today
+            self.fields['due_date'].initial = today + timezone.timedelta(days=364)
+            self.fields['grace_period_end'].initial = today + timezone.timedelta(days=369)  # due date + 5 days
+
         # Update principal_amount field to use integer values
         self.fields['principal_amount'] = forms.DecimalField(
             max_digits=10,
-            decimal_places=0,  # Changed to 0 decimal places for integer
-            help_text="₹ Loan amount in Rupees"
+            decimal_places=0,
+            help_text="₹ Loan amount in Rupees",
+            widget=forms.NumberInput(attrs={
+                'data-show-words': 'true',
+                'step': '1'  # Ensure only whole numbers
+            })
         )
-        
+
+        # Update processing_fee field to use integer values
+        self.fields['processing_fee'] = forms.DecimalField(
+            max_digits=10,
+            decimal_places=0,
+            initial=0,
+            help_text="Processing fee amount in Rupees",
+            widget=forms.NumberInput(attrs={
+                'step': '1'  # Ensure only whole numbers
+            })
+        )
+
         # Configure customer field
         self.fields['customer'].queryset = Customer.objects.all().order_by('first_name', 'last_name')
         self.fields['customer'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
 
         # Define top priority ornament types and Tamil Nadu relevant gold ornament categories
         top_categories = [
+            'Mixed Items',
             'Chain', 
             'Chain with Dollar', 
             'Chain without Dollar', 
             'Ring'
         ]
-        
+
+        # Create Mixed Items category first to ensure it exists
+        mixed_items_category, created = Category.objects.get_or_create(
+            name='Mixed Items',
+            defaults={'description': 'Multiple types of gold ornaments'}
+        )
+        category_ids = [mixed_items_category.id]
+
+        # Create other top categories
+        for category_name in top_categories[1:]:  # Skip Mixed Items as it's already created
+            category, created = Category.objects.get_or_create(
+                name=category_name,
+                defaults={'description': f'Gold ornament: {category_name}'}
+            )
+            category_ids.append(category.id)
+
+        # Then create or get the Tamil Nadu categories
         tamilnadu_categories = [
             'Thali (Mangalsutra)', 'Jimikki (Earrings)', 'Mothiram (Rings)', 
             'Valai (Bangles)', 'Malai (Necklaces)', 'Koppu (Studs)',
             'Odiyanam (Waist Belt)', 'Thodu (Ear Hoops)', 'Vanki (Armlet)',
             'Kolusu (Anklet)', 'Metti (Toe Ring)', 'Jadai Nagam (Hair Ornament)'
         ]
-        
-        # Create categories in order, starting with the top categories
-        all_categories = top_categories + tamilnadu_categories
-        category_ids = []
-        
-        # Create the top categories first
-        for category_name in top_categories:
-            category, created = Category.objects.get_or_create(
-                name=category_name,
-                defaults={'description': f'Gold ornament: {category_name}'}
-            )
-            category_ids.append(category.id)
-        
-        # Then create or get the Tamil Nadu categories
+
         for category_name in tamilnadu_categories:
             category, created = Category.objects.get_or_create(
                 name=category_name,
@@ -169,18 +204,18 @@ class LoanForm(forms.ModelForm):
             )
             category_ids.append(category.id)
         
-        # Order the categories to ensure top categories appear first
+        # Create the complete categories list in order
+        all_categories = ['Mixed Items'] + top_categories[1:] + tamilnadu_categories
+        
+        # Order the categories to ensure Mixed Items appears first
         self.fields['item_category'].queryset = Category.objects.filter(id__in=category_ids).order_by(
             models.Case(
                 *[models.When(name=name, then=pos) for pos, name in enumerate(all_categories)]
             )
         )
         
-        # Set Chain as default
-        chain_category = Category.objects.filter(name='Chain').first()
-        if chain_category:
-            self.fields['item_category'].initial = chain_category
-            
+        # Always set Mixed Items as default
+        self.fields['item_category'].initial = mixed_items_category
         self.fields['item_category'].label = 'Ornament Type'
         self.fields['item_category'].help_text = 'Select the type of gold ornament'
 
@@ -283,6 +318,23 @@ class LoanForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
+        # Convert string inputs to Decimal and ensure they are integers
+        try:
+            if 'market_price_22k' in cleaned_data:
+                cleaned_data['market_price_22k'] = Decimal(cleaned_data['market_price_22k'])
+            if 'principal_amount' in cleaned_data:
+                cleaned_data['principal_amount'] = Decimal(str(int(float(cleaned_data['principal_amount']))))
+        except (ValueError, TypeError, InvalidOperation):
+            raise ValidationError("Please enter valid whole numbers for principal amount")
+
+        # Calculate processing fee and distribution amount
+        principal_amount = cleaned_data.get('principal_amount')
+        if principal_amount:
+            # Processing fee is fixed at 1% of the principal amount
+            processing_fee_amount = (principal_amount * Decimal('0.01')).to_integral_value()
+            cleaned_data['processing_fee'] = processing_fee_amount
+            cleaned_data['distribution_amount'] = principal_amount - processing_fee_amount
+
         # Check if at least one item is being added
         # For new item creation, check required fields
         required_fields = [
@@ -313,17 +365,6 @@ class LoanForm(forms.ModelForm):
             elif principal < min_principal:
                 self.add_error('principal_amount',
                     f'Principal amount must be at least 50% of the gold value. Minimum required: ₹{min_principal:.2f}')
-
-        # Calculate processing fee amount and distribution amount
-        principal_amount = cleaned_data.get('principal_amount')
-        
-        if principal_amount:
-            # Processing fee is fixed at 1% of the principal amount
-            processing_fee_amount = principal_amount * Decimal('0.01')
-            # Round to 2 decimal places to avoid validation error
-            processing_fee_amount = processing_fee_amount.quantize(Decimal('0.01'))
-            cleaned_data['processing_fee'] = processing_fee_amount
-            cleaned_data['distribution_amount'] = principal_amount - processing_fee_amount
 
         # Calculate total payable amount (principal + interest)
         interest_rate = cleaned_data.get('interest_rate')

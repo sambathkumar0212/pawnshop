@@ -1,6 +1,14 @@
+import os
+import uuid
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib import messages
 from django.shortcuts import redirect
+
+def item_photo_path(instance, filename):
+    """Generate a unique file path for loan item photos"""
+    ext = filename.split('.')[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    return os.path.join('inventory_images', f'loan_{instance.loan_number}', filename)
 
 class ManagerPermissionMixin(UserPassesTestMixin):
     """

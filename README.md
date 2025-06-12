@@ -62,6 +62,35 @@ A comprehensive Django-based management system for pawn shops with multiple bran
 
 8. Access the admin interface at http://127.0.0.1:8000/admin/ and the application at http://127.0.0.1:8000/
 
+## Quick Development Setup
+
+1. Make the setup script executable:
+   ```bash
+   chmod +x dev_setup.sh
+   ```
+
+2. Run the development setup script:
+   ```bash
+   ./dev_setup.sh
+   ```
+
+   This will:
+   - Create and activate virtual environment
+   - Install dependencies
+   - Set up development environment
+   - Run migrations
+   - Create default superuser (if needed)
+   - Start the development server
+
+   Default superuser credentials:
+   - Username: admin
+   - Password: admin
+   - Email: admin@example.com
+
+3. Access the application:
+   - Admin interface: http://127.0.0.1:8000/admin/
+   - Main application: http://127.0.0.1:8000/
+
 ## Getting Started
 
 After installation, follow these steps to set up your pawnshop:
@@ -150,3 +179,18 @@ Inventory Manager - Item tracking and inventory
 Accountant - Financial reporting and analysis
 Customer Service - Customer support
 Appraiser - Item valuation specialist
+
+To use different environments:
+
+Development: DJANGO_ENV=development python manage.py runserver
+Production: DJANGO_ENV=production python manage.py runserver
+Don't forget to:
+
+Add both .env files to .gitignore
+Install python-dotenv: pip install python-dotenv
+Never commit production credentials
+Keep a .env.example template in version control
+
+## To Run project in development env
+chmod +x dev_setup.sh
+./dev_setup.sh

@@ -533,17 +533,33 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
             
-            // Insert at the top of the form
-            const form = document.querySelector('form');
-            form.insertBefore(alertDiv, form.firstChild);
+            // Find or create the alert container at the top of the form
+            let alertContainer = document.getElementById('alertContainer');
+            if (!alertContainer) {
+                alertContainer = document.createElement('div');
+                alertContainer.id = 'alertContainer';
+                const form = document.querySelector('form');
+                form.insertBefore(alertContainer, form.firstChild);
+            }
+            
+            // Add the alert to the container
+            alertContainer.appendChild(alertDiv);
             
             // Auto dismiss after 5 seconds
             setTimeout(() => {
                 alertDiv.classList.remove('show');
-                setTimeout(() => alertDiv.remove(), 150);
+                setTimeout(() => {
+                    if (alertDiv.parentNode === alertContainer) {
+                        alertContainer.removeChild(alertDiv);
+                    }
+                    // Remove container if empty
+                    if (alertContainer.children.length === 0) {
+                        alertContainer.remove();
+                    }
+                }, 150);
             }, 5000);
         }
-        
+
         // Gold Item Photo Capture Functionality
         const itemCameraStream = document.getElementById('itemCameraStream');
         const itemPhotoCanvas = document.getElementById('itemPhotoCanvas');
@@ -632,6 +648,9 @@
             
             // Enable the clear button
             if (clearItemPhotosBtn) clearItemPhotosBtn.disabled = false;
+
+            // Show success message without affecting the photos
+            showAlert('Item photo captured successfully!', 'success');
         });
         
         // Add an item photo to the collection
@@ -736,75 +755,43 @@
             });
         }
         
-        // Add scheme handling
-        function updateSchemeInfo() {
-            const scheme = $('#id_scheme').val();
-            const schemeInfo = $('#scheme-info');
-            const schemeDetails = $('#scheme-details');
-            let interestRate = 0;
-            let schemeText = '';
+        // Calculate and display Total Items count from item name
+        function updateTotalItemsCount() {
+            // Show the total items section by default
+            $('#totalItemsDisplay').show();
             
-            if (scheme === 'standard') {
-                interestRate = 12.00;
-                schemeText = '<strong>Standard Scheme:</strong> 12% interest rate, can only be closed after 3 months from loan date.';
-                schemeInfo.removeClass('alert-info alert-warning').addClass('alert-info');
-            } else if (scheme === 'flexible') {
-                interestRate = 24.00;
-                schemeText = '<strong>Flexible Scheme:</strong> 24% interest rate, but no interest if closed within 25 days from loan date.';
-                schemeInfo.removeClass('alert-info alert-warning').addClass('alert-warning');
+            const itemName = $('#id_item_name').val() || '';
+            let totalItems = 0;
+            
+            // Pattern to match formats like "ring-6" or "earrings-2"
+            const pattern = /(\w+)-(\d+)/g;
+            let match;
+            let itemsFound = false;
+            
+            // Find all matches in the item name
+            while ((match = pattern.exec(itemName)) !== null) {
+                const count = parseInt(match[2], 10);
+                if (!isNaN(count)) {
+                    totalItems += count;
+                    itemsFound = true;
+                }
             }
             
-            // Update interest rate field
-            $('#id_interest_rate').val(interestRate);
-            
-            // Update scheme info display
-            schemeDetails.html(schemeText);
-            schemeInfo.show();
-            
-            // Update due dates based on scheme
-            updateDueDates();
-        }
-        
-        // Function to update due dates based on loan date and scheme
-        function updateDueDates() {
-            const issueDate = $('#id_issue_date').val();
-            const scheme = $('#id_scheme').val();
-            
-            if (issueDate) {
-                const issueDateObj = new Date(issueDate);
-                let dueDate = new Date(issueDateObj);
-                
-                // Set due date to exactly 364 days from issue date for both schemes
-                dueDate.setDate(dueDate.getDate() + 364); // Add 364 days
-                
-                // Set grace period as due date + 5 days
-                let gracePeriod = new Date(dueDate);
-                gracePeriod.setDate(gracePeriod.getDate() + 5);
-                
-                // Format dates as YYYY-MM-DD for input fields
-                const dueDateFormatted = dueDate.toISOString().split('T')[0];
-                const gracePeriodFormatted = gracePeriod.toISOString().split('T')[0];
-                
-                // Set the values
-                $('#id_due_date').val(dueDateFormatted);
-                $('#id_grace_period_end').val(gracePeriodFormatted);
+            // If no pattern matches found, default to 1
+            if (!itemsFound) {
+                totalItems = 1;
             }
+            
+            // Update the field with the calculated value
+            $('#calculatedTotalItems').val(totalItems);
+            
+            return totalItems;
         }
         
-        // Set up scheme change handler
-        $('#id_scheme').on('change', updateSchemeInfo);
-        
-        // Set up loan date change handler
-        $('#id_issue_date').on('change', updateDueDates);
-        
-        // Run on page load to set initial values
-        updateSchemeInfo();
-        
-        // If loan date is already set on page load, update due dates accordingly
-        if ($('#id_issue_date').val()) {
-            updateDueDates();
-        }
-        
+        // Set initial value and attach event listener
+        updateTotalItemsCount();
+        $('#id_item_name').on('input', updateTotalItemsCount);
+
         // Original loan form JS code
         const KARAT_PURITY = {
             '24': 0.999,
@@ -839,9 +826,22 @@
             calculateGoldValue();
         };
 
+        // Function to clean numeric input
+        function cleanNumericInput(value) {
+            // Remove all non-numeric characters except decimal point
+            return value.replace(/[^0-9.]/g, '');
+        }
+
+        // Format number inputs to handle string values
+        $('#id_market_price_22k, #id_principal_amount').on('input', function() {
+            const cleanedValue = cleanNumericInput($(this).val());
+            $(this).val(cleanedValue);
+        });
+
         // Calculate gold value and suggest principal amount
         const calculateGoldValue = debounce(function() {
-            const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;
+            const marketPriceStr = cleanNumericInput($('#id_market_price_22k').val());
+            const marketPrice = parseFloat(marketPriceStr) || 0;
             const selectedKarat = $('#id_gold_karat').val();
             const netWeight = parseFloat($('#id_net_weight').val()) || 0;
             
@@ -859,40 +859,40 @@
                 const minPrincipal = Math.round(goldValue * 0.5);
                 const maxPrincipal = Math.round(goldValue * 0.85);
 
-                // Automatically fill in the suggested principal amount
+                // Set the suggested principal amount
                 $('#id_principal_amount').val(suggestedPrincipal);
                 
                 // Trigger the distribution amount calculation
                 calculateDistributionAmount();
                 
-                // Create a compact info message with mild custom styling
+                // Create info message
                 const messageDiv = $('<div class="gold-value-message small mt-1"></div>')
-                    .css('color', '#5470b0')  // Mild blue color
+                    .css('color', '#5470b0')
                     .html(`<i class="fas fa-info-circle"></i> Gold value: ₹${goldValue.toFixed(0)} | Principal set to ₹${suggestedPrincipal} (75%) | Range: ₹${minPrincipal}-₹${maxPrincipal}`);
                 
-                // Insert after the principal amount field
                 messageDiv.insertAfter('#div_id_principal_amount .form-text');
             }
         }, 300);
 
-        // Calculate distribution amount when principal or processing fee changes
+        // Calculate distribution amount when principal changes
         const calculateDistributionAmount = function() {
-            const principal = parseFloat($('#id_principal_amount').val()) || 0;
-            // Round principal to whole number
-            $('#id_principal_amount').val(Math.round(principal));
+            const principalStr = cleanNumericInput($('#id_principal_amount').val());
+            const principal = Math.round(parseFloat(principalStr)) || 0;
             
             // Calculate processing fee as 1% of principal amount
-            const processingFeePercentage = 0.01; // Fixed at 1%
-            const processingFeeAmount = Math.round(principal * processingFeePercentage);
+            const processingFeeAmount = Math.round(principal * 0.01);
             
-            // Display the processing fee amount instead of percentage
-            $('#id_processing_fee')
-                .val(processingFeeAmount);
+            // Set the processing fee amount
+            $('#id_processing_fee').val(processingFeeAmount);
             
+            // Calculate and set distribution amount
             const distributionAmount = principal - processingFeeAmount;
-            
-            $('#id_distribution_amount')
-                .val(Math.round(distributionAmount));
+            $('#id_distribution_amount').val(Math.round(distributionAmount));
+
+            // Update distribution amount in words
+            $.get(`/transactions/number_to_words/${Math.round(distributionAmount)}`, function(response) {
+                $('#distributionAmountWords').text(response.words + ' Rupees Only');
+            });
         };
 
         // Set up event handlers
@@ -923,84 +923,66 @@
                         .text(principal < minPrincipal 
                             ? `Principal must be at least ₹${minPrincipal} (50% of gold value)`
                             : `Principal cannot exceed ₹${maxPrincipal} (85% of gold value)`);
-                    
-                    $(this).after(errorMsg);
+                    errorMsg.insertAfter('#div_id_principal_amount .form-text');
                 }
             }
+            
+            // Update amount in words
+            $.get(`/transactions/number_to_words/${principal}`, function(response) {
+                $('#principalAmountWords').text(response.words + ' Rupees Only');
+            });
         });
+
+        // Add amount in words display for distribution amount
+        $('#id_distribution_amount').on('change', function() {
+            const amount = parseFloat($(this).val()) || 0;
+            $.get(`/transactions/number_to_words/${amount}`, function(response) {
+                $('#distributionAmountWords').text(response.words + ' Rupees Only');
+            });
+        });
+
+        // Add help text containers after the input fields
+        $('#div_id_principal_amount').append('<small id="principalAmountWords" class="text-muted d-block mt-1"></small>');
+        $('#div_id_distribution_amount').append('<small id="distributionAmountWords" class="text-muted d-block mt-1"></small>');
         
         // Add form submission handling
         $('#loanForm').on('submit', function(event) {
-            // Ensure customer face capture is properly included
+            // Store current photos in localStorage before submit
+            if (itemPhotos.length > 0) {
+                localStorage.setItem('tempItemPhotos', JSON.stringify(itemPhotos));
+            }
             if (customerFaceCapture.value) {
-                // Log the image data length to console for debugging
-                console.log("Submitting customer face capture, data length:", customerFaceCapture.value.length);
-            } else {
-                console.log("No customer face capture data to submit");
+                localStorage.setItem('tempCustomerPhoto', customerFaceCapture.value);
             }
         });
-        
-        // Clean up when leaving the page
-        $(window).on('beforeunload', function() {
-            // Stop the camera streams if they exist
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            if (itemStream) {
-                itemStream.getTracks().forEach(track => track.stop());
-            }
-        });
-        
-        // Item name change handler to update total items count
-        $('#id_item_name').on('input', function() {
-            const itemNameValue = $(this).val();
-            const totalItemsDisplay = $('#totalItemsDisplay');
-            const calculatedTotalItems = $('#calculatedTotalItems');
-            
-            if (itemNameValue) {
-                // Parse the item name value to count items (format: "ring-6, chain-1")
-                let totalCount = 0;
-                const items = itemNameValue.split(',').map(item => item.trim()).filter(item => item);
-                
-                items.forEach(item => {
-                    if (item.includes('-')) {
-                        const parts = item.split('-');
-                        if (parts.length > 1) {
-                            const count = parseInt(parts[1]);
-                            if (!isNaN(count)) {
-                                totalCount += count;
-                            }
-                        }
-                    }
-                });
-                
-                // Update the total items count display with parsed count
-                calculatedTotalItems.val(totalCount > 0 ? totalCount : '0');
-                
-                // Show/hide the display based on if we found parseable items
-                if (totalCount > 0) {
-                    totalItemsDisplay.show();
-                    calculatedTotalItems.parent().removeClass('has-error').addClass('has-success');
-                } else {
-                    if (itemNameValue.includes('-')) {
-                        // If there's a hyphen but no valid count, show zero with warning
-                        totalItemsDisplay.show();
-                        calculatedTotalItems.parent().removeClass('has-success').addClass('has-error');
-                    } else {
-                        // If no hyphen format detected, hide the counter
-                        totalItemsDisplay.hide();
-                    }
-                }
-            } else {
-                // Hide the total items count display if input is empty
-                totalItemsDisplay.hide();
-            }
-        });
-        
-        // Trigger the calculation on page load if item name is already filled
+
+        // Restore photos after page load if form had errors
         $(document).ready(function() {
-            if ($('#id_item_name').val()) {
-                $('#id_item_name').trigger('input');
+            // Check if we have stored photos from a previous submission
+            const storedItemPhotos = localStorage.getItem('tempItemPhotos');
+            const storedCustomerPhoto = localStorage.getItem('tempCustomerPhoto');
+
+            if (storedItemPhotos) {
+                try {
+                    const parsedPhotos = JSON.parse(storedItemPhotos);
+                    parsedPhotos.forEach(photo => {
+                        addItemPhoto(photo.dataUrl);
+                    });
+                    // Clear stored photos after restoring
+                    localStorage.removeItem('tempItemPhotos');
+                } catch (e) {
+                    console.error('Error restoring item photos:', e);
+                }
+            }
+
+            if (storedCustomerPhoto && !customerFaceCapture.value) {
+                capturedPhoto.src = storedCustomerPhoto;
+                capturedPhoto.style.display = 'block';
+                customerFaceCapture.value = storedCustomerPhoto;
+                if (noCaptureText) noCaptureText.style.display = 'none';
+                if (retakeBtn) retakeBtn.disabled = false;
+                // Clear stored customer photo after restoring
+                localStorage.removeItem('tempCustomerPhoto');
             }
         });
     });
