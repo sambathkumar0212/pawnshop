@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
-{% load loan_tags %}
+{% load custom_filters %}
 
 {% block title %}Record Payment - Loan #{{ loan.loan_number }} - Pawnshop Management{% endblock %}
 
@@ -56,7 +56,7 @@
                                 </tr>
                                 <tr class="text-primary">
                                     <td>Total Payable (Till Today)</td>
-                                    <td class="text-end">₹{{ loan.total_payable_till_date|floatformat:2 }}</td>
+                                    <td class="text-end">₹{{ loan.total_payable_till_date|floatformat:0 }}</td>
                                 </tr>
                                 <tr class="text-success">
                                     <td>Amount Already Paid</td>
@@ -64,7 +64,15 @@
                                 </tr>
                                 <tr class="table-primary fw-bold">
                                     <td>Net Amount Due</td>
-                                    <td class="text-end">₹{{ loan.total_payable_till_date|subtract:loan.amount_paid|floatformat:2 }}</td>
+                                    <td class="text-end">₹{{ loan.total_payable_till_date|subtract:loan.amount_paid|floatformat:0 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Total Payable (Maturity)</td>
+                                    <td class="text-end">₹{{ loan.total_payable_mature|floatformat:0 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Remaining Balance</td>
+                                    <td class="text-end">₹{{ loan.remaining_balance|floatformat:0 }}</td>
                                 </tr>
                             </table>
                         </div>
@@ -85,7 +93,7 @@
                             </div>
                             <div class="d-flex justify-content-between mt-1">
                                 <small class="text-muted">₹{{ loan.amount_paid|floatformat:2 }} paid</small>
-                                <small class="text-muted">₹{{ loan.total_payable_till_date|floatformat:2 }} total</small>
+                                <small class="text-muted">₹{{ loan.total_payable_till_date|floatformat:0 }} total</small>
                             </div>
                             {% endwith %}
                         </div>

@@ -40,15 +40,21 @@ def item_photos_count(item_photos):
     """Return the count of item photos"""
     try:
         if isinstance(item_photos, str):
-            # Parse the JSON string to get the list of photo URLs
+            # If it's a base64 string, it's one photo
+            if item_photos.startswith('data:image/'):
+                return 1
+                
+            # Try to parse as JSON
             photo_list = json.loads(item_photos)
-            return len(photo_list)
+            if isinstance(photo_list, list):
+                return len(photo_list)
+            return 1
         elif isinstance(item_photos, list):
             # If it's already a list, just return the length
             return len(item_photos)
+        return 0
     except (json.JSONDecodeError, TypeError):
-        pass
-    return 0
+        return 0
 
 @register.filter
 def multiply(value, arg):
@@ -113,3 +119,10 @@ def calculate_total_items(item_name):
     except Exception:
         # Return 0 if any error occurs
         return 0
+
+@register.filter
+def is_base64(value):
+    """Check if a string is a base64 image"""
+    if not isinstance(value, str):
+        return False
+    return value.startswith('data:image/')

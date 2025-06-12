@@ -74,8 +74,6 @@ class Item(models.Model):
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     appraised_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    
-    # Add these fields to match admin usage
     estimated_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     
@@ -84,6 +82,8 @@ class Item(models.Model):
     featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+    
+    # User relationships
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         related_name='created_items',
@@ -97,8 +97,6 @@ class Item(models.Model):
         null=True,
         blank=True
     )
-    
-    # Added field to match admin.py
     added_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name='added_items',
@@ -116,6 +114,14 @@ class Item(models.Model):
         blank=True
     )
     
+    # Loan relationship through LoanItem
+    loans = models.ManyToManyField(
+        'transactions.Loan',
+        through='transactions.LoanItem',
+        through_fields=('item', 'loan'),
+        related_name='items'
+    )
+    
     # Additional metadata
     tags = models.CharField(max_length=255, blank=True, help_text="Comma-separated tags")
     notes = models.TextField(blank=True)
@@ -125,7 +131,7 @@ class Item(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.item_id})"
-    
+        
     def save(self, *args, **kwargs):
         # Generate a unique item ID if not provided
         if not self.item_id:
@@ -149,7 +155,7 @@ class Item(models.Model):
                 seq_num = 1
                 
             self.item_id = f"{branch_code}-{category_code}-{seq_num:04d}"
-        
+            
         super().save(*args, **kwargs)
     
     def get_absolute_url(self):

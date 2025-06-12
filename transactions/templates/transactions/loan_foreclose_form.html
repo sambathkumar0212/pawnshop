@@ -80,27 +80,27 @@
                             <table class="table table-bordered">
                                 <tr>
                                     <th width="30%">Principal Amount</th>
-                                    <td>₹{{ principal_amount }}</td>
+                                    <td>₹{{ principal_amount|floatformat:2 }}</td>
                                 </tr>
                                 <tr>
                                     <th>Interest Amount (till today)</th>
-                                    <td>₹{{ loan.total_payable_till_date|subtract:principal_amount|floatformat:2 }}</td>
+                                    <td>₹{{ loan.total_payable_till_date|subtract:principal_amount|floatformat:0 }}</td>
                                 </tr>
                                 <tr>
                                     <th>Total Payable (Till Today)</th>
-                                    <td>₹{{ loan.total_payable_till_date|floatformat:2 }}</td>
+                                    <td>₹{{ loan.total_payable_till_date|floatformat:0 }}</td>
                                 </tr>
                                 <tr>
                                     <th>Amount Already Paid</th>
-                                    <td>₹{{ amount_paid }}</td>
+                                    <td>₹{{ amount_paid|floatformat:2 }}</td>
                                 </tr>
                                 <tr class="table-primary">
                                     <th>Net Amount Due</th>
-                                    <td><strong>₹{{ loan.total_payable_till_date|subtract:amount_paid|floatformat:2 }}</strong></td>
+                                    <td><strong>₹{{ loan.total_payable_till_date|subtract:amount_paid|floatformat:0 }}</strong></td>
                                 </tr>
                                 <tr class="table-secondary">
                                     <th>Total Payable (At Maturity)</th>
-                                    <td>₹{{ total_payable_mature|floatformat:2 }}</td>
+                                    <td>₹{{ total_payable_mature|floatformat:0 }}</td>
                                 </tr>
                             </table>
                             <div class="alert alert-info">

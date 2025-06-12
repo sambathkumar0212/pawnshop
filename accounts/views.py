@@ -622,14 +622,25 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
                 # Decode base64 image data
                 image_data = base64.b64decode(imgstr)
                 
-                # Create a ContentFile to save to the ImageField
-                from django.core.files.base import ContentFile
+                # Create a ContentFile and save to id_image field
                 image_file = ContentFile(image_data, name=f"id_{form.instance.first_name}_{form.instance.last_name}.{ext}")
-                
-                # Assign to the form instance
                 form.instance.id_image = image_file
+                
+                # Log success
+                messages.success(self.request, "ID image captured and saved successfully.")
+                
+                if settings.DEBUG:
+                    print("Successfully processed camera image in CustomerUpdateView")
             except Exception as e:
                 messages.error(self.request, f"Error processing ID image: {str(e)}")
+                if settings.DEBUG:
+                    print(f"Error processing camera image: {str(e)}")
+        else:
+            if settings.DEBUG:
+                if 'camera_image_data' in self.request.POST:
+                    print("Camera image data was received but in incorrect format or empty")
+                else:
+                    print("No camera image data was received")
 
         # Process profile photo if available
         profile_photo_data = self.request.POST.get('profile_photo_data')
@@ -637,6 +648,8 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
             try:
                 # Store the base64 data directly in the profile_photo field
                 form.instance.profile_photo = profile_photo_data
+                
+                messages.success(self.request, "Profile photo saved successfully.")
             except Exception as e:
                 messages.error(self.request, f"Error processing profile photo: {str(e)}")
         

@@ -1,10 +1,10 @@
 /**
  * Simple Camera Capture Utility for Customer Forms
- * Version 2.0 - Complete rewrite for better reliability
+ * Version 3.0 - Added auto-start camera functionality
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Camera capture script v2 initialized');
+    console.log('Camera capture script v3 initialized');
     
     // Core elements
     const captureButton = document.getElementById('capture-id-button');
@@ -27,6 +27,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Global variables
     let mediaStream = null;
+    
+    // Check for auto-start flag in data attributes or window.cameraConfig
+    const shouldAutoStart = captureButton.dataset.autoStart === 'true' || 
+                           (window.cameraConfig && window.cameraConfig.autoStart === true);
     
     // Initialize camera UI
     function setupCamera() {
@@ -75,6 +79,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         console.log('Camera event handlers initialized');
+        
+        // Auto-start camera if configured
+        if (shouldAutoStart) {
+            console.log('Auto-starting camera...');
+            // Slight delay to allow the page to fully load
+            setTimeout(openCamera, 500);
+        }
     }
     
     // Open camera function
@@ -146,12 +157,22 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get image as data URL
             const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
             
-            // Update preview image
-            idImagePreview.src = imageDataUrl;
-            idImagePreview.style.display = 'block';
+            // Make sure preview element exists before using it
+            if (idImagePreview) {
+                idImagePreview.src = imageDataUrl;
+                idImagePreview.style.display = 'block';
+                console.log('Preview image updated');
+            } else {
+                console.error('ID image preview element not found');
+            }
             
             // Store in hidden field
-            hiddenImageField.value = imageDataUrl;
+            if (hiddenImageField) {
+                hiddenImageField.value = imageDataUrl;
+                console.log('Image data stored in hidden field');
+            } else {
+                console.error('Hidden image field not found');
+            }
             
             // Update UI
             takePictureButton.style.display = 'none';
@@ -192,5 +213,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize camera UI
     setupCamera();
-    console.log('Camera capture script v2 initialized successfully');
+    console.log('Camera capture script v3 initialized successfully');
 });

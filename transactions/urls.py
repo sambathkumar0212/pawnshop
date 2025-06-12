@@ -23,4 +23,7 @@ urlpatterns = [
     path('sales/<str:transaction_number>/edit/', views.SaleUpdateView.as_view(), name='sale_update'),
     path('sales/<str:transaction_number>/cancel/', views.SaleCancelView.as_view(), name='sale_cancel'),
     path('sales/<str:transaction_number>/receipt/', views.SaleReceiptView.as_view(), name='sale_receipt'),
+
+    # Utilities
+    path('number_to_words/<str:number>/', views.number_to_words, name='number_to_words'),
 ]

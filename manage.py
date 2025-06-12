@@ -2,10 +2,14 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
+from env_loader import load_env
 
 
 def main():
     """Run administrative tasks."""
+    load_env()
+
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
     try:
         from django.core.management import execute_from_command_line
