@@ -304,29 +304,58 @@
                         <div class="col-12">
                             <h6 class="text-muted small mb-2">Item Photos</h6>
                             <div class="item-photos-gallery d-flex flex-wrap">
-                                {% if item_photos_list %}
-                                    {% for photo in item_photos_list %}
-                                        <div class="item-photo-thumbnail me-2 mb-2 position-relative" data-bs-toggle="modal" data-bs-target="#photoModal" data-photo-url="{{ photo }}" data-photo-index="{{ forloop.counter }}">
-                                            <img src="{{ photo }}" class="rounded border" alt="Item Photo {{ forloop.counter }}" 
+                                {% try %}
+                                    {% if item_photos_list %}
+                                        {% for photo in item_photos_list %}
+                                            <div class="item-photo-thumbnail me-2 mb-2 position-relative" data-bs-toggle="modal" data-bs-target="#photoModal" data-photo-url="{{ photo }}" data-photo-index="{{ forloop.counter }}">
+                                                <img src="{{ photo }}" class="rounded border" alt="Item Photo {{ forloop.counter }}" 
+                                                     style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;">
+                                                <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-50 text-white small text-center">
+                                                    Photo {{ forloop.counter }}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% elif loan.item_photos|is_base64 %}
+                                        <div class="item-photo-thumbnail me-2 mb-2 position-relative" data-bs-toggle="modal" data-bs-target="#photoModal" data-photo-url="{{ loan.item_photos }}" data-photo-index="1">
+                                            <img src="{{ loan.item_photos }}" class="rounded border" alt="Item Photo" 
                                                  style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;">
                                             <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-50 text-white small text-center">
-                                                Photo {{ forloop.counter }}
+                                                Photo 1
                                             </div>
                                         </div>
-                                    {% endfor %}
-                                {% elif loan.item_photos|is_base64 %}
-                                    <div class="item-photo-thumbnail me-2 mb-2 position-relative" data-bs-toggle="modal" data-bs-target="#photoModal" data-photo-url="{{ loan.item_photos }}" data-photo-index="1">
-                                        <img src="{{ loan.item_photos }}" class="rounded border" alt="Item Photo" 
-                                             style="width: 80px; height: 80px; object-fit: cover; cursor: pointer;">
-                                        <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-50 text-white small text-center">
-                                            Photo 1
+                                    {% elif loan.item_photos|is_empty_photo_list %}
+                                        <div class="alert alert-light small py-2">
+                                            <i class="fas fa-camera me-2"></i>No photos available
+                                            <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-sm btn-outline-secondary ms-2">
+                                                <i class="fas fa-plus me-1"></i>Add Photos
+                                            </a>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <div class="alert alert-warning py-2 small">
-                                        <i class="fas fa-exclamation-triangle me-2"></i>Photos need to be reprocessed. Please edit the loan to fix this.
-                                    </div>
-                                {% endif %}
+                                    {% else %}
+                                        <div class="alert alert-warning small py-2">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>
+                                            <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-sync-alt me-1"></i>Reprocess Photos
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                {% except %}
+                                    <!-- Handle the case when item_photos is empty or cannot be processed -->
+                                    {% if loan.item_photos|is_empty_photo_list %}
+                                        <div class="alert alert-light small py-2">
+                                            <i class="fas fa-camera me-2"></i>No photos available
+                                            <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-sm btn-outline-secondary ms-2">
+                                                <i class="fas fa-plus me-1"></i>Add Photos
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning small py-2">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>Photos need to be reprocessed. 
+                                            <a href="{% url 'loan_update' loan.loan_number %}" class="btn btn-sm btn-warning">
+                                                <i class="fas fa-sync-alt me-1"></i>Edit Loan to Fix
+                                            </a>
+                                        </div>
+                                    {% endif %}
+                                {% endtry %}
                             </div>
                         </div>
                     </div>

@@ -470,7 +470,7 @@ class CustomerDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
 class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Customer
     template_name = 'accounts/customer_form.html'
-    fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 
+    fields = ['first_name', 'last_name', 'email', 'phone', 'branch', 'address', 'city', 
               'state', 'zip_code', 'id_type', 'id_number', 'id_image', 'notes']
     success_url = reverse_lazy('customer_list')
     permission_required = 'accounts.add_customer'
@@ -479,7 +479,7 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         context = super().get_context_data(**kwargs)
         # Add fieldset information for better UI organization
         context['fieldsets'] = [
-            {'title': 'Personal Information', 'fields': ['first_name', 'last_name', 'email', 'phone']},
+            {'title': 'Personal Information', 'fields': ['first_name', 'last_name', 'email', 'phone', 'branch']},
             {'title': 'Address', 'fields': ['address', 'city', 'state', 'zip_code']},
             {'title': 'Identification', 'fields': ['id_type', 'id_number', 'id_image']},
             {'title': 'Additional Information', 'fields': ['notes']}
@@ -508,6 +508,7 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         form.fields['last_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Last Name'})
         form.fields['email'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Email Address'})
         form.fields['phone'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Phone Number', 'type': 'tel'})
+        form.fields['branch'].widget.attrs.update({'class': 'form-control'})
         form.fields['address'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Street Address', 'rows': 2})
         form.fields['city'].widget.attrs.update({'class': 'form-control', 'placeholder': 'City'})
         form.fields['state'].widget.attrs.update({'class': 'form-control', 'placeholder': 'State/Province'})
@@ -593,7 +594,7 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
 class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Customer
     template_name = 'accounts/customer_form.html'
-    fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 
+    fields = ['first_name', 'last_name', 'email', 'phone', 'branch', 'address', 'city', 
               'state', 'zip_code', 'id_type', 'id_number', 'id_image', 'notes']
     permission_required = 'accounts.change_customer'
     
@@ -616,7 +617,7 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         context = super().get_context_data(**kwargs)
         # Add fieldset information for better UI organization
         context['fieldsets'] = [
-            {'title': 'Personal Information', 'fields': ['first_name', 'last_name', 'email', 'phone']},
+            {'title': 'Personal Information', 'fields': ['first_name', 'last_name', 'email', 'phone', 'branch']},
             {'title': 'Address', 'fields': ['address', 'city', 'state', 'zip_code']},
             {'title': 'Identification', 'fields': ['id_type', 'id_number', 'id_image']},
             {'title': 'Additional Information', 'fields': ['notes']}
@@ -645,6 +646,7 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         form.fields['last_name'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Last Name'})
         form.fields['email'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Email Address'})
         form.fields['phone'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Phone Number', 'type': 'tel'})
+        form.fields['branch'].widget.attrs.update({'class': 'form-control'})
         form.fields['address'].widget.attrs.update({'class': 'form-control', 'placeholder': 'Street Address', 'rows': 2})
         form.fields['city'].widget.attrs.update({'class': 'form-control', 'placeholder': 'City'})
         form.fields['state'].widget.attrs.update({'class': 'form-control', 'placeholder': 'State/Province'})
@@ -731,3 +733,19 @@ class CustomerDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
         customer = self.get_object()
         messages.success(request, f'Customer {customer.full_name} was deleted successfully.')
         return super().delete(request, *args, **kwargs)
+
+
+class CustomerJsonView(LoginRequiredMixin, View):
+    """Return customer data in JSON format"""
+    def get(self, request, pk):
+        try:
+            customer = Customer.objects.get(pk=pk)
+            data = {
+                'id': customer.id,
+                'first_name': customer.first_name,
+                'last_name': customer.last_name,
+                'branch_id': customer.branch_id if customer.branch else None
+            }
+            return JsonResponse(data)
+        except Customer.DoesNotExist:
+            return JsonResponse({'error': 'Customer not found'}, status=404)
