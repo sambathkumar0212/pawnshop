@@ -11,23 +11,17 @@ export RENDER=true
 echo "Verifying database configuration..."
 python -c "import os; from django.conf import settings; import django; django.setup(); db = settings.DATABASES['default']; print(f\"DATABASE ENGINE: {db.get('ENGINE', 'Not set')}\"); print(f\"DATABASE NAME: {db.get('NAME', 'Not set')}\"); print(f\"DATABASE HOST: {db.get('HOST', 'Not set')}\")"
 
-# Special fix for "relation does not exist" error
-echo "Applying fix for database schema issues..."
-
-# Force-apply auth and contenttypes migrations first
-echo "Applying core Django migrations..."
-python manage.py migrate auth --fake
-python manage.py migrate contenttypes --fake
-
-# Check if accounts_customuser table exists
-echo "Checking for CustomUser table..."
-table_exists=$(python -c "
-import os, django, psycopg2
+# Create a temporary Python script for checking the database
+cat > /tmp/check_db.py << EOL
+import os, django, psycopg2, sys
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
 from django.conf import settings
+
+# Get database connection details
 db = settings.DATABASES['default']
 try:
+    # Connect to the database
     conn = psycopg2.connect(
         dbname=db.get('NAME', ''), 
         user=db.get('USER', ''), 
@@ -35,34 +29,73 @@ try:
         host=db.get('HOST', ''), 
         port=db.get('PORT', '5432')
     )
-    cur = conn.cursor()
-    cur.execute(\"SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='accounts_customuser');\")
-    exists = cur.fetchone()[0]
-    print('true' if exists else 'false')
-    conn.close()
-except Exception as e:
-    print(f'Error checking table: {e}')
-    print('false')
-")
-
-# Apply migrations with appropriate strategy
-if [ "$table_exists" == "true" ]; then
-    echo "CustomUser table exists, applying migrations normally..."
-    python manage.py migrate
-else
-    echo "CustomUser table does not exist, applying initial migrations..."
-    # Create tables for accounts app first
-    echo "Creating accounts app tables..."
-    python manage.py migrate accounts 0001_initial
     
-    # Then apply all migrations
-    echo "Applying all migrations..."
-    python manage.py migrate
+    # Check if accounts_customuser exists
+    cur = conn.cursor()
+    cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='accounts_customuser');")
+    exists = cur.fetchone()[0]
+    
+    if not exists:
+        print('⚠️ accounts_customuser table missing! Applying emergency fix...')
+        
+        # Check if auth tables exist
+        cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='auth_user');")
+        auth_exists = cur.fetchone()[0]
+        
+        # Close connection before migrations
+        conn.close()
+        
+        if auth_exists:
+            print('auth_user exists but accounts_customuser is missing, need to reset migrations')
+            sys.exit(1)
+        else:
+            print('Creating fresh database schema')
+            sys.exit(2)
+    else:
+        print('✅ accounts_customuser table exists')
+        conn.close()
+        sys.exit(0)
+except Exception as e:
+    print(f'⚠️ Error checking database: {e}')
+    sys.exit(3)
+EOL
+
+# Run the database check script
+echo "Checking for accounts_customuser table and applying emergency fix if needed..."
+python /tmp/check_db.py
+DB_CHECK_RESULT=$?
+
+# Remove the temporary script
+rm /tmp/check_db.py
+
+# Special handling for accounts_customuser issue based on the exit code
+if [ $DB_CHECK_RESULT -eq 0 ]; then
+    echo "Database schema is correct, proceeding with normal migrations..."
+    python manage.py migrate --no-input
+elif [ $DB_CHECK_RESULT -eq 1 ]; then
+    echo "Applying specialized fix for auth_user exists but accounts_customuser missing..."
+    # First fake the initial migrations for Django's built-in apps
+    python manage.py migrate --fake-initial auth
+    python manage.py migrate --fake-initial contenttypes 
+    python manage.py migrate --fake-initial sessions
+    
+    # Now apply accounts migrations carefully
+    python manage.py sqlmigrate accounts 0001_initial
+    python manage.py migrate accounts 0001_initial --force-migrate
+    
+    # Then all other migrations
+    python manage.py migrate --no-input
+elif [ $DB_CHECK_RESULT -eq 2 ]; then
+    echo "Creating fresh database schema..."
+    python manage.py migrate --no-input
+else
+    echo "Using fallback migration approach..."
+    python manage.py migrate --no-input
 fi
 
-# Verify migrations status
+# Verify migrations were applied correctly
 echo "Verifying migration status..."
-python manage.py showmigrations
+python manage.py showmigrations | grep -v "\[X\]" || true
 
 # Create a superuser if needed (non-interactive)
 if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_PASSWORD" && -n "$DJANGO_SUPERUSER_EMAIL" ]]; then
