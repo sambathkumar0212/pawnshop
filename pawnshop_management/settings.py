@@ -18,7 +18,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-q3&i^6%a0jn(+yhy8a_02
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+# Update ALLOWED_HOSTS to include render.com domain
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '127.0.0.1,localhost,pawnshop-z817.onrender.com').split(',')
 
 # Application definition
 
