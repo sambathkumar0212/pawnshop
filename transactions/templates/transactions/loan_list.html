@@ -121,7 +121,6 @@
                             <tr>
                                 <th>Customer</th>
                                 <th>Item</th>
-                                <th>Total Items</th>
                                 <th>Principal</th>
                                 <th>Interest Rate</th>
                                 <th>Scheme</th>
@@ -182,7 +181,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% for loan_item in loan.loanitem_set.all|slice:":1" %}
+                                        {% for loan_item in loan.loanitem.all|slice:":1" %}
                                         <div class="d-flex align-items-center mb-1">
                                             {% if loan.item_photos %}
                                                 <div class="position-relative me-2" data-bs-toggle="modal" data-bs-target="#itemModal-{{ loan.id }}">
@@ -200,7 +199,9 @@
                                                 </div>
                                             {% endif %}
                                             <div>
-                                                <span class="d-block">{{ loan_item.item.name }}</span>
+                                                <a href="{% url 'loan_detail' loan.loan_number %}" class="d-block fw-bold text-primary">
+                                                    {{ loan_item.item.name }}
+                                                </a>
                                                 <small class="text-muted">
                                                     {{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g
                                                 </small>
@@ -239,26 +240,15 @@
                                         <span class="text-muted">No items</span>
                                         {% endfor %}
                                     </td>
-                                    <td>
-                                        {% for loan_item in loan.loanitem_set.all|slice:":1" %}
-                                            {% with total_items=loan_item.item.name|calculate_total_items %}
-                                                {% if total_items > 0 %}
-                                                    <span class="badge bg-success">{{ total_items }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">-</span>
-                                                {% endif %}
-                                            {% endwith %}
-                                        {% empty %}
-                                            <span class="text-muted">-</span>
-                                        {% endfor %}
-                                    </td>
                                     <td>₹{{ loan.principal_amount|floatformat:2 }}</td>
                                     <td>{{ loan.interest_rate }}%</td>
                                     <td>
                                         {% if loan.scheme == 'standard' %}
                                             <span class="badge bg-info" data-bs-toggle="tooltip" title="12% interest, minimum 3 months">Standard</span>
                                         {% elif loan.scheme == 'flexible' %}
-                                            <span class="badge bg-warning" data-bs-toggle="tooltip" title="24% interest, no interest if repaid within 25 days">Flexible</span>
+                                            <span class="badge bg-warning" data-bs-toggle="tooltip" title="24% interest, no interest if repaid within 23 days">Flexible</span>
+                                        {% elif loan.scheme == 'premium' %}
+                                            <span class="badge bg-primary" data-bs-toggle="tooltip" title="36% interest, no interest if repaid within 30 days">Premium</span>
                                         {% endif %}
                                     </td>
                                     <td>{{ loan.issue_date }}</td>

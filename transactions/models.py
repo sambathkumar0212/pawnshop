@@ -25,7 +25,8 @@ class Loan(models.Model):
     # Loan scheme choices
     SCHEME_CHOICES = (
         ('standard', 'Standard (12% p.a.)'),
-        ('flexible', 'Flexible (24% p.a.)'),
+        ('flexible', 'Flexible (24% p.a. - No interest if paid within 23 days)'),
+        ('premium', 'Premium (36% p.a. - No interest if paid within 30 days)'),
     )
     
     # Basic loan information
@@ -189,12 +190,18 @@ class Loan(models.Model):
         
         days_elapsed = self.days_since_issue
         
-        # For flexible scheme, no interest if paid within 25 days
-        if self.scheme == 'flexible' and days_elapsed <= 25:
+        # For flexible scheme, no interest if paid within 23 days
+        if self.scheme == 'flexible' and days_elapsed <= 23:
+            return self.principal_amount
+            
+        # For premium scheme, no interest if paid within 30 days
+        if self.scheme == 'premium' and days_elapsed <= 30:
             return self.principal_amount
         
         # Calculate interest based on scheme
-        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else Decimal('0.0006575')
+        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else (
+            Decimal('0.0006575') if self.scheme == 'flexible' else Decimal('0.0009863')
+        )  # 0.0009863 is daily rate for 36% p.a.
         interest = self.principal_amount * daily_rate * days_elapsed
         
         return self.principal_amount + interest
@@ -207,16 +214,47 @@ class Loan(models.Model):
         
         total_days = (self.due_date - self.issue_date).days
         
-        # For flexible scheme, no interest if paid within 25 days
-        if self.scheme == 'flexible' and total_days <= 25:
+        # For flexible scheme, no interest if paid within 23 days
+        if self.scheme == 'flexible' and total_days <= 23:
+            return self.principal_amount
+            
+        # For premium scheme, no interest if paid within 30 days
+        if self.scheme == 'premium' and total_days <= 30:
             return self.principal_amount
         
         # Calculate interest based on scheme
-        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else Decimal('0.0006575')
+        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else (
+            Decimal('0.0006575') if self.scheme == 'flexible' else Decimal('0.0009863')
+        )  # 0.0009863 is daily rate for 36% p.a.
         interest = self.principal_amount * daily_rate * total_days
         
         return self.principal_amount + interest
     
+    def calculate_interest(self):
+        """Calculate interest on loan"""
+        if not self.due_date or self.status != 'active':
+            return Decimal('0.00')
+        
+        # Use the transaction date for calculating days elapsed
+        current_date = timezone.now().date()
+        days_elapsed = (current_date - self.issue_date).days
+        
+        # For flexible scheme, no interest if paid within 23 days
+        if self.scheme == 'flexible' and days_elapsed <= 23:
+            return Decimal('0.00')
+            
+        # For premium scheme, no interest if paid within 30 days
+        if self.scheme == 'premium' and days_elapsed <= 30:
+            return Decimal('0.00')
+        
+        # Calculate interest based on scheme
+        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else (
+            Decimal('0.0006575') if self.scheme == 'flexible' else Decimal('0.0009863')
+        )  # 0.0009863 is daily rate for 36% p.a.
+        interest = self.principal_amount * daily_rate * days_elapsed
+        
+        return interest
+
 class LoanItem(models.Model):
     """Model to track items in a loan with their gold details"""
     loan = models.ForeignKey(Loan, on_delete=models.CASCADE)

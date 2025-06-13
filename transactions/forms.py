@@ -25,7 +25,7 @@ class LoanForm(forms.ModelForm):
     scheme = forms.ChoiceField(
         choices=Loan.SCHEME_CHOICES,
         initial='standard',
-        help_text="Select loan scheme: Standard (12%) or Flexible (24%)"
+        help_text="Select loan scheme: Standard (12%), Flexible (24% - no interest if paid within 23 days), or Premium (36% - no interest if paid within 30 days)"
     )
 
     KARAT_CHOICES = [
@@ -468,6 +468,8 @@ class LoanForm(forms.ModelForm):
             interest_rate = Decimal('12.00')
         elif scheme == 'flexible':
             interest_rate = Decimal('24.00')
+        elif scheme == 'premium':
+            interest_rate = Decimal('36.00')
         else:
             # If it's an invalid value, default to standard
             scheme = 'standard'

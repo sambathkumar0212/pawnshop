@@ -296,11 +296,6 @@
                                 <i class="fas fa-save me-2"></i>
                                 {% if form.instance.pk %}Update{% else %}Create{% endif %} Loan
                             </button>
-                            {% if not form.instance.pk %}
-                            <button type="button" class="btn btn-success" id="continueIterateBtn">
-                                <i class="fas fa-redo me-2"></i>Continue to iterate?
-                            </button>
-                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -961,7 +956,7 @@
 
         // Add help text containers after the input fields
         $('#div_id_principal_amount').append('<small id="principalAmountWords" class="text-muted d-block mt-1"></small>');
-        $('#div_id_distribution_amount').append('<small id="distributionAmountWords" class="text-muted d-block mt-1"></small>');
+        $('#div_id_distribution_amount').append('<small id="distributionAmountWords" class="text-muted d-block mt-1" style="font-size: 0.65rem;"></small>');
         
         // Add form submission handling
         $('#loanForm').on('submit', function(event) {

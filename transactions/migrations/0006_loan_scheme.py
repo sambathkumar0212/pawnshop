@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='loan',
             name='scheme',
-            field=models.CharField(choices=[('standard', 'Standard (12% - Min 3 months)'), ('flexible', 'Flexible (24% - No interest if repaid within 25 days)')], default='standard', max_length=20),
+            field=models.CharField(choices=[('standard', 'Standard (12% - Min 3 months)'), ('flexible', 'Flexible (24% - No interest if repaid within 23 days)')], default='standard', max_length=20),
         ),
     ]

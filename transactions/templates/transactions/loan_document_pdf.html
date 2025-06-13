@@ -226,6 +226,12 @@
             border: 1px solid #e0d4a0;
             margin-bottom: 3px;
         }
+        .premium-scheme {
+            background-color: #f0e0ff;
+            padding: 2px;
+            border: 1px solid #d4a0e0;
+            margin-bottom: 3px;
+        }
         .scheme-details {
             font-size: 10px;
             margin-top: 1px;
@@ -338,9 +344,19 @@
                 <td><b>Distribution Amount</b><br><span class="distribution-amount">Rs. {{ loan.distribution_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
-                <td><b>Interest Rate</b><br>{{ loan.interest_rate|floatformat:2 }}% per annum<br>
+                <td><b>Interest Rate</b><br>
+                    {% if loan.scheme == 'standard' %}
+                        <span class="financial-value">12.00% per annum</span>
+                    {% elif loan.scheme == 'flexible' %}
+                        <span class="financial-value">24.00% per annum</span>
+                    {% elif loan.scheme == 'premium' %}
+                        <span class="financial-value">36.00% per annum</span>
+                    {% else %}
+                        <span class="financial-value">{{ loan.interest_rate|floatformat:2 }}% per annum</span>
+                    {% endif %}
+                    <br>
                     <span style="font-size: 9px;">
-                        (Monthly: {% if loan.scheme == 'standard' %}Rs. 1 per Rs. 100{% elif loan.scheme == 'flexible' %}Rs. 2 per Rs. 100{% endif %})
+                        (Monthly: {% if loan.scheme == 'standard' %}Rs. 1 per Rs. 100{% elif loan.scheme == 'flexible' %}Rs. 2 per Rs. 100{% elif loan.scheme == 'premium' %}Rs. 3 per Rs. 100{% endif %})
                     </span>
                 </td>
                 <td class="highlight-cell"><b>Loan Scheme</b>
@@ -352,11 +368,18 @@
                                 Cannot be fully repaid before {{ loan.issue_date|date_add_days:90|date:"d/m/Y" }}
                             </span>
                         </div>
-                        {% else %}
+                        {% elif loan.scheme == 'flexible' %}
                         <div class="flexible-scheme">
-                            <b>Flexible Scheme:</b> 24% interest, no interest if repaid within 25 days.<br>
+                            <b>Flexible Scheme:</b> 24% interest, no interest if repaid within 23 days.<br>
                             <span class="scheme-details">
-                                Zero interest if repaid by {{ loan.issue_date|date_add_days:25|date:"d/m/Y" }}
+                                Zero interest if repaid by {{ loan.issue_date|date_add_days:23|date:"d/m/Y" }}
+                            </span>
+                        </div>
+                        {% elif loan.scheme == 'premium' %}
+                        <div class="premium-scheme">
+                            <b>Premium Scheme:</b> 36% interest, no interest if repaid within 30 days.<br>
+                            <span class="scheme-details">
+                                Zero interest if repaid by {{ loan.issue_date|date_add_days:30|date:"d/m/Y" }}
                             </span>
                         </div>
                         {% endif %}
