@@ -49,7 +49,7 @@ class LoanListView(LoginRequiredMixin, ListView):
                 Q(customer__first_name__icontains=search) |
                 Q(customer__last_name__icontains=search) |
                 Q(loan_number__icontains=search) |
-                Q(loanitem_set__item__name__icontains=search)
+                Q(loanitem__item__name__icontains=search)
             ).distinct()
 
         # Date range filter

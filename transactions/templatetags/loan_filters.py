@@ -112,6 +112,14 @@ def is_empty_photo_list(value):
         
     return False
 
+@register.filter
+def subtract(value, arg):
+    """Subtract the argument from the value"""
+    try:
+        return int(value) - int(arg)
+    except (ValueError, TypeError):
+        return 0
+
 # Try/Except template tags for error handling
 @register.tag(name="try")
 def do_try(parser, token):
