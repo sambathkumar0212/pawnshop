@@ -64,4 +64,24 @@ fi
 echo "Verifying migration status..."
 python manage.py showmigrations
 
+# Create a superuser if needed (non-interactive)
+if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_PASSWORD" && -n "$DJANGO_SUPERUSER_EMAIL" ]]; then
+  echo "Creating superuser..."
+  python -c "
+import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='$DJANGO_SUPERUSER_USERNAME').exists():
+    User.objects.create_superuser('$DJANGO_SUPERUSER_USERNAME', 
+                                 '$DJANGO_SUPERUSER_EMAIL', 
+                                 '$DJANGO_SUPERUSER_PASSWORD')
+    print('Superuser created successfully')
+else:
+    print('Superuser already exists, skipping creation')
+  "
+fi
+
 echo "Post-deployment tasks completed!"
