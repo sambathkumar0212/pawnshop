@@ -32,6 +32,7 @@ urlpatterns = [
     path('customers/<int:pk>/', views.CustomerDetailView.as_view(), name='customer_detail'),
     path('customers/<int:pk>/edit/', views.CustomerUpdateView.as_view(), name='customer_update'),
     path('customers/<int:pk>/delete/', views.CustomerDeleteView.as_view(), name='customer_delete'),
+    path('customer/<int:pk>/json/', views.CustomerJsonView.as_view(), name='customer_json'),
     
     # User profile
     path('profile/', views.ProfileView.as_view(), name='profile'),

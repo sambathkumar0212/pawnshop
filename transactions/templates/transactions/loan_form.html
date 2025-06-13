@@ -51,6 +51,9 @@
                     </div>
                     {% endif %}
                     
+                    <!-- Alert container for dynamic notifications -->
+                    <div id="alertContainer" class="mb-3"></div>
+                    
                     <form method="post" id="loanForm" enctype="multipart/form-data" novalidate>
                         {% csrf_token %}
                         <input type="hidden" name="customer_face_capture" id="customerFaceCapture" value="{% if form.instance.customer_face_capture %}{{ form.instance.customer_face_capture|escapejs }}{% endif %}">
@@ -129,10 +132,10 @@
                                                         </div>
                                                         <div class="col-md-6">
                                                             <div id="photoPreview" class="border rounded d-flex align-items-center justify-content-center bg-light" style="height: 150px;">
-                                                                {% if form.instance.customer_face_capture %}
+                                                                {% if form.instance.pk and form.instance.customer_face_capture %}
                                                                     <img id="capturedPhoto" class="img-fluid" style="max-height: 150px;" src="{{ form.instance.customer_face_capture }}">
                                                                 {% else %}
-                                                                    <span id="noCaptureText" class="small text-muted">No photo</span>
+                                                                    <span id="noCaptureText" class="small text-muted">{% if form.instance.pk %}No photo{% else %}{% endif %}</span>
                                                                 {% endif %}
                                                             </div>
                                                             <div class="d-grid gap-1 mt-1">
@@ -170,8 +173,8 @@
                                                                 <div id="noItemPhotosText" class="text-center text-muted p-2 small">
                                                                     <small>No photos available</small>
                                                                 </div>
-                                                                <div id="itemPhotosContainer" class="row g-1">
-                                                                    {% if item_photos_list %}
+                                                                <div id="itemPhotosContainer" class="row g-1" {% if not form.instance.pk %}style="display: none;"{% endif %}>
+                                                                    {% if form.instance.pk and item_photos_list %}
                                                                         {% for photo in item_photos_list %}
                                                                             <div class="col-6">
                                                                                 <div class="position-relative">
@@ -184,7 +187,7 @@
                                                                         {% endfor %}
                                                                     {% endif %}
                                                                 </div>
-                                                                <button type="button" class="btn btn-sm btn-outline-danger position-absolute bottom-0 end-0 m-1" id="clearItemPhotosBtn" {% if not item_photos_list %}disabled{% endif %}>
+                                                                <button type="button" class="btn btn-sm btn-outline-danger position-absolute bottom-0 end-0 m-1" id="clearItemPhotosBtn" {% if not form.instance.pk or not item_photos_list %}disabled{% endif %}>
                                                                     <i class="fas fa-trash-alt"></i>
                                                                 </button>
                                                             </div>
@@ -293,6 +296,11 @@
                                 <i class="fas fa-save me-2"></i>
                                 {% if form.instance.pk %}Update{% else %}Create{% endif %} Loan
                             </button>
+                            {% if not form.instance.pk %}
+                            <button type="button" class="btn btn-success" id="continueIterateBtn">
+                                <i class="fas fa-redo me-2"></i>Continue to iterate?
+                            </button>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -305,6 +313,23 @@
 {% block extra_scripts %}
 <script>
     $(document).ready(function() {
+        // Set up customer change event to update branch field
+        $('#id_customer').on('change', function() {
+            const customerId = $(this).val();
+            
+            if (customerId) {
+                // Fetch customer data to get the branch
+                $.get(`/accounts/customer/${customerId}/json/`, function(data) {
+                    if (data.branch_id) {
+                        $('#id_branch').val(data.branch_id);
+                        showAlert('Branch automatically set based on customer\'s branch', 'info');
+                    }
+                }).fail(function() {
+                    console.error('Failed to fetch customer data');
+                });
+            }
+        });
+        
         // Camera functionality
         const cameraStream = document.getElementById('cameraStream');
         const photoCanvas = document.getElementById('photoCanvas');
@@ -533,14 +558,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
             
-            // Find or create the alert container at the top of the form
+            // Use the dedicated alert container added in the HTML
             let alertContainer = document.getElementById('alertContainer');
-            if (!alertContainer) {
-                alertContainer = document.createElement('div');
-                alertContainer.id = 'alertContainer';
-                const form = document.querySelector('form');
-                form.insertBefore(alertContainer, form.firstChild);
-            }
             
             // Add the alert to the container
             alertContainer.appendChild(alertDiv);
@@ -551,10 +570,6 @@
                 setTimeout(() => {
                     if (alertDiv.parentNode === alertContainer) {
                         alertContainer.removeChild(alertDiv);
-                    }
-                    // Remove container if empty
-                    if (alertContainer.children.length === 0) {
-                        alertContainer.remove();
                     }
                 }, 150);
             }, 5000);
@@ -663,21 +678,24 @@
                 noItemPhotosText.style.display = 'none';
             }
             
-            // Create a thumbnail element
-            const thumbnailCol = document.createElement('div');
-            thumbnailCol.className = 'col-6';
-            thumbnailCol.innerHTML = `
-                <div class="position-relative">
-                    <img src="${photoDataUrl}" class="img-thumbnail" alt="Item photo ${itemPhotos.length}">
-                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 delete-photo" data-photo-id="${photoId}">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="bg-dark bg-opacity-50 text-white position-absolute bottom-0 start-0 end-0 small text-center">
-                        Photo ${itemPhotos.length}
-                    </div>
-                </div>
-            `;
+            // Ensure the photos container is visible
             if (itemPhotosContainer) {
+                itemPhotosContainer.style.display = 'flex';
+    
+                // Create a thumbnail element
+                const thumbnailCol = document.createElement('div');
+                thumbnailCol.className = 'col-6';
+                thumbnailCol.innerHTML = `
+                    <div class="position-relative">
+                        <img src="${photoDataUrl}" class="img-thumbnail" alt="Item photo ${itemPhotos.length}">
+                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 delete-photo" data-photo-id="${photoId}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <div class="bg-dark bg-opacity-50 text-white position-absolute bottom-0 start-0 end-0 small text-center">
+                            Photo ${itemPhotos.length}
+                        </div>
+                    </div>
+                `;
                 itemPhotosContainer.appendChild(thumbnailCol);
                 
                 // Add event listener to delete button
@@ -985,6 +1003,88 @@
                 localStorage.removeItem('tempCustomerPhoto');
             }
         });
+        
+        // Continue to iterate button functionality
+        const continueIterateBtn = document.getElementById('continueIterateBtn');
+        if (continueIterateBtn) {
+            continueIterateBtn.addEventListener('click', function() {
+                // Store current form data in sessionStorage
+                const formData = {
+                    branch: $('#id_branch').val(),
+                    customer: $('#id_customer').val(),
+                    item_category: $('#id_item_category').val(),
+                    market_price_22k: $('#id_market_price_22k').val(),
+                    gold_karat: $('#id_gold_karat').val(),
+                    scheme: $('#id_scheme').val()
+                };
+                
+                // Store photos in sessionStorage
+                if (itemPhotos.length > 0) {
+                    sessionStorage.setItem('tempItemPhotos', JSON.stringify(itemPhotos));
+                }
+                if (customerFaceCapture.value) {
+                    sessionStorage.setItem('tempCustomerPhoto', customerFaceCapture.value);
+                }
+                
+                // Store form data in sessionStorage
+                sessionStorage.setItem('loanFormData', JSON.stringify(formData));
+                sessionStorage.setItem('continueIteration', 'true');
+                
+                // Redirect to create a new loan
+                window.location.href = '{% url "loan_create" %}';
+            });
+        }
+        
+        // Check if we're continuing an iteration
+        $(document).ready(function() {
+            if (sessionStorage.getItem('continueIteration') === 'true') {
+                try {
+                    // Restore form data
+                    const formData = JSON.parse(sessionStorage.getItem('loanFormData') || '{}');
+                    
+                    // Set form field values
+                    if (formData.branch) $('#id_branch').val(formData.branch);
+                    if (formData.customer) $('#id_customer').val(formData.customer);
+                    if (formData.item_category) $('#id_item_category').val(formData.item_category);
+                    if (formData.market_price_22k) $('#id_market_price_22k').val(formData.market_price_22k);
+                    if (formData.gold_karat) $('#id_gold_karat').val(formData.gold_karat);
+                    if (formData.scheme) $('#id_scheme').val(formData.scheme);
+                    
+                    // Trigger the scheme info update if scheme is selected
+                    if (formData.scheme) {
+                        $('#id_scheme').trigger('change');
+                    }
+                    
+                    // Show a notification that we're continuing from previous entry
+                    showAlert('Continuing with similar loan entry. You can modify the details as needed.', 'info');
+                    
+                    // Clear the flag
+                    sessionStorage.removeItem('continueIteration');
+                } catch (e) {
+                    console.error('Error restoring form data:', e);
+                    sessionStorage.removeItem('loanFormData');
+                    sessionStorage.removeItem('continueIteration');
+                }
+            }
+        });
+
+        // Clear photos when creating a new loan
+        {% if not form.instance.pk %}
+        // Clear customer photo
+        capturedPhoto.src = '';
+        customerFaceCapture.value = '';
+        noCaptureText.style.display = 'block';
+        retakeBtn.disabled = true;
+
+        // Clear item photos
+        itemPhotos = [];
+        itemPhotosData.value = '';
+        photoCountBadge.textContent = '0 Photos';
+        photoCountBadge.className = 'badge bg-danger';
+        noItemPhotosText.style.display = 'block';
+        itemPhotosContainer.innerHTML = '';
+        clearItemPhotosBtn.disabled = true;
+        {% endif %}
     });
 </script>
 {% endblock %}

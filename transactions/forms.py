@@ -170,6 +170,9 @@ class LoanForm(forms.ModelForm):
             self.fields['customer'].queryset = Customer.objects.all().order_by('first_name', 'last_name')
             
         self.fields['customer'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
+        
+        # Add data attribute to customer field to support setting branch based on customer's branch
+        self.fields['customer'].widget.attrs['data-branch-update'] = 'true'
 
         # Define top priority ornament types and Tamil Nadu relevant gold ornament categories
         top_categories = [

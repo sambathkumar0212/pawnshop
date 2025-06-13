@@ -86,6 +86,14 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
         kwargs['user'] = self.request.user
         return kwargs
     
+    def get_initial(self):
+        initial = super().get_initial()
+        # Check if customer_id is provided in URL parameters
+        customer_id = self.request.GET.get('customer_id')
+        if customer_id:
+            initial['customer'] = customer_id
+        return initial
+    
     def form_valid(self, form):
         # Set created_by
         form.instance.created_by = self.request.user
@@ -99,10 +107,12 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
         
         # Process customer face capture photo
         customer_face_capture = self.request.POST.get('customer_face_capture')
-        if customer_face_capture:
-            # Make sure it's a proper data URL
-            if customer_face_capture.startswith('data:image/'):
-                form.instance.customer_face_capture = customer_face_capture
+        if customer_face_capture and customer_face_capture.startswith('data:image/'):
+            # Save the face capture directly to the model instance
+            form.instance.customer_face_capture = customer_face_capture
+            print(f"Successfully saved customer face capture. Data length: {len(customer_face_capture)}")
+        else:
+            print("No valid customer face capture found in form data")
         
         # Process item photos to ensure they're properly stored as JSON
         item_photos_data = self.request.POST.get('item_photos')
@@ -116,19 +126,81 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
                 if isinstance(photos_array, list):
                     # Store as JSON string
                     form.instance.item_photos = json.dumps(photos_array)
+                    print(f"Successfully saved {len(photos_array)} item photos as JSON array")
                 else:
                     # If not a list, convert to a list with a single item
                     form.instance.item_photos = json.dumps([str(photos_array)])
+                    print(f"Saved single item photo as JSON array")
             except json.JSONDecodeError:
                 # If not valid JSON, check if it's a base64 image
                 if isinstance(item_photos_data, str) and item_photos_data.startswith('data:image/'):
                     # Store as a JSON array with a single item
                     form.instance.item_photos = json.dumps([item_photos_data])
+                    print(f"Saved raw base64 item photo as JSON array")
                 else:
                     # Default to empty array if can't process
                     form.instance.item_photos = "[]"
+                    print("Could not process item photos data, setting empty array")
+        else:
+            print("No item photos data found in form submission")
             
-        return super().form_valid(form)
+        # Save the loan first to get loan_number
+        response = super().form_valid(form)
+        
+        # Now we have the loan object with a loan_number, let's process any base64 images and save them to files
+        self._process_and_save_photos(self.object)
+        
+        return response
+    
+    def _process_and_save_photos(self, loan):
+        """Process and save photos to the filesystem if they are in base64 format."""
+        import json
+        import os
+        import base64
+        import uuid
+        from django.conf import settings
+        
+        # Process item photos
+        if loan.item_photos:
+            try:
+                photos_list = json.loads(loan.item_photos)
+                new_photos_list = []
+                
+                for i, photo_data in enumerate(photos_list):
+                    if isinstance(photo_data, str) and photo_data.startswith('data:image/'):
+                        # Extract the image format and data
+                        format_info, encoded_data = photo_data.split(',', 1)
+                        image_format = format_info.split('/')[1].split(';')[0]  # png, jpeg, etc.
+                        
+                        # Create directory if it doesn't exist
+                        photos_dir = os.path.join(settings.MEDIA_ROOT, 'inventory_images')
+                        os.makedirs(photos_dir, exist_ok=True)
+                        
+                        # Generate a unique filename
+                        filename = f"loan_{loan.id}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
+                        filepath = os.path.join(photos_dir, filename)
+                        
+                        # Save the image
+                        with open(filepath, 'wb') as f:
+                            f.write(base64.b64decode(encoded_data))
+                        
+                        # Add the URL to the list
+                        file_url = f"/media/inventory_images/{filename}"
+                        new_photos_list.append(file_url)
+                    else:
+                        # If not a base64 image, keep the original value (likely a URL)
+                        new_photos_list.append(photo_data)
+                
+                # Update the loan with the processed photo URLs
+                loan.item_photos = json.dumps(new_photos_list)
+                loan.save()
+                
+            except Exception as e:
+                print(f"Error processing item photos: {str(e)}")
+                # If error occurs, ensure we have a valid JSON array
+                if not loan.item_photos or loan.item_photos == "null":
+                    loan.item_photos = "[]"
+                    loan.save()
     
     def get_success_url(self):
         return reverse('loan_detail', kwargs={'loan_number': self.object.loan_number})
@@ -164,117 +236,96 @@ class LoanDetailView(LoginRequiredMixin, DetailView):
         # Process item photos for the template
         if loan.item_photos:
             try:
-                # If it's a base64 string, keep it as is
+                photo_list = []
+                
+                # Handle the case when item_photos is already a string with base64 data
                 if isinstance(loan.item_photos, str) and loan.item_photos.startswith('data:image/'):
-                    context['item_photos_list'] = [loan.item_photos]
+                    photo_list.append(loan.item_photos)
                 else:
-                    # Handle different types of stored photo data
-                    photo_list = []
-                    if isinstance(loan.item_photos, str):
-                        # Clean up the string
-                        cleaned_data = loan.item_photos.strip()
-                        if (cleaned_data.startswith('"') and cleaned_data.endswith('"')) or \
-                           (cleaned_data.startswith("'") and cleaned_data.endswith("'")):
-                            cleaned_data = cleaned_data[1:-1]
-                        
-                        try:
-                            # Try parsing as JSON
-                            parsed_data = json.loads(cleaned_data)
-                            if isinstance(parsed_data, list):
-                                photo_list.extend(parsed_data)
-                            elif isinstance(parsed_data, str):
-                                # Could be a JSON string within a JSON string
-                                try:
-                                    nested_data = json.loads(parsed_data)
-                                    if isinstance(nested_data, list):
-                                        photo_list.extend(nested_data)
-                                    else:
-                                        photo_list.append(parsed_data)
-                                except json.JSONDecodeError:
-                                    photo_list.append(parsed_data)
+                    # Try to parse as JSON
+                    try:
+                        # If it's already a JSON string
+                        if isinstance(loan.item_photos, str):
+                            photos_data = json.loads(loan.item_photos)
+                            
+                            if isinstance(photos_data, list):
+                                photo_list.extend([p for p in photos_data if p])
                             else:
-                                photo_list.append(str(parsed_data))
-                        except json.JSONDecodeError:
-                            # Try ast.literal_eval as last resort
-                            try:
-                                import ast
-                                if cleaned_data.startswith('[') and cleaned_data.endswith(']'):
-                                    photo_list.extend(ast.literal_eval(cleaned_data))
-                                else:
-                                    photo_list.append(cleaned_data)
-                            except Exception:
-                                photo_list.append(cleaned_data)
-                    elif isinstance(loan.item_photos, list):
-                        photo_list.extend(loan.item_photos)
-                    else:
-                        photo_list.append(str(loan.item_photos))
-                    
-                    # Clean up the photo list
-                    photo_list = [str(photo).strip() for photo in photo_list if photo]
-                    photo_list = [photo for photo in photo_list if photo.strip()]
-                    
-                    # Convert any remaining base64 photos to files
-                    for i, photo in enumerate(photo_list):
-                        if photo.startswith('data:image/'):
-                            try:
-                                url = self._save_base64_photo(loan, photo, i)
-                                if url:
-                                    photo_list[i] = url
-                            except Exception as e:
-                                print(f"Error converting base64 photo {i}: {e}")
-                    
-                    context['item_photos_list'] = photo_list
-                    
-                    # Update loan's item_photos if we processed any base64 images
-                    if any(not p.startswith('data:image/') for p in photo_list):
-                        loan.item_photos = json.dumps(photo_list)
-                        loan.save()
-                    
+                                photo_list.append(str(photos_data))
+                        # If it's already a list
+                        elif isinstance(loan.item_photos, list):
+                            photo_list.extend([p for p in loan.item_photos if p])
+                    except json.JSONDecodeError:
+                        # If not valid JSON, treat as a single item
+                        photo_list.append(loan.item_photos)
+                
+                # Filter out empty items and clean strings
+                photo_list = [str(p).strip() for p in photo_list if p]
+                
+                # Save the processed list to context
+                context['item_photos_list'] = photo_list
+                
+                # If we have any base64 images, convert them to files for better performance
+                has_base64 = any(str(p).startswith('data:image/') for p in photo_list)
+                if has_base64:
+                    processed_list = self._save_base64_photos(loan, photo_list)
+                    if processed_list:
+                        context['item_photos_list'] = processed_list
+                        # Update the loan object with the processed URLs
+                        loan.item_photos = json.dumps(processed_list)
+                        loan.save(update_fields=['item_photos'])
+                
             except Exception as e:
-                print(f"Error processing photos: {str(e)}")
-                context['photo_processing_error'] = str(e)
-                if loan.item_photos and isinstance(loan.item_photos, str) and loan.item_photos.startswith('data:image/'):
-                    context['item_photos_list'] = [loan.item_photos]
-                else:
-                    context['item_photos_list'] = []
+                # Provide error information to the template
+                import traceback
+                context['photo_processing_error'] = f"Error: {str(e)}"
+                context['photo_processing_traceback'] = traceback.format_exc()
+                context['item_photos_list'] = []
         else:
             context['item_photos_list'] = []
-        
+            
         return context
-    
-    def _save_base64_photo(self, loan, base64_data, index):
-        """Save a base64 photo to file and return the URL"""
-        try:
-            if not base64_data.startswith('data:image/'):
-                return None
-            
-            format, imgstr = base64_data.split(';base64,')
-            ext = format.split('/')[-1]
-            
-            # Decode base64 image data
-            image_data = base64.b64decode(imgstr)
-            
-            # Generate unique filename
-            filename = f"loan_{loan.loan_number}_item_{index}_{timezone.now().timestamp()}.{ext}"
-            
-            # Create directory path
-            import os
-            from django.conf import settings
-            
-            dir_path = os.path.join(settings.MEDIA_ROOT, 'inventory_images', str(loan.loan_number))
-            os.makedirs(dir_path, exist_ok=True)
-            
-            # Save file
-            file_path = os.path.join(dir_path, filename)
-            with open(file_path, 'wb') as f:
-                f.write(image_data)
-            
-            # Return URL
-            return os.path.join(settings.MEDIA_URL, 'inventory_images', str(loan.loan_number), filename)
-            
-        except Exception as e:
-            print(f"Error saving base64 photo: {str(e)}")
-            return None
+        
+    def _save_base64_photos(self, loan, photo_list):
+        """Convert base64 photos to files and return updated URLs"""
+        import os
+        import base64
+        import uuid
+        from django.conf import settings
+        
+        new_photos_list = []
+        
+        for i, photo_data in enumerate(photo_list):
+            if isinstance(photo_data, str) and photo_data.startswith('data:image/'):
+                try:
+                    # Extract the image format and data
+                    format_info, encoded_data = photo_data.split(',', 1)
+                    image_format = format_info.split('/')[1].split(';')[0]  # png, jpeg, etc.
+                    
+                    # Create directory if it doesn't exist
+                    photos_dir = os.path.join(settings.MEDIA_ROOT, 'inventory_images')
+                    os.makedirs(photos_dir, exist_ok=True)
+                    
+                    # Generate a unique filename
+                    filename = f"loan_{loan.id}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
+                    filepath = os.path.join(photos_dir, filename)
+                    
+                    # Save the image
+                    with open(filepath, 'wb') as f:
+                        f.write(base64.b64decode(encoded_data))
+                    
+                    # Add the URL to the list
+                    file_url = f"/media/inventory_images/{filename}"
+                    new_photos_list.append(file_url)
+                except Exception as e:
+                    # If there's an error, keep the original
+                    print(f"Error saving base64 image {i}: {str(e)}")
+                    new_photos_list.append(photo_data)
+            else:
+                # Keep non-base64 URLs as is
+                new_photos_list.append(photo_data)
+        
+        return new_photos_list
     
 
 
@@ -333,7 +384,7 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         loan = self.get_object()
         
-        # Process item photos for the template - Using the IMPROVED VERSION from LoanDetailView
+        # Process item photos for the template
         if loan.item_photos:
             import json
             try:
@@ -348,7 +399,20 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
                         cleaned_json = cleaned_json[1:-1]
                     
                     # Try to parse the JSON
-                    photo_list = json.loads(cleaned_json)
+                    try:
+                        photo_list = json.loads(cleaned_json)
+                    except json.JSONDecodeError:
+                        # If it's not valid JSON but starts with '[', try ast.literal_eval
+                        if cleaned_json.startswith('[') and cleaned_json.endswith(']'):
+                            import ast
+                            try:
+                                photo_list = ast.literal_eval(cleaned_json)
+                            except Exception:
+                                # Last resort: treat as a single item
+                                photo_list = [cleaned_json]
+                        else:
+                            # Not valid JSON and not a list format, treat as a single item
+                            photo_list = [cleaned_json]
                     
                     # Handle the case where we get a string instead of a list
                     if isinstance(photo_list, str):
@@ -363,7 +427,9 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
                     if not isinstance(photo_list, list):
                         photo_list = [str(photo_list)]
                     
-                    # Debug output
+                    # Clean the photo list to ensure valid URLs
+                    photo_list = [p for p in photo_list if p and isinstance(p, str)]
+                    
                     print(f"Successfully parsed item photos for edit. Found {len(photo_list)} photos")
                     print(f"First photo sample: {photo_list[0][:30]}..." if photo_list else "No photos found")
                     
@@ -374,21 +440,9 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
                 else:
                     # If it's neither a string nor a list, convert to string representation
                     context['item_photos_list'] = [str(loan.item_photos)]
-            except json.JSONDecodeError as e:
-                print(f"JSON decode error in edit view: {e}")
-                # Last resort: try with ast.literal_eval for string representations of lists
-                try:
-                    import ast
-                    if loan.item_photos.startswith('[') and loan.item_photos.endswith(']'):
-                        photo_list = ast.literal_eval(loan.item_photos)
-                        context['item_photos_list'] = photo_list
-                        print(f"Parsed with ast in edit view: {len(photo_list)} photos")
-                    else:
-                        # Handle as a single item
-                        context['item_photos_list'] = [loan.item_photos]
-                except Exception as e2:
-                    print(f"Fallback parsing failed in edit view: {e2}")
-                    context['item_photos_list'] = [loan.item_photos]
+            except Exception as e:
+                print(f"Error processing photos in edit view: {str(e)}")
+                context['item_photos_list'] = []
         else:
             print("No item photos found for this loan in edit view")
             context['item_photos_list'] = []
@@ -428,37 +482,137 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
         if item_photos_data:
             import json
             try:
-                # Validate it's a valid JSON string
-                photos_array = json.loads(item_photos_data)
-                
-                # Ensure it's a properly formatted array of strings
-                if isinstance(photos_array, list):
-                    # Limit the size of each photo if needed
-                    limited_photos = []
-                    for photo in photos_array:
-                        if isinstance(photo, str):
-                            # Add to the limited photos list
-                            limited_photos.append(photo)
+                # Check if it's already a valid JSON array
+                try:
+                    photos_array = json.loads(item_photos_data)
                     
-                    # Save as JSON string
-                    form.instance.item_photos = json.dumps(limited_photos)
-                else:
-                    form.instance.item_photos = "[]"  # Empty array if format is incorrect
-            except json.JSONDecodeError:
-                print("Invalid item_photos JSON format, not saving")
-                # Preserve existing photos
+                    # Ensure it's a properly formatted array of strings
+                    if isinstance(photos_array, list):
+                        # Store as JSON string
+                        form.instance.item_photos = json.dumps(photos_array)
+                        print(f"Successfully saved {len(photos_array)} item photos as JSON array")
+                    else:
+                        # If not a list, convert to a list with a single item
+                        form.instance.item_photos = json.dumps([str(photos_array)])
+                        print(f"Saved single item photo as JSON array")
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, check if it's a base64 image
+                    if isinstance(item_photos_data, str) and item_photos_data.startswith('data:image/'):
+                        # Store as a JSON array with a single item
+                        form.instance.item_photos = json.dumps([item_photos_data])
+                        print(f"Saved raw base64 item photo as JSON array")
+                    elif isinstance(item_photos_data, str) and item_photos_data.startswith('['):
+                        # It might be a string representation of a list but not valid JSON
+                        # Try with ast.literal_eval
+                        import ast
+                        try:
+                            photos_list = ast.literal_eval(item_photos_data)
+                            if isinstance(photos_list, list):
+                                form.instance.item_photos = json.dumps(photos_list)
+                                print(f"Used ast.literal_eval to parse and save {len(photos_list)} photos")
+                            else:
+                                form.instance.item_photos = json.dumps([str(photos_list)])
+                                print(f"Used ast.literal_eval but got non-list, saved as single item")
+                        except Exception as ast_err:
+                            print(f"Failed ast.literal_eval: {str(ast_err)}")
+                            # Preserve existing photos if they exist
+                            if form.instance.pk and form.instance.item_photos:
+                                print("Preserving existing item photos after ast fail")
+                                pass
+                            else:
+                                # Default to empty array if can't process
+                                form.instance.item_photos = "[]"
+                                print("Could not process item photos data, setting empty array")
+                    else:
+                        # Preserve existing photos if they exist
+                        if form.instance.pk and form.instance.item_photos:
+                            print("Preserving existing item photos")
+                            # Don't modify existing photos
+                            pass
+                        else:
+                            # Default to empty array if can't process
+                            form.instance.item_photos = "[]"
+                            print("Could not process item photos data, setting empty array")
+            except Exception as e:
+                print(f"General exception in item_photos processing: {str(e)}")
+                # Preserve existing photos on error
                 if form.instance.pk and form.instance.item_photos:
-                    # Don't modify existing photos
+                    print(f"Preserving existing item photos after exception: {str(e)}")
                     pass
                 else:
-                    form.instance.item_photos = "[]"  # Empty array as fallback
+                    form.instance.item_photos = "[]"
+                    print(f"Setting empty array after exception: {str(e)}")
+        else:
+            print("No item photos data found in form submission")
+            # Preserve existing photos
+            if form.instance.pk and form.instance.item_photos:
+                print("No new photos submitted, preserving existing photos")
+                pass
+            else:
+                form.instance.item_photos = "[]"
+                print("No photos in form or existing record, setting empty array")
         
         # Record who updated the loan
         form.instance.last_updated_by = self.request.user
         
         response = super().form_valid(form)
+        
+        # Process and save photos to files if needed
+        loan_update = self.object
+        self._process_and_save_photos(loan_update)
+        
         messages.success(self.request, f'Loan #{form.instance.loan_number} has been updated successfully.')
         return response
+        
+    def _process_and_save_photos(self, loan):
+        """Process and save photos to the filesystem if they are in base64 format."""
+        import json
+        import os
+        import base64
+        import uuid
+        from django.conf import settings
+        
+        # Process item photos
+        if loan.item_photos:
+            try:
+                photos_list = json.loads(loan.item_photos)
+                new_photos_list = []
+                
+                for i, photo_data in enumerate(photos_list):
+                    if isinstance(photo_data, str) and photo_data.startswith('data:image/'):
+                        # Extract the image format and data
+                        format_info, encoded_data = photo_data.split(',', 1)
+                        image_format = format_info.split('/')[1].split(';')[0]  # png, jpeg, etc.
+                        
+                        # Create directory if it doesn't exist
+                        photos_dir = os.path.join(settings.MEDIA_ROOT, 'inventory_images')
+                        os.makedirs(photos_dir, exist_ok=True)
+                        
+                        # Generate a unique filename
+                        filename = f"loan_{loan.id}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
+                        filepath = os.path.join(photos_dir, filename)
+                        
+                        # Save the image
+                        with open(filepath, 'wb') as f:
+                            f.write(base64.b64decode(encoded_data))
+                        
+                        # Add the URL to the list
+                        file_url = f"/media/inventory_images/{filename}"
+                        new_photos_list.append(file_url)
+                    else:
+                        # If not a base64 image, keep the original value (likely a URL)
+                        new_photos_list.append(photo_data)
+                
+                # Update the loan with the processed photo URLs
+                loan.item_photos = json.dumps(new_photos_list)
+                loan.save()
+                
+            except Exception as e:
+                print(f"Error processing item photos: {str(e)}")
+                # If error occurs, ensure we have a valid JSON array
+                if not loan.item_photos or loan.item_photos == "null":
+                    loan.item_photos = "[]"
+                    loan.save()
 
     def get_success_url(self):
         return reverse('loan_detail', kwargs={'loan_number': self.object.loan_number})

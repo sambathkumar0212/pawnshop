@@ -3,6 +3,7 @@ from decimal import Decimal
 from datetime import timedelta
 import re
 from num2words import num2words
+import json
 
 register = template.Library()
 
@@ -59,3 +60,91 @@ def number_to_words(value):
         return num2words(amount, lang='en_IN').title()
     except (ValueError, TypeError):
         return ''
+
+@register.filter
+def is_base64(value):
+    """Check if a string is a base64 image data URL or contains base64 data"""
+    if not value:
+        return False
+    
+    # If it's a string
+    if isinstance(value, str):
+        # Direct base64 image check
+        if value.startswith('data:image/'):
+            return True
+            
+        # Check if it's a JSON string containing base64 data
+        try:
+            if value.startswith('[') and value.endswith(']'):
+                data = json.loads(value)
+                if isinstance(data, list) and any(isinstance(item, str) and item.startswith('data:image/') for item in data):
+                    return True
+        except (json.JSONDecodeError, TypeError):
+            pass
+            
+        # If it's a URL path, return False
+        if value.startswith('/media/') or value.startswith('http'):
+            return False
+    
+    return False
+
+@register.filter
+def is_empty_photo_list(value):
+    """Check if a value represents an empty photo list (either '[]' string or actual empty list)"""
+    if value is None:
+        return True
+        
+    if isinstance(value, str):
+        # Check if it's a string that just contains '[]'
+        if value.strip() == '[]':
+            return True
+            
+        # Try to decode as JSON to see if it's an empty list
+        try:
+            data = json.loads(value)
+            return isinstance(data, list) and len(data) == 0
+        except (json.JSONDecodeError, TypeError):
+            pass
+            
+    # Check if it's an actual Python empty list
+    if isinstance(value, list) and len(value) == 0:
+        return True
+        
+    return False
+
+# Try/Except template tags for error handling
+@register.tag(name="try")
+def do_try(parser, token):
+    """
+    Wrap content in a try/except block for graceful error handling in templates.
+    
+    Usage:
+    {% try %}
+        <!-- code that might raise an error -->
+    {% except %}
+        <!-- fallback content -->
+    {% endtry %}
+    """
+    bits = list(token.split_contents())
+    if len(bits) != 1:
+        raise template.TemplateSyntaxError("'try' tag takes no arguments")
+    
+    # Parse content until endtry, with except as a divider
+    try_nodelist = parser.parse(('except',))
+    token = parser.next_token()
+    
+    except_nodelist = parser.parse(('endtry',))
+    parser.delete_first_token()
+    
+    return TryExceptNode(try_nodelist, except_nodelist)
+
+class TryExceptNode(template.Node):
+    def __init__(self, try_nodelist, except_nodelist):
+        self.try_nodelist = try_nodelist
+        self.except_nodelist = except_nodelist
+        
+    def render(self, context):
+        try:
+            return self.try_nodelist.render(context)
+        except Exception:
+            return self.except_nodelist.render(context)
