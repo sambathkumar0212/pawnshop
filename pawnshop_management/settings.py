@@ -87,35 +87,47 @@ WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Initialize with SQLite as a last resort
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DATABASE_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.environ.get('DATABASE_USER', ''),
-        'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
-        'HOST': os.environ.get('DATABASE_HOST', ''),
-        'PORT': os.environ.get('DATABASE_PORT', ''),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
-# Configure database with fallback to SQLite if DATABASE_URL is not available or invalid
+# Check if we're on Render.com production environment
+is_render = os.environ.get('RENDER', '') == 'true'
+
+# Configure database based on environment
 database_url = os.environ.get('DATABASE_URL')
 if database_url:
-    DATABASES = {
-        'default': dj_database_url.config(default=database_url)
-    }
+    # Parse the DATABASE_URL and use it
+    import dj_database_url
+    db_config = dj_database_url.config(default=database_url, conn_max_age=600)
     
-    # Ensure ENGINE is specified
-    if 'ENGINE' not in DATABASES['default']:
-        DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
-else:
-    # Default to SQLite if no DATABASE_URL is provided
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
+    # Ensure ENGINE is properly set
+    if 'ENGINE' not in db_config or not db_config['ENGINE']:
+        db_config['ENGINE'] = 'django.db.backends.postgresql'
+    
+    DATABASES['default'] = db_config
+    
+    # Debug information (will appear in logs)
+    print(f"Using database configuration: ENGINE={DATABASES['default']['ENGINE']}, NAME={DATABASES['default'].get('NAME', 'unknown')}")
+elif is_render:
+    # If we're on Render but don't have DATABASE_URL, something is wrong
+    # Force PostgreSQL configuration
+    print("WARNING: No DATABASE_URL found but RENDER=true. Forcing PostgreSQL configuration.")
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DATABASE', 'postgres'),
+        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
+else:
+    # Development environment - SQLite already configured above
+    print("Using SQLite for development environment")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
