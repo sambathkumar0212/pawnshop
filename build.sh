@@ -3,9 +3,9 @@ set -e
 
 echo "Starting build process with memory optimization..."
 
-# Install only minimal requirements with memory optimization flags
+# Install minimal requirements with proper dependency resolution
 echo "Installing minimal dependencies..."
-pip install --no-cache-dir --no-deps -r requirements-minimal.txt
+pip install --no-cache-dir -r requirements-minimal.txt
 
 # Set environment variables to handle missing packages during initial setup
 export DJANGO_SETTINGS_MODULE=pawnshop_management.settings
