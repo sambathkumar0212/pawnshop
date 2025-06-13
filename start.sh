@@ -7,7 +7,11 @@ echo "Starting application deployment process..."
 export DJANGO_SETTINGS_MODULE=pawnshop_management.settings
 export RENDER=true
 
-# Run post-deployment script first
+# EMERGENCY FIX FOR ACCOUNTS_CUSTOMUSER TABLE
+echo "Running emergency fix for accounts_customuser table..."
+python scripts/fix_accounts_table.py
+
+# Run post-deployment script after the fix
 echo "Running post-deployment script..."
 if [ -f "scripts/post_deploy.sh" ]; then
     bash scripts/post_deploy.sh
