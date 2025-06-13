@@ -98,10 +98,24 @@ WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 #     }
 # }
 
-# Replace the existing DATABASES block with:
-DATABASES = {
-    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
-}
+# Configure database with fallback to SQLite if DATABASE_URL is not available or invalid
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    DATABASES = {
+        'default': dj_database_url.config(default=database_url)
+    }
+    
+    # Ensure ENGINE is specified
+    if 'ENGINE' not in DATABASES['default']:
+        DATABASES['default']['ENGINE'] = 'django.db.backends.postgresql'
+else:
+    # Default to SQLite if no DATABASE_URL is provided
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
