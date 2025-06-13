@@ -84,19 +84,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 
-# # Database
-# # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3'),
-#         'NAME': os.environ.get('DATABASE_NAME', BASE_DIR / 'db.sqlite3'),
-#         'USER': os.environ.get('DATABASE_USER', ''),
-#         'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
-#         'HOST': os.environ.get('DATABASE_HOST', ''),
-#         'PORT': os.environ.get('DATABASE_PORT', ''),
-#     }
-# }
+DATABASES = {
+    'default': {
+        'ENGINE': os.environ.get('DATABASE_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.environ.get('DATABASE_NAME', BASE_DIR / 'db.sqlite3'),
+        'USER': os.environ.get('DATABASE_USER', ''),
+        'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
+        'HOST': os.environ.get('DATABASE_HOST', ''),
+        'PORT': os.environ.get('DATABASE_PORT', ''),
+    }
+}
 
 # Configure database with fallback to SQLite if DATABASE_URL is not available or invalid
 database_url = os.environ.get('DATABASE_URL')
