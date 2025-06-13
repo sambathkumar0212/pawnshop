@@ -17,9 +17,17 @@ export GUNICORN_CMD_ARGS="--bind=0.0.0.0:$PORT --workers=2 pawnshop_management.w
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Run migrations
-echo "Running database migrations..."
-python manage.py migrate
+# Print database configuration (without sensitive info)
+echo "Database configuration check:"
+python -c "import os; from django.conf import settings; import django; django.setup(); print(f'DATABASE ENGINE: {settings.DATABASES[\"default\"].get(\"ENGINE\", \"Not set\")}'); print(f'DATABASE NAME: {settings.DATABASES[\"default\"].get(\"NAME\", \"Not set\")}');"
+
+# Run migrations with verbosity for debugging
+echo "Running database migrations with verbosity..."
+python manage.py migrate --verbosity 2
+
+# Verify migrations were applied correctly
+echo "Verifying migrations status..."
+python manage.py showmigrations
 
 # Create a proper wsgi.py file in the project root for platforms that look for app.py
 echo "Creating root-level wsgi.py file for compatibility..."
