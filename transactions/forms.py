@@ -161,8 +161,14 @@ class LoanForm(forms.ModelForm):
             })
         )
 
-        # Configure customer field
-        self.fields['customer'].queryset = Customer.objects.all().order_by('first_name', 'last_name')
+        # Configure customer field - filter by current branch if user has branch assigned
+        if self.user and not self.user.is_superuser and self.user.branch:
+            # Only show customers from the current branch
+            self.fields['customer'].queryset = Customer.objects.filter(branch=self.user.branch).order_by('first_name', 'last_name')
+        else:
+            # Show all customers for superusers or users without a branch
+            self.fields['customer'].queryset = Customer.objects.all().order_by('first_name', 'last_name')
+            
         self.fields['customer'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
 
         # Define top priority ornament types and Tamil Nadu relevant gold ornament categories

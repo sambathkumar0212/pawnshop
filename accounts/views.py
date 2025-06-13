@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from django import forms
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.contrib.auth import login
 from biometrics.models import FaceEnrollment, FaceAuthLog, CustomerFaceEnrollment
 import json
@@ -362,8 +362,22 @@ class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     context_object_name = 'customers'
     permission_required = 'accounts.view_customer'
     
+    def has_permission(self):
+        # Allow Sales Associates to always view customer list
+        if hasattr(self.request.user, 'role') and self.request.user.role and self.request.user.role.name.lower() == 'sales associate':
+            return True
+        # For others, use the standard permission check
+        return super().has_permission()
+    
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        
+        # Filter customers by branch for branch managers
+        # Allow regional managers and superusers to see all customers
+        if not user.is_superuser and user.branch and not user.role.name.lower() in ['regional manager', 'sales associate']:
+            queryset = queryset.filter(branch=user.branch)
+            
         search_term = self.request.GET.get('search', '')
         
         if search_term:
@@ -382,6 +396,26 @@ class CustomerDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
     template_name = 'accounts/customer_detail.html'
     context_object_name = 'customer'
     permission_required = 'accounts.view_customer'
+    
+    def has_permission(self):
+        # Allow Sales Associates to always view customers
+        if hasattr(self.request.user, 'role') and self.request.user.role and self.request.user.role.name.lower() == 'sales associate':
+            return True
+        # For others, use the standard permission check
+        return super().has_permission()
+    
+    def get_object(self, queryset=None):
+        """Override to check branch-based access permissions"""
+        obj = super().get_object(queryset=queryset)
+        user = self.request.user
+        
+        # Branch managers can only access customers from their branch
+        # Allow Sales Associates, regional managers and superusers to see all customer details
+        if not user.is_superuser and user.branch and not user.role.name.lower() in ['regional manager', 'sales associate']:
+            if obj.branch != user.branch:
+                raise Http404("You don't have permission to view this customer.")
+        
+        return obj
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -492,6 +526,10 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         
+        # Automatically set the branch to the user's branch
+        if self.request.user.branch:
+            form.instance.branch = self.request.user.branch
+        
         # Log received form data for debugging (only field names for privacy)
         if settings.DEBUG:
             print(f"Form data received: {list(self.request.POST.keys())}")
@@ -558,6 +596,18 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
     fields = ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 
               'state', 'zip_code', 'id_type', 'id_number', 'id_image', 'notes']
     permission_required = 'accounts.change_customer'
+    
+    def get_object(self, queryset=None):
+        """Override to check branch-based access permissions"""
+        obj = super().get_object(queryset=queryset)
+        user = self.request.user
+        
+        # Branch managers can only access customers from their branch
+        if not user.is_superuser and user.branch and not user.role.name.lower() == 'regional manager':
+            if obj.branch != user.branch:
+                raise Http404("You don't have permission to edit this customer.")
+        
+        return obj
     
     def get_success_url(self):
         return reverse_lazy('customer_detail', kwargs={'pk': self.object.pk})
@@ -663,6 +713,19 @@ class CustomerDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView
     context_object_name = 'customer'
     success_url = reverse_lazy('customer_list')
     permission_required = 'accounts.delete_customer'
+    
+    def get_object(self, queryset=None):
+        """Override to check branch-based access permissions"""
+        obj = super().get_object(queryset=queryset)
+        user = self.request.user
+        
+        # Branch managers can only access customers from their branch
+        # Allow regional managers and superusers to see all customer details
+        if not user.is_superuser and user.branch and not user.role.name.lower() == 'regional manager':
+            if obj.branch != user.branch:
+                raise Http404("You don't have permission to delete this customer.")
+        
+        return obj
     
     def delete(self, request, *args, **kwargs):
         customer = self.get_object()

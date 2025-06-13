@@ -68,6 +68,7 @@ class Customer(models.Model):
     last_name = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20)
+    branch = models.ForeignKey('branches.Branch', on_delete=models.PROTECT, related_name='customers', null=True)
     profile_photo = models.TextField(blank=True, null=True, help_text="Base64-encoded profile photo of customer")
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)

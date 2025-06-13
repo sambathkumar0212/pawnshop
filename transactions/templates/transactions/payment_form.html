@@ -24,6 +24,25 @@
         </div>
     </div>
 
+    {% if new_payment_id %}
+    <!-- Success message with receipt button when payment is recorded -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="alert alert-success">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="alert-heading mb-1"><i class="fas fa-check-circle me-2"></i>Payment Successfully Recorded!</h5>
+                        <p class="mb-0">The payment has been recorded successfully. You can now print a receipt for the customer.</p>
+                    </div>
+                    <a href="{% url 'payment_receipt' new_payment_id %}" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-print me-2"></i>Print Receipt
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow">
@@ -109,6 +128,7 @@
                                             <th>Date</th>
                                             <th class="text-end">Amount</th>
                                             <th>Method</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -117,6 +137,11 @@
                                             <td>{{ payment.payment_date|date:"M d, Y" }}</td>
                                             <td class="text-end">₹{{ payment.amount|floatformat:2 }}</td>
                                             <td>{{ payment.get_payment_method_display }}</td>
+                                            <td>
+                                                <a href="{% url 'payment_receipt' payment.id %}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-print"></i> Receipt
+                                                </a>
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>

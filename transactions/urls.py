@@ -15,6 +15,7 @@ urlpatterns = [
     # Payments
     path('payments/', views.PaymentListView.as_view(), name='payment_list'),
     path('payments/<int:pk>/', views.PaymentDetailView.as_view(), name='payment_detail'),
+    path('payments/<int:payment_id>/receipt/', views.PaymentReceiptView.as_view(), name='payment_receipt'),
     
     # Sales
     path('sales/', views.SaleListView.as_view(), name='sale_list'),
