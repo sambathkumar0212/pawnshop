@@ -5,6 +5,7 @@ Django settings for pawnshop_management project.
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import dj_database_url  # added for parsing DATABASE_URL
 
 # Load environment variables from .env file
 load_dotenv()
@@ -97,22 +98,11 @@ WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 #     }
 # }
 
-import environ
-
-# Initialize environment variables
-env = environ.Env()
-environ.Env.read_env()
-
+# Replace the existing DATABASES block with:
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME'),
-        'USER': os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': os.environ.get('DB_HOST'),
-        'PORT': os.environ.get('DB_PORT'),
-    }
+    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
 }
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
