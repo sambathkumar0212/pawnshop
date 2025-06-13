@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Receipt</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm; /* Reduced margins */
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 10px; /* Reduced font size */
+            line-height: 1.3; /* Reduced line height */
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .receipt-container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 10px; /* Reduced padding */
+            border: 1px solid #4a5568;
+            position: relative;
+        }
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 10px; /* Reduced margin */
+            padding: 5px; /* Reduced padding */
+        }
+        .receipt-header h1 {
+            margin: 0;
+            font-size: 16px; /* Reduced font size */
+            color: #2d3748;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .receipt-header p {
+            margin: 2px 0 0; /* Reduced margin */
+            color: #4a5568;
+            font-size: 9px; /* Reduced font size */
+        }
+        .receipt-title {
+            text-align: center;
+            color: #2d3748;
+            padding: 3px; /* Reduced padding */
+            margin: 5px 0; /* Reduced margin */
+            font-size: 12px; /* Reduced font size */
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .receipt-details {
+            margin-bottom: 10px; /* Reduced margin */
+            padding: 5px; /* Reduced padding */
+        }
+        .receipt-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .receipt-details td {
+            padding: 3px 2px; /* Further reduced horizontal padding */
+            vertical-align: top; /* Align content to top */
+        }
+        .receipt-details .label {
+            font-weight: bold;
+            width: 18%; /* Reduced width */
+            color: #4a5568;
+            white-space: nowrap; /* Prevent wrapping */
+        }
+        .receipt-details .value {
+            width: 32%; /* Set fixed width */
+            padding-right: 10px; /* Add some right padding for space between columns */
+        }
+        .payment-info {
+            margin-bottom: 10px; /* Reduced margin */
+        }
+        .payment-info table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e2e8f0;
+        }
+        .payment-info th, .payment-info td {
+            padding: 4px 5px; /* Reduced padding */
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .payment-info th {
+            color: #2d3748;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 9px; /* Reduced font size */
+            letter-spacing: 0.5px; /* Reduced letter spacing */
+            border-bottom: 1px solid #4a5568;
+        }
+        .totals-table {
+            width: 65%;
+            margin-left: auto;
+            margin-top: 3px; /* Further reduced margin */
+            border-collapse: collapse;
+            font-size: 9px; /* Reduced font size specifically for totals table */
+        }
+        .totals-table td {
+            padding: 2px 3px; /* Further reduced padding */
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .totals-table .total-label {
+            font-weight: bold;
+            text-align: right;
+            color: #4a5568;
+            white-space: nowrap; /* Prevent wrapping */
+        }
+        .totals-table .total-amount {
+            text-align: right;
+            font-weight: 500;
+            width: 25%; /* Set fixed width */
+            white-space: nowrap; /* Prevent wrapping */
+        }
+        .totals-table tr:last-child {
+            border-top: 1px solid #4a5568;
+            font-weight: bold;
+        }
+        .amount-in-words {
+            font-style: italic;
+            margin: 10px 0; /* Reduced margin */
+            padding: 5px; /* Reduced padding */
+            border: 1px dashed #a0aec0;
+            color: #4a5568;
+            font-size: 10px; /* Reduced font size */
+            text-align: center;
+        }
+        .notes {
+            margin-top: 10px; /* Reduced margin */
+            font-style: italic;
+            font-size: 9px; /* Reduced font size */
+            padding: 5px; /* Reduced padding */
+        }
+        .signature {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .signature div.customer-sign {
+            width: 45%;
+            text-align: left;
+            margin-left: 0;
+        }
+        .signature div.branch-sign {
+            width: 45%;
+            text-align: right;
+            margin-right: 0;
+        }
+        .signature .line {
+            border-top: 1px solid #4a5568;
+            margin-top: 20px;
+            margin-bottom: 2px;
+        }
+        .customer-sign .line {
+            margin-right: 10%;
+        }
+        .branch-sign .line {
+            margin-left: 10%;
+        }
+        .signature-name {
+            margin: 0;
+            padding: 0;
+            font-weight: normal;
+            font-size: 9px;
+        }
+        .signature-title {
+            margin: 0 0 2px 0;
+            padding: 0;
+            font-weight: bold;
+            font-size: 9px;
+        }
+        .footer {
+            margin-top: 10px; /* Reduced margin */
+            text-align: center;
+            font-size: 8px; /* Reduced font size */
+            color: #718096;
+            padding-top: 5px; /* Reduced padding */
+        }
+        .paid-stamp {
+            position: absolute;
+            top: 30%;
+            right: 10%;
+            transform: rotate(25deg);
+            font-size: 20px; /* Reduced font size */
+            font-weight: bold;
+            color: rgba(104, 211, 145, 0.4);
+            border: 3px solid rgba(104, 211, 145, 0.4); /* Reduced border */
+            border-radius: 5px; /* Reduced border radius */
+            padding: 5px; /* Reduced padding */
+            z-index: 1;
+            text-transform: uppercase;
+            letter-spacing: 1px; /* Reduced letter spacing */
+        }
+        .rupee {
+            font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;
+            font-weight: normal;
+            display: inline-block;
+        }
+        @media print {
+            .receipt-container {
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        {% if payment_type == 'full' or loan.status == 'repaid' %}
+        <div class="paid-stamp">PAID</div>
+        {% endif %}
+        
+        <div class="receipt-header">
+            <h1>{{ branch.name }}</h1>
+            <p>{{ branch.address }}, {{ branch.city }}, {{ branch.state }}, {{ branch.zip_code }}</p>
+            <p>Phone: {{ branch.phone }} | Email: {{ branch.email }}</p>
+        </div>
+
+        <div class="receipt-title">Payment Receipt</div>
+
+        <div class="receipt-details">
+            <table>
+                <tr>
+                    <td class="label">Receipt No:</td>
+                    <td class="value">#{{ payment.id }}</td>
+                    <td class="label">Date:</td>
+                    <td class="value">{{ payment.payment_date|date:"d-M-Y" }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Customer:</td>
+                    <td class="value">{{ loan.customer.full_name }}</td>
+                    <td class="label">Loan No:</td>
+                    <td class="value">{{ loan.loan_number }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Payment Method:</td>
+                    <td class="value">{{ payment.get_payment_method_display }}</td>
+                    <td class="label">Reference No:</td>
+                    <td class="value">{{ payment.reference_number|default:"-" }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="payment-info">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th style="text-align: right;">Amount (<span class="rupee">Rs.</span>)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Payment towards Loan #{{ loan.loan_number }}</td>
+                        <td style="text-align: right; font-weight: bold;"><span class="rupee">Rs.</span> {{ payment.amount|floatformat:2 }}</td>
+                    </tr>
+                    {% if payment_type == 'full' %}
+                    <tr>
+                        <td><em>Full settlement (Principal + Interest)</em></td>
+                        <td style="text-align: right;">-</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td><em>Partial payment</em></td>
+                        <td style="text-align: right;">-</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <table class="totals-table">
+                <tr>
+                    <td class="total-label">Total Amount Paid:</td>
+                    <td class="total-amount"><span class="rupee">Rs.</span>{{ payment.amount|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td class="total-label">Principal Amount:</td>
+                    <td class="total-amount"><span class="rupee">Rs.</span>{{ loan.principal_amount|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td class="total-label">Interest Accrued:</td>
+                    <td class="total-amount"><span class="rupee">Rs.</span>{{ interest_amount|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td class="total-label">Total Paid Till Date:</td>
+                    <td class="total-amount"><span class="rupee">Rs.</span>{{ total_paid|floatformat:2 }}</td>
+                </tr>
+                {% if remaining_balance > 0 %}
+                <tr>
+                    <td class="total-label">Remaining Balance:</td>
+                    <td class="total-amount"><span class="rupee">Rs.</span>{{ remaining_balance|floatformat:2 }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td class="total-label">Status:</td>
+                    <td class="total-amount">FULLY PAID</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <div class="amount-in-words">
+            <strong>Amount in words:</strong> {{ amount_in_words }}
+        </div>
+
+        {% if payment.notes %}
+        <div class="notes">
+            <strong>Notes:</strong> {{ payment.notes }}
+        </div>
+        {% endif %}
+
+        <div style="clear: both;"></div>
+        <div class="signature">
+            <div class="customer-sign">
+                <div class="line"></div>
+                <p class="signature-title">Customer Signature</p>
+                <p class="signature-name">{{ loan.customer.full_name }}</p>
+            </div>
+            <div class="branch-sign">
+                <div class="line"></div>
+                <p class="signature-title">For {{ branch.name }}</p>
+                <p class="signature-name">{{ payment.received_by.get_full_name }}</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Thank you for your business. This receipt is computer generated and serves as proof of payment.</p>
+            {% if loan.status == 'repaid' %}
+            <p style="font-weight: bold;">This loan has been fully repaid. All pawned items have been returned to the customer.</p>
+            {% endif %}
+            <p>Generated: {{ date_today|date:"d-M-Y H:i:s" }}</p>
+        </div>
+    </div>
+</body>
+</html>

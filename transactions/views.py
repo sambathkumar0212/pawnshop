@@ -28,10 +28,14 @@ class LoanListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         queryset = Loan.objects.all()
+        user = self.request.user
 
-        # Branch filter for non-superusers
-        if not self.request.user.is_superuser:
-            queryset = queryset.filter(branch=self.request.user.branch)
+        # Branch filter for branch managers
+        # Branch managers can only see loans from their branch
+        # Regional managers and superusers can see all loans
+        if not user.is_superuser and user.branch:
+            if not hasattr(user, 'role') or not user.role or not user.role.name.lower() == 'regional manager':
+                queryset = queryset.filter(branch=user.branch)
 
         # Status filter
         status = self.request.GET.get('status')
@@ -92,6 +96,37 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
             
         # Ensure interest rate is set based on scheme before saving
         form.instance.interest_rate = 24.00 if form.instance.scheme == 'flexible' else 12.00
+        
+        # Process customer face capture photo
+        customer_face_capture = self.request.POST.get('customer_face_capture')
+        if customer_face_capture:
+            # Make sure it's a proper data URL
+            if customer_face_capture.startswith('data:image/'):
+                form.instance.customer_face_capture = customer_face_capture
+        
+        # Process item photos to ensure they're properly stored as JSON
+        item_photos_data = self.request.POST.get('item_photos')
+        if item_photos_data:
+            import json
+            try:
+                # Try to parse as JSON
+                photos_array = json.loads(item_photos_data)
+                
+                # Ensure it's a properly formatted array of strings
+                if isinstance(photos_array, list):
+                    # Store as JSON string
+                    form.instance.item_photos = json.dumps(photos_array)
+                else:
+                    # If not a list, convert to a list with a single item
+                    form.instance.item_photos = json.dumps([str(photos_array)])
+            except json.JSONDecodeError:
+                # If not valid JSON, check if it's a base64 image
+                if isinstance(item_photos_data, str) and item_photos_data.startswith('data:image/'):
+                    # Store as a JSON array with a single item
+                    form.instance.item_photos = json.dumps([item_photos_data])
+                else:
+                    # Default to empty array if can't process
+                    form.instance.item_photos = "[]"
             
         return super().form_valid(form)
     
@@ -104,6 +139,18 @@ class LoanDetailView(LoginRequiredMixin, DetailView):
     template_name = 'transactions/loan_detail.html'
     slug_field = 'loan_number'
     slug_url_kwarg = 'loan_number'
+    
+    def get_object(self, queryset=None):
+        """Override to check branch-based access permissions"""
+        obj = super().get_object(queryset=queryset)
+        user = self.request.user
+        
+        # Branch managers can only access loans from their branch
+        if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+            if obj.branch != user.branch:
+                raise Http404("You don't have permission to view this loan.")
+        
+        return obj
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -241,12 +288,24 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
         
         # First try to find by loan_number (UUID)
         try:
-            return Loan.objects.get(loan_number=loan_identifier)
+            loan = Loan.objects.get(loan_number=loan_identifier)
+            # Check branch-based permissions
+            user = self.request.user
+            if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                if loan.branch != user.branch:
+                    raise Http404("You don't have permission to edit this loan.")
+            return loan
         except Loan.DoesNotExist:
             # If not found, try to find by primary key (ID)
             try:
                 if loan_identifier.isdigit():
-                    return Loan.objects.get(pk=int(loan_identifier))
+                    loan = Loan.objects.get(pk=int(loan_identifier))
+                    # Check branch-based permissions
+                    user = self.request.user
+                    if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                        if loan.branch != user.branch:
+                            raise Http404("You don't have permission to edit this loan.")
+                    return loan
             except (Loan.DoesNotExist, ValueError):
                 pass
             
@@ -415,12 +474,24 @@ class LoanExtensionCreateView(LoginRequiredMixin, CreateView):
         
         # First try to find by loan_number (UUID)
         try:
-            return Loan.objects.get(loan_number=loan_identifier)
+            loan = Loan.objects.get(loan_number=loan_identifier)
+            # Check branch-based permissions
+            user = self.request.user
+            if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                if loan.branch != user.branch:
+                    raise Http404("You don't have permission to extend this loan.")
+            return loan
         except Loan.DoesNotExist:
             # If not found, try to find by primary key (ID)
             try:
                 if loan_identifier.isdigit():
-                    return Loan.objects.get(pk=int(loan_identifier))
+                    loan = Loan.objects.get(pk=int(loan_identifier))
+                    # Check branch-based permissions
+                    user = self.request.user
+                    if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                        if loan.branch != user.branch:
+                            raise Http404("You don't have permission to extend this loan.")
+                    return loan
             except (Loan.DoesNotExist, ValueError):
                 pass
             
@@ -467,12 +538,24 @@ class LoanForecloseView(LoginRequiredMixin, UpdateView):
         
         # First try to find by loan_number (UUID)
         try:
-            return Loan.objects.get(loan_number=loan_identifier)
+            loan = Loan.objects.get(loan_number=loan_identifier)
+            # Check branch-based permissions
+            user = self.request.user
+            if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                if loan.branch != user.branch:
+                    raise Http404("You don't have permission to foreclose this loan.")
+            return loan
         except Loan.DoesNotExist:
             # If not found, try to find by primary key (ID)
             try:
                 if loan_identifier.isdigit():
-                    return Loan.objects.get(pk=int(loan_identifier))
+                    loan = Loan.objects.get(pk=int(loan_identifier))
+                    # Check branch-based permissions
+                    user = self.request.user
+                    if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                        if loan.branch != user.branch:
+                            raise Http404("You don't have permission to foreclose this loan.")
+                    return loan
             except (Loan.DoesNotExist, ValueError):
                 pass
             
@@ -568,12 +651,24 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
         
         # First try to find by loan_number (UUID)
         try:
-            return Loan.objects.get(loan_number=loan_identifier)
+            loan = Loan.objects.get(loan_number=loan_identifier)
+            # Check branch-based permissions
+            user = self.request.user
+            if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                if loan.branch != user.branch:
+                    raise Http404("You don't have permission to make payments for this loan.")
+            return loan
         except Loan.DoesNotExist:
             # If not found, try to find by primary key (ID)
             try:
                 if loan_identifier.isdigit():
-                    return Loan.objects.get(pk=int(loan_identifier))
+                    loan = Loan.objects.get(pk=int(loan_identifier))
+                    # Check branch-based permissions
+                    user = self.request.user
+                    if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                        if loan.branch != user.branch:
+                            raise Http404("You don't have permission to make payments for this loan.")
+                    return loan
             except (Loan.DoesNotExist, ValueError):
                 pass
             
@@ -605,6 +700,12 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
                     'message': 'Early repayment benefit: No interest will be charged if fully repaid today!',
                     'days_remaining': 25 - loan_age
                 }
+        
+        # Check for newly created payment ID in session
+        if 'new_payment_id' in self.request.session:
+            context['new_payment_id'] = self.request.session['new_payment_id']
+            # Remove it from session after retrieving
+            del self.request.session['new_payment_id']
         
         return context
     
@@ -663,6 +764,9 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
             # Save the payment first
             response = super().form_valid(form)
             
+            # Store the payment ID in the session for receipt generation
+            self.request.session['new_payment_id'] = self.object.id
+            
             # Update loan status to repaid
             loan.status = 'repaid'
             loan.save()
@@ -698,6 +802,9 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
                 # Save the payment first
                 response = super().form_valid(form)
                 
+                # Store the payment ID in the session for receipt generation
+                self.request.session['new_payment_id'] = self.object.id
+                
                 # Update loan status
                 loan.status = 'repaid'
                 loan.save()
@@ -717,12 +824,16 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
             else:
                 # Regular partial payment
                 response = super().form_valid(form)
+                
+                # Store the payment ID in the session for receipt generation
+                self.request.session['new_payment_id'] = self.object.id
+                
                 messages.success(self.request, f'Partial payment of ₹{form.instance.amount} has been recorded successfully.')
                 return response
 
     def get_success_url(self):
-        return reverse('loan_detail', kwargs={'loan_number': self.kwargs['loan_number']})
-
+        return reverse('payment_create', kwargs={'loan_number': self.kwargs['loan_number']})
+        
 
 class PaymentListView(LoginRequiredMixin, ListView):
     template_name = 'transactions/payment_list.html'
@@ -743,8 +854,16 @@ class SaleListView(LoginRequiredMixin, ListView):
     context_object_name = 'sales'
     
     def get_queryset(self):
-        # This will need to be implemented with proper Sale model
-        return []
+        queryset = Sale.objects.all()
+        user = self.request.user
+        
+        # Filter sales by branch for branch managers
+        # Allow regional managers and superusers to see all sales
+        if not user.is_superuser and user.branch:
+            if not hasattr(user, 'role') or not user.role or not user.role.name.lower() == 'regional manager':
+                queryset = queryset.filter(branch=user.branch)
+        
+        return queryset.select_related('customer', 'branch', 'item').order_by('-sale_date')
 
 
 class SaleCreateView(LoginRequiredMixin, CreateView):
@@ -768,8 +887,21 @@ class SaleCreateView(LoginRequiredMixin, CreateView):
 
 
 class SaleDetailView(LoginRequiredMixin, DetailView):
+    model = Sale
     template_name = 'transactions/sale_detail.html'
     context_object_name = 'sale'
+    
+    def get_object(self, queryset=None):
+        """Override to check branch-based access permissions"""
+        obj = super().get_object(queryset=queryset)
+        user = self.request.user
+        
+        # Branch managers can only access sales from their branch
+        if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+            if obj.branch != user.branch:
+                raise Http404("You don't have permission to view this sale.")
+        
+        return obj
 
 
 class SaleUpdateView(LoginRequiredMixin, UpdateView):
@@ -949,3 +1081,82 @@ def number_to_words(request, number):
         return JsonResponse({'words': words})
     except (ValueError, TypeError):
         return JsonResponse({'error': 'Invalid number'}, status=400)
+
+class PaymentReceiptView(LoginRequiredMixin, View):
+    """Generate a PDF receipt for a payment"""
+    
+    def get(self, request, payment_id):
+        try:
+            payment = Payment.objects.get(id=payment_id)
+            loan = payment.loan
+            
+            # Check branch-based permissions
+            user = self.request.user
+            if not user.is_superuser and user.branch and not (hasattr(user, 'role') and user.role and user.role.name.lower() == 'regional manager'):
+                if loan.branch != user.branch:
+                    raise Http404("You don't have permission to view this payment receipt.")
+            
+            # Calculate interest amount
+            from decimal import Decimal
+            interest_amount = loan.total_payable_till_date - loan.principal_amount
+            interest_amount = max(Decimal('0'), interest_amount)
+            
+            # Calculate total paid including this payment
+            total_paid = loan.amount_paid
+            
+            # Calculate remaining balance
+            remaining_balance = max(Decimal('0'), loan.total_payable_till_date - total_paid)
+            
+            # Determine payment type (full or partial)
+            payment_type = 'partial'
+            if payment.notes and ('full payment' in payment.notes.lower() or 
+                              'loan closed' in payment.notes.lower() or 
+                              'fully repaid' in payment.notes.lower()):
+                payment_type = 'full'
+            
+            # Convert amount to words
+            from num2words import num2words
+            amount_in_words = num2words(payment.amount, lang='en_IN').title() + " Rupees Only"
+            
+            # Prepare context for PDF template
+            context = {
+                'payment': payment,
+                'loan': loan,
+                'branch': loan.branch,
+                'interest_amount': interest_amount,
+                'total_paid': total_paid,
+                'remaining_balance': remaining_balance,
+                'payment_type': payment_type,
+                'amount_in_words': amount_in_words,
+                'date_today': timezone.now()
+            }
+            
+            # Render the PDF template
+            template = get_template('transactions/payment_receipt_pdf.html')
+            html = template.render(context)
+            result = BytesIO()
+            
+            # Create PDF from HTML content
+            pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+            
+            if not pdf.err:
+                # Generate response with PDF content
+                response = HttpResponse(result.getvalue(), content_type='application/pdf')
+                
+                # Generate filename
+                customer_name = f"{loan.customer.first_name}_{loan.customer.last_name}"
+                payment_date = payment.payment_date.strftime('%d%b%Y')
+                filename = f"Payment_Receipt_{customer_name}_{payment_date}.pdf"
+                
+                # Make the filename URL-safe
+                import re
+                filename = re.sub(r'[^\w\-_.]', '_', filename)
+                
+                response['Content-Disposition'] = f'inline; filename="{filename}"'
+                return response
+            
+            # If PDF generation fails
+            return HttpResponse("Error generating payment receipt PDF", status=400)
+            
+        except Payment.DoesNotExist:
+            raise Http404("Payment not found")

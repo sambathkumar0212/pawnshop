@@ -50,138 +50,108 @@
             border-collapse: collapse;
             margin-bottom: 15px;
             font-size: 11px;
+            page-break-inside: avoid; /* Prevent table from breaking across pages */
         }
         table.data-table, table.data-table th, table.data-table td {
             border: 1px solid #000;
         }
         table.data-table th, table.data-table td {
-            padding: 5px;
+            padding: 3px 5px; /* Reduced padding to make it more compact vertically */
             text-align: left;
+            line-height: 1.2; /* Reduced line height */
         }
         table.gold-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 15px;
             font-size: 11px;
+            page-break-inside: avoid; /* Prevent table from breaking across pages */
         }
         table.gold-table, table.gold-table th, table.gold-table td {
             border: 1px solid #000;
         }
         table.gold-table th, table.gold-table td {
-            padding: 5px;
+            padding: 6px;
             text-align: center;
         }
         table.gold-table th {
             font-weight: bold;
+            background-color: #f2f2f2;
+            padding: 8px 4px;
         }
-        .terms-section h3 {
-            font-size: 13px;
-            font-weight: bold;
-            margin: 15px 0 10px 0;
-        }
-        .terms-list {
-            padding-left: 25px;
-            margin: 5px 0;
-            font-size: 11px;
-        }
-        .terms-list li {
-            margin-bottom: 6px;
-            text-align: justify;
-        }
-        .signatures {
-            margin-top: 30px;
-            display: flex;
-            justify-content: space-between;
+        /* Make gold table span full width */
+        .gold-table-container {
             width: 100%;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
         }
-        .signature-box-left {
-            width: 45%;
+        /* Expand item description cell width */
+        table.gold-table td.item-cell {
+            text-align: left;
+            vertical-align: top;
+            padding: 8px;
+            width: 55%; /* Increased width for item description */
+            max-width: 55%;
+            word-break: break-word;
+            border-right: 1px solid #000;
+            overflow-wrap: break-word;
         }
-        .signature-box-right {
-            width: 45%;
-            text-align: right;
+        /* Adjust column widths for gold details */
+        table.gold-table th.karat-header {
+            padding: 4px 1px;
+            font-size: 10px;
+            background-color: #f2f2f2;
+            width: 15%; /* Increased from 10% */
         }
-        .signature-line {
-            border-top: 1px solid #000;
-            margin-top: 40px;
-            margin-bottom: 5px;
+        table.gold-table th.compact-header {
+            padding: 5px 2px;
+            font-size: 10px;
+            background-color: #f2f2f2;
+            width: 15%; /* Left as is */
         }
-        .footer {
-            margin-top: 20px;
+        table.gold-table td.karat-cell {
+            padding: 6px 2px;
             font-size: 11px;
-            text-align: center;
-        }
-        /* Item display improvements */
-        .item-name {
-            font-size: 11px;
+            width: 15%; /* Increased from 10% */
+            min-width: 15%;
             font-weight: bold;
-            margin-bottom: 2px;
+        }
+        table.gold-table td.compact-cell {
+            padding: 6px 2px;
+            font-size: 11px;
+            width: 15%; /* Left as is */
+            font-weight: bold;
+        }
+        /* Improve item name and description display */
+        .item-name {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 4px;
             text-align: left;
             word-break: break-word;
-            line-height: 1.1;
+            line-height: 1.2;
             hyphens: auto;
         }
         .item-description {
-            font-size: 8px;
-            font-style: italic;
+            font-size: 10px; /* Increased from 8px */
             color: #333;
             text-align: left;
             overflow: hidden;
             white-space: normal;
             word-wrap: break-word;
-            word-break: break-all; /* Force breaks within words if needed */
-            line-height: 1;
+            line-height: 1.2; /* Increased from 1 */
             max-width: 100%;
             display: block;
-            margin-bottom: 1px;
+            margin-bottom: 3px;
             hyphens: auto;
         }
-        /* Responsive font sizing for description based on content length */
-        .long-description {
-            font-size: 7px;
-            line-height: 0.9;
-        }
-        .very-long-description {
-            font-size: 6px;
-            line-height: 0.8;
-        }
-        table.gold-table td.item-cell {
-            text-align: left;
-            vertical-align: top;
-            padding: 6px;
-            width: 40%; /* Increased width for item description */
-            max-width: 40%;
-            word-break: break-word;
-            border-right: 1px solid #000;
-            overflow-wrap: break-word;
-        }
-        /* Compact gold table columns with special handling for karat */
-        table.gold-table th.compact-header {
-            padding: 5px 2px;
-            font-size: 10px;
-            background-color: #f8f8f8;
-            width: 15%; /* Standard width for compact headers */
-        }
-        table.gold-table th.karat-header {
-            padding: 4px 1px;
-            font-size: 10px;
-            background-color: #f8f8f8;
-            width: 10%; /* Extra narrow for karat */
-        }
-        table.gold-table td.compact-cell {
-            padding: 4px 2px;
-            font-size: 10px;
-            width: 15%; /* Standard width for compact cells */
-        }
-        table.gold-table td.karat-cell {
-            padding: 4px 1px;
-            font-size: 10px;
-            width: 10%; /* Extra narrow for karat */
-            min-width: 10%;
-        }
-        /* Add a subtle highlight to item rows for better readability */
-        table.gold-table tbody tr:nth-child(even) {
-            background-color: #fbfbfb;
+        .total-items {
+            font-size: 11px;
+            font-weight: bold;
+            color: #00458B;
+            margin-top: 4px;
+            border-top: 1px dotted #ccc;
+            padding-top: 4px;
         }
         .terms-section h3 {
             font-size: 13px;
@@ -399,6 +369,7 @@
             </tr>
         </table>
         
+        <div class="gold-table-container">
         <table class="gold-table">
             <thead>
                 <tr>
@@ -406,7 +377,6 @@
                     <th class="karat-header">Gold Karat</th>
                     <th class="compact-header">Gross Weight (g)</th>
                     <th class="compact-header">Net Weight (g)</th>
-                    <th class="compact-header">Total Items Count</th>
                 </tr>
             </thead>
             <tbody>
@@ -427,22 +397,22 @@
                                 </div>
                             {% endwith %}
                         {% endif %}
+                        {% with total_items=item.item.name|calculate_total_items %}
+                            {% if total_items > 0 %}
+                                <div class="total-items">
+                                    Total Items: <strong>{{ total_items }}</strong>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
                     </td>
                     <td class="karat-cell">{{ item.gold_karat }}K</td>
                     <td class="compact-cell">{{ item.gross_weight|floatformat:3 }}</td>
                     <td class="compact-cell">{{ item.net_weight|floatformat:3 }}</td>
-                    <td class="compact-cell">{% with total_items=item.item.name|calculate_total_items %}
-                            {% if total_items > 0 %}
-                                <strong>{{ total_items }}</strong>
-                            {% else %}
-                                -
-                            {% endif %}
-                        {% endwith %}
-                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         
         {% if item_photos and item_photos|length > 0 %}
         <h3 class="photo-section-title">Pledged Gold Item Photos</h3>
