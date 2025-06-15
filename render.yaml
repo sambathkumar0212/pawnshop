@@ -19,6 +19,9 @@ services:
     # The DATABASE_URL should be set in the Render dashboard Environment section
     # and Render will automatically inject it as an environment variable
 
+    # Configure post-deployment script to run migrations and setup roles
+    postDeployCommand: ./scripts/post_deploy.sh
+    
     # Specify healthcheck to ensure the app is running correctly
     healthCheckPath: /login/
     

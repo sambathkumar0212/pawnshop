@@ -97,6 +97,10 @@ fi
 echo "Verifying migration status..."
 python manage.py showmigrations | grep -v "\[X\]" || true
 
+# Set up staff roles for multi-branch management
+echo "Setting up staff roles for multi-branch management..."
+python manage.py setup_roles
+
 # Create a superuser if needed (non-interactive)
 if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_PASSWORD" && -n "$DJANGO_SUPERUSER_EMAIL" ]]; then
   echo "Creating superuser..."
