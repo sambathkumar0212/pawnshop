@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url  # added for parsing DATABASE_URL
+import sys  # Import sys for command-line argument detection
 
 # Load environment variables from .env file
 load_dotenv()
@@ -87,47 +88,75 @@ WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Initialize with SQLite as a last resort
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+# Database configuration
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Check if we're on Render.com production environment
-is_render = os.environ.get('RENDER', '') == 'true'
+IS_RENDER = os.environ.get('RENDER', '').lower() == 'true'
+
+# Detect if we're running migrations command
+IS_MIGRATION_COMMAND = 'makemigrations' in sys.argv or 'migrate' in sys.argv
+
+# Database URL from environment (if provided)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Load environment variables from .env file
+env_file = '.env.development' if os.path.exists('.env.development') else None
+if env_file:
+    load_dotenv(env_file)
+    print(f"Loaded environment from {env_file}")
 
 # Configure database based on environment
-database_url = os.environ.get('DATABASE_URL')
-if database_url:
-    # Parse the DATABASE_URL and use it
-    import dj_database_url
-    db_config = dj_database_url.config(default=database_url, conn_max_age=600)
-    
-    # Ensure ENGINE is properly set
-    if 'ENGINE' not in db_config or not db_config['ENGINE']:
-        db_config['ENGINE'] = 'django.db.backends.postgresql'
-    
-    DATABASES['default'] = db_config
-    
-    # Debug information (will appear in logs)
-    print(f"Using database configuration: ENGINE={DATABASES['default']['ENGINE']}, NAME={DATABASES['default'].get('NAME', 'unknown')}")
-elif is_render:
-    # If we're on Render but don't have DATABASE_URL, something is wrong
-    # Force PostgreSQL configuration
-    print("WARNING: No DATABASE_URL found but RENDER=true. Forcing PostgreSQL configuration.")
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DATABASE', 'postgres'),
-        'USER': os.environ.get('POSTGRES_USER', 'postgres'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+if IS_RENDER:
+    # We're in production on Render.com - use environment variables provided in Render dashboard
+    DATABASES = {
+        'default': {
+            'ENGINE': os.environ.get('ENGINE', 'django.db.backends.postgresql'),
+            'NAME': os.environ.get('NAME', 'pawnshop'),
+            'USER': os.environ.get('USER', 'pawnshop_admin'),
+            'PASSWORD': os.environ.get('PASSWORD', ''),
+            'HOST': os.environ.get('HOST', 'dpg-d128v4k9c44c738361m0-a.oregon-postgres.render.com'),
+            'PORT': os.environ.get('PORT', '5432'),
+        }
     }
+    print(f"Using Render.com PostgreSQL database: NAME={DATABASES['default'].get('NAME')}, HOST={DATABASES['default'].get('HOST')}")
 else:
-    # Development environment - SQLite already configured above
-    print("Using SQLite for development environment")
+    # Try to connect to PostgreSQL with the credentials from .env file
+    try:
+        # Get database credentials from environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.environ.get('DATABASE_NAME', 'pawnshop'),
+                'USER': os.environ.get('DATABASE_USER', 'sku316'),
+                'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'postgres'),
+                'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
+                'PORT': os.environ.get('DATABASE_PORT', '5432'),
+            }
+        }
+        # Test the connection if not running migrations
+        if not IS_MIGRATION_COMMAND:
+            import psycopg2
+            conn = psycopg2.connect(
+                dbname=DATABASES['default']['NAME'],
+                user=DATABASES['default']['USER'],
+                password=DATABASES['default']['PASSWORD'],
+                host=DATABASES['default']['HOST'],
+                port=DATABASES['default']['PORT'],
+                connect_timeout=3
+            )
+            conn.close()
+            print(f"Connected to PostgreSQL database: NAME={DATABASES['default'].get('NAME')}, HOST={DATABASES['default'].get('HOST')}")
+    except (ImportError, Exception) as e:
+        # Fall back to SQLite if PostgreSQL connection fails
+        print(f"Could not connect to PostgreSQL: {str(e)}. Using SQLite instead.")
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+        print(f"Using SQLite database: {DATABASES['default'].get('NAME')}")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

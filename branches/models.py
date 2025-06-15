@@ -11,6 +11,8 @@ class Branch(models.Model):
     zip_code = models.CharField(max_length=20)
     phone = models.CharField(max_length=20)
     email = models.EmailField(blank=True, null=True)
+    region = models.ForeignKey('accounts.Region', on_delete=models.SET_NULL, 
+                              null=True, blank=True, related_name='branches')
     manager = models.ForeignKey('accounts.CustomUser', on_delete=models.SET_NULL, 
                                null=True, blank=True, related_name='managed_branches')
     is_active = models.BooleanField(default=True)
