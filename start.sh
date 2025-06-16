@@ -7,46 +7,33 @@ echo "Starting application deployment process..."
 export DJANGO_SETTINGS_MODULE=pawnshop_management.settings
 export RENDER=true
 
-# Check if database migrations are needed
-echo "Checking if migrations are needed..."
-python - <<EOF
-import os, django, sys
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
-django.setup()
+# Skip the database checks and migrations during the initial startup
+# This is critical to avoid worker timeouts - we'll handle DB setup separately
+export SKIP_DB_CHECKS=true
+export MINIMAL_STARTUP=true
 
-from django.db import connections, connection
-from django.db.migrations.executor import MigrationExecutor
-from django.db.utils import OperationalError, ProgrammingError
+# Set a longer timeout for gunicorn
+export GUNICORN_TIMEOUT=300
 
-# Quick connection test
-try:
-    connections['default'].ensure_connection()
-    print('✅ Database connection successful')
-    
-    # Only check migrations if connected successfully
-    executor = MigrationExecutor(connection)
-    plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
-    if plan:
-        print(f'⚠️ {len(plan)} pending migrations found')
-    else:
-        print('✅ No migrations needed')
-        sys.exit(0)  # Exit with success - no emergency fix needed
-except Exception as e:
-    print(f'⚠️ Database check failed: {e}')
-EOF
+# Log some diagnostic info
+echo "PORT=$PORT"
+echo "PYTHON_VERSION=$(python --version)"
+echo "Current directory: $(pwd)"
+echo "Using minimal WSGI application for reliable startup"
 
-# Only run emergency fix if needed
-if [ $? -ne 0 ]; then
-    echo "Running emergency fix for accounts_customuser table..."
-    timeout 60 python scripts/fix_accounts_table.py || echo "⚠️ Fix script timed out but proceeding anyway"
-else
-    echo "✅ Database check passed, skipping emergency fix"
-fi
+# Skip most startup tasks - critical to avoid timeouts
+echo "Starting web server with minimal configuration..."
+gunicorn minimal_wsgi:application \
+  --bind 0.0.0.0:$PORT \
+  --workers=1 \
+  --threads=4 \
+  --timeout=$GUNICORN_TIMEOUT \
+  --log-level=debug \
+  --capture-output \
+  --error-logfile=- \
+  --access-logfile=- \
+  --preload
 
-# Run minimal migrations only
-echo "Running essential migrations..."
-python manage.py migrate --no-input
-
-# Start the web server with optimized settings
-echo "Starting web server..."
-gunicorn pawnshop_management.wsgi:application --bind 0.0.0.0:$PORT --workers=2 --timeout=120 --max-requests=1000 --log-level=info
+# Note: After this initial startup, you can run migrations manually 
+# using Render shell or a one-off job:
+# python manage.py migrate
