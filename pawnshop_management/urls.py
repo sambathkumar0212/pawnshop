@@ -18,6 +18,46 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import TemplateView
+from django.http import JsonResponse
+from django.db.migrations.recorder import MigrationRecorder
+
+def migration_status(request):
+    """View to check migration status - useful for monitoring if migrations have run"""
+    if not request.user.is_superuser and not settings.DEBUG:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+        
+    try:
+        # Get all applied migrations
+        applied_migrations = MigrationRecorder.Migration.objects.all()
+        
+        # Group by app
+        migrations_by_app = {}
+        for migration in applied_migrations:
+            app_name = migration.app
+            if app_name not in migrations_by_app:
+                migrations_by_app[app_name] = []
+            migrations_by_app[app_name].append(migration.name)
+        
+        # Check for specific migrations that indicate successful deployment
+        critical_apps = ['accounts', 'branches', 'inventory', 'transactions']
+        status_ok = all(app in migrations_by_app for app in critical_apps)
+        
+        return JsonResponse({
+            'status': 'ok' if status_ok else 'incomplete',
+            'migrations': migrations_by_app,
+            'total_count': applied_migrations.count(),
+            'last_migration': {
+                'app': applied_migrations.last().app,
+                'name': applied_migrations.last().name,
+                'applied': applied_migrations.last().applied.isoformat() 
+            } if applied_migrations.exists() else None
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -31,6 +71,8 @@ urlpatterns = [
     path('content-manager/', include('content_manager.urls')),  # Added content manager URLs
     path('api/', include('rest_framework.urls')),
     path('', include('accounts.urls')),  # Default route to accounts app
+    # Migration status endpoint - for monitoring migrations
+    path('migration-status/', migration_status, name='migration_status'),
 ]
 
 # Serve media files during development
