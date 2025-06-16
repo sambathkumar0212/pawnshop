@@ -411,7 +411,7 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
                                 # Last resort: treat as a single item
                                 photo_list = [cleaned_json]
                         else:
-                            # Not valid JSON and not a list format, treat as a single item
+                            # Not valid JSON, treat as a single item
                             photo_list = [cleaned_json]
                     
                     # Handle the case where we get a string instead of a list
@@ -1099,18 +1099,36 @@ class LoanDocumentView(LoginRequiredMixin, View):
         # Get loan items with gold details
         loan_items = loan.loanitem_set.all()
         
+        # Default base64 placeholder image for customer photo (minimal version)
+        default_customer_photo = "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gQaDyoKQAHnpAAAA+1JREFUaN7tmm1IVEEUht+Z3VxXs7TdVikRIlMhkEgogxDCQrGPBCMsP37RD21D/RH0L/xRUJFA/QiMwC9E0NAfJUVEaYmGJWUUUUFFJZG2rru3H+ruuO7u3L1z72p04ID7dWbmnPec887ZO8A0pmlM07j+2DFy5I+4/r9YSYa7MX4QCSRsKTR0Fbgd6olObJyXhEJX+gbPsQ15E+iEo02rpf6MgR9gOFU5Ksv4ISDBqaYMPcQIn51zQcr4pZBAx8xkZcxZmxA3BNrryPb1syWgdNdVXwxzNr+W6wvNmUKNAZdnCJHRqKAEsOQk7HoWi8S1Bs6Fc2Gl6IfDSFWl8bPv84LInywiKoYNOImHCTMDXCus2ITOPGmfmjNkIbRMiTwLnkIfJ/xJx9OESkDZFNJbIPpOIfdggxLnPbdWNnQV4EY6AyDPkXf2gwlZdtwbhRG+sVJrYDDcxEn+uWhCFi751Jzb67iapgbrppCaIQw4Pzc7ya9k2HwLtVAXmnzCN3rKtBIIf4j9FB5aSIi0sJIVIvAQS8jcBe9qBX+qDpn47Nxs5HtvuVYzrd9ByDmkqd5lu+XLGDJw430Gl/PrvTfSfgm7+gYR97x1ED88UyL280r7Nsf3vePRpFBroMH7ky6F3K5mjHSJ/2n0h3HbH03MsE+MdL5cStHVBfLQBcGJezoH53Pi4N1/14UkfnEFz7RcoXp37qiWqA402CT/XV8/BNb5qVSubK9IxhsOAlHO5ykJSF6oMpHAThZjkBDARO/XkRnQMsIXeCnfeNU0YRbid/oG5ji2Uw5CI524/x4x7i4p441DgOHTnTdciRxaSHCYyzEQiSC10Ymlg1ay8Un3UydIcEEo5zN8QWPyfcM19aGeZRXja+O3FTGBLiXD52aCZw1oeAAAAAA="
+        
+        # Default base64 placeholder image for item photo (minimal version)
+        default_item_photo = "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"""
+                
         # Process customer photo (remove the data:image/jpeg;base64, prefix if present)
         customer_photo = None
         if hasattr(loan, 'customer_face_capture') and loan.customer_face_capture:
             if isinstance(loan.customer_face_capture, str):
-                # Handle various formats of base64 images
-                if loan.customer_face_capture.startswith('data:image/'):
-                    # Extract the base64 part after the comma
-                    format_prefix, base64_data = loan.customer_face_capture.split(';base64,', 1)
-                    customer_photo = base64_data
-                else:
-                    # Maybe it's already just the base64 string without prefix
-                    customer_photo = loan.customer_face_capture
+                try:
+                    # Handle various formats of base64 images
+                    if loan.customer_face_capture.startswith('data:image/'):
+                        try:
+                            # Extract the base64 part after the comma
+                            format_prefix, base64_data = loan.customer_face_capture.split(';base64,', 1)
+                            customer_photo = base64_data
+                        except Exception as e:
+                            # Use default if there's an error processing the customer photo
+                            print(f"Error splitting customer face capture: {e}")
+                            customer_photo = default_customer_photo
+                    else:
+                        # Maybe it's already just the base64 string without prefix
+                        customer_photo = loan.customer_face_capture
+                except Exception as e:
+                    print(f"Error processing customer photo: {e}")
+                    customer_photo = default_customer_photo
+        else:
+            # Use default customer photo placeholder
+            customer_photo = default_customer_photo
                 
         # Process item photos (parse JSON string if needed)
         item_photos = []
@@ -1126,54 +1144,101 @@ class LoanDocumentView(LoginRequiredMixin, View):
                         cleaned_data = cleaned_data[1:-1]
                     
                     # Try parsing as JSON
-                    photo_list = json.loads(cleaned_data)
-                    
-                    # Process each photo in the list
-                    for photo in photo_list:
-                        if isinstance(photo, str):
-                            if photo.startswith('data:image/'):
-                                # Extract the base64 part after the comma
-                                format_prefix, base64_data = photo.split(';base64,', 1)
-                                item_photos.append(base64_data)
-                            elif photo.startswith('/media/'):
-                                # For file URLs, we need to read the file and convert to base64
+                    try:
+                        photo_list = json.loads(cleaned_data)
+                        
+                        # Process each photo in the list
+                        for photo in photo_list:
+                            if isinstance(photo, str):
                                 try:
-                                    import os
-                                    from django.conf import settings
-                                    import base64
-                                    
-                                    # Clean up the URL to get the file path
-                                    file_path = os.path.join(settings.MEDIA_ROOT, photo.replace('/media/', ''))
-                                    
-                                    # Read the file and convert to base64
-                                    if os.path.exists(file_path):
-                                        with open(file_path, 'rb') as f:
-                                            file_data = f.read()
-                                            base64_data = base64.b64encode(file_data).decode('utf-8')
+                                    if photo.startswith('data:image/'):
+                                        try:
+                                            # Extract the base64 part after the comma
+                                            format_prefix, base64_data = photo.split(';base64,', 1)
                                             item_photos.append(base64_data)
+                                        except Exception:
+                                            # If we can't split the data URL format, use default instead
+                                            item_photos.append(default_item_photo)
+                                    elif photo.startswith('/media/'):
+                                        # For file URLs, we need to read the file and convert to base64
+                                        try:
+                                            import os
+                                            from django.conf import settings
+                                            import base64
+                                            
+                                            # Clean up the URL to get the file path - correctly handle the first '/'
+                                            if photo.startswith('/'):
+                                                rel_path = photo[1:] # Remove leading slash
+                                            else:
+                                                rel_path = photo
+                                                
+                                            # Extract the part after '/media/' - avoiding path traversal issues
+                                            if rel_path.startswith('media/'):
+                                                media_path = rel_path[6:] # Just the part after 'media/'
+                                            else:
+                                                media_path = rel_path
+                                            
+                                            file_path = os.path.join(settings.MEDIA_ROOT, media_path)
+                                            
+                                            # Validate file path to prevent directory traversal attacks
+                                            if not os.path.abspath(file_path).startswith(os.path.abspath(settings.MEDIA_ROOT)):
+                                                print(f"Security warning: Invalid file path requested: {file_path}")
+                                                item_photos.append(default_item_photo)
+                                                continue
+                                            
+                                            # Check if file exists and is readable
+                                            if os.path.exists(file_path) and os.path.isfile(file_path) and os.access(file_path, os.R_OK):
+                                                try:
+                                                    with open(file_path, 'rb') as f:
+                                                        file_data = f.read()
+                                                        base64_data = base64.b64encode(file_data).decode('utf-8')
+                                                        item_photos.append(base64_data)
+                                                except (IOError, OSError, PermissionError) as e:
+                                                    print(f"File read error for {file_path}: {e}")
+                                                    item_photos.append(default_item_photo)
+                                            else:
+                                                print(f"Image file not found or not accessible: {file_path}")
+                                                item_photos.append(default_item_photo)
+                                        except Exception as e:
+                                            print(f"Error processing image at path {photo}: {str(e)}")
+                                            item_photos.append(default_item_photo)
                                     else:
-                                        print(f"Image file not found: {file_path}")
+                                        # Assume it's already a base64 string without prefix
+                                        item_photos.append(photo)
                                 except Exception as e:
-                                    print(f"Error processing image at path {photo}: {str(e)}")
-                            else:
-                                # Assume it's already a base64 string
-                                item_photos.append(photo)
-                
-                # If no photos were successfully processed, try alternate methods
-                if not item_photos:
-                    # If we failed to process JSON, maybe it's a single base64 string
-                    if loan.item_photos.startswith('data:image/'):
-                        format_prefix, base64_data = loan.item_photos.split(';base64,', 1)
-                        item_photos.append(base64_data)
+                                    print(f"Error processing individual photo: {str(e)}")
+                                    item_photos.append(default_item_photo)
+                    except json.JSONDecodeError as json_err:
+                        print(f"JSON decode error: {json_err}")
+                        # If we failed to process JSON, maybe it's a single base64 string
+                        if cleaned_data.startswith('data:image/'):
+                            try:
+                                format_prefix, base64_data = cleaned_data.split(';base64,', 1)
+                                item_photos.append(base64_data)
+                            except Exception:
+                                item_photos.append(default_item_photo)
+                        else:
+                            # Add default for invalid format
+                            item_photos.append(default_item_photo)
+                else:
+                    # Not a string - add default
+                    item_photos.append(default_item_photo)
             
-            except (json.JSONDecodeError, AttributeError, ValueError) as e:
+            except Exception as e:
                 # Log the error
                 print(f"Error processing item_photos in loan agreement: {str(e)}")
-                
-                # If it's not valid JSON, maybe it's a direct base64 string
-                if isinstance(loan.item_photos, str) and loan.item_photos.startswith('data:image/'):
-                    format_prefix, base64_data = loan.item_photos.split(';base64,', 1)
-                    item_photos.append(base64_data)
+                # Add default
+                item_photos.append(default_item_photo)
+
+        # If no item photos found, add default placeholder images
+        if not item_photos:
+            # Add default placeholder image - if there are loan items, add one placeholder per item
+            if loan_items:
+                for _ in loan_items:
+                    item_photos.append(default_item_photo)
+            else:
+                # If no loan items, add at least one placeholder
+                item_photos.append(default_item_photo)
         
         # Debug logging
         print(f"Item photos processed for loan agreement: {len(item_photos)} photos found")
@@ -1194,37 +1259,42 @@ class LoanDocumentView(LoginRequiredMixin, View):
         html = template.render(context)
         result = BytesIO()
         
-        # Create PDF from HTML content
-        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
-        
-        if not pdf.err:
-            # Generate response with PDF content
-            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+        try:
+            # Create PDF from HTML content with error handling
+            pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
             
-            # Generate filename with customer name and loan item name only (no loan ID)
-            customer_name = f"{loan.customer.first_name}_{loan.customer.last_name}"
-            
-            # Get the first item name as part of the filename
-            item_name = "NoItem"
-            if loan_items:
-                # If there are multiple items, use the first one's name
-                first_item = loan_items.first()
-                if first_item and first_item.item:
-                    # Clean the item name to make it URL-safe
-                    item_name = first_item.item.name.replace(' ', '_')
-            
-            # Format the filename: CustomerName_ItemName.pdf (removed loan number)
-            filename = f"{customer_name}_{item_name}.pdf"
-            
-            # Make the filename URL-safe (replace special characters)
-            import re
-            filename = re.sub(r'[^\w\-_.]', '_', filename)
-            
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            return response
-        
-        # If PDF generation fails
-        return HttpResponse("Error generating PDF", status=400)
+            if not pdf.err:
+                # Generate response with PDF content
+                response = HttpResponse(result.getvalue(), content_type='application/pdf')
+                
+                # Generate filename with customer name and loan item name only
+                customer_name = f"{loan.customer.first_name}_{loan.customer.last_name}"
+                
+                # Get the first item name as part of the filename
+                item_name = "NoItem"
+                if loan_items:
+                    # If there are multiple items, use the first one's name
+                    first_item = loan_items.first()
+                    if first_item and first_item.item:
+                        # Clean the item name to make it URL-safe
+                        item_name = first_item.item.name.replace(' ', '_')
+                
+                # Format the filename: CustomerName_ItemName.pdf
+                filename = f"{customer_name}_{item_name}.pdf"
+                
+                # Make the filename URL-safe (replace special characters)
+                import re
+                filename = re.sub(r'[^\w\-_.]', '_', filename)
+                
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                return response
+            else:
+                # If PDF generation fails
+                print("PDF generation error:", pdf.err)
+                return HttpResponse("Error generating PDF. Please try again later.", status=500)
+        except Exception as e:
+            print(f"Exception during PDF generation: {str(e)}")
+            return HttpResponse("An unexpected error occurred while generating the PDF.", status=500)
 
 def number_to_words(request, number):
     """Convert number to words in Indian format"""
