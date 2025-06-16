@@ -64,11 +64,30 @@ echo "Running migrations in production environment..."
   else
     echo "⚠️ Migrations failed! Check $MIGRATION_LOG for details"
   fi
+  
+  # Check migration status and create a status file in a static directory
+  echo "Creating migration status file..."
+  MIGRATION_STATUS_DIR="static/status"
+  mkdir -p $MIGRATION_STATUS_DIR
+  
+  # Run migration check script and save the output
+  python scripts/check_migrations.py > $MIGRATION_STATUS_DIR/migrations.json
+  if [ $? -eq 0 ]; then
+    echo "✅ All migrations are properly applied"
+    echo "SUCCESS" > $MIGRATION_STATUS_DIR/migration_status.txt
+  else
+    echo "⚠️ Migration status check indicates issues"
+    echo "INCOMPLETE" > $MIGRATION_STATUS_DIR/migration_status.txt
+  fi
+  
+  # Add timestamp to status file
+  echo "Last checked: $(date)" >> $MIGRATION_STATUS_DIR/migration_status.txt
 } &
 
 # Keep the main process running to prevent container from stopping
 # This works because gunicorn is running as a daemon
 echo "Server is now running with migrations executing in the background"
+echo "You can check migration status at /static/status/migrations.json"
 echo "Monitoring logs..."
 
 # Use tail to keep the container running and show logs
