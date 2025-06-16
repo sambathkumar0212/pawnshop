@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% load crispy_forms_tags %}
 
 {% block title %}{% if form.instance.pk %}Edit Loan{% else %}New Loan{% endif %} - Pawnshop Management{% endblock %}
@@ -306,6 +307,9 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<!-- Load the loan calculator script -->
+<script src="{% static 'js/loan-calculator.js' %}"></script>
+
 <script>
     $(document).ready(function() {
         // Set up customer change event to update branch field
@@ -324,6 +328,12 @@
                 });
             }
         });
+        
+        // Initialize loan calculator
+        // The calculator is automatically initialized by the loan-calculator.js file
+        
+        // Show the scheme-info div that's hidden by default
+        $('#scheme-info').removeClass('d-none');
         
         // Camera functionality
         const cameraStream = document.getElementById('cameraStream');

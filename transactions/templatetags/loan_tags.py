@@ -21,16 +21,30 @@ def status_color(status):
 def first_item_photo(item_photos):
     """Return the first item photo from the item_photos JSON data"""
     try:
+        if not item_photos:
+            return "/static/img/placeholder-item.png"
+            
         if isinstance(item_photos, str):
+            # If it's already a base64 image, return it directly
+            if item_photos.startswith('data:image/'):
+                return item_photos
+                
             # Parse the JSON string to get the list of photo URLs
             photo_list = json.loads(item_photos)
             if photo_list and len(photo_list) > 0:
+                # Handle the case where the first item itself is a list or dict
+                if isinstance(photo_list[0], (list, dict)):
+                    if isinstance(photo_list[0], dict) and 'url' in photo_list[0]:
+                        return photo_list[0]['url']
+                    return "/static/img/placeholder-item.png"
                 return photo_list[0]
         elif isinstance(item_photos, list) and len(item_photos) > 0:
             # If it's already a list, just return the first item
+            if isinstance(item_photos[0], dict) and 'url' in item_photos[0]:
+                return item_photos[0]['url']
             return item_photos[0]
-    except (json.JSONDecodeError, IndexError, TypeError):
-        pass
+    except (json.JSONDecodeError, IndexError, TypeError) as e:
+        print(f"Error in first_item_photo filter: {e}, input: {type(item_photos)}")
     
     # Return a default placeholder image if no photo is available
     return "/static/img/placeholder-item.png"

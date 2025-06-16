@@ -163,6 +163,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a href="{% url 'scheme_list' %}" class="nav-link {% block schemes_active %}{% endblock %}">
+                            <i class="fas fa-percentage"></i> Loan Schemes
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a href="{% url 'branch_list' %}" class="nav-link {% block branches_active %}{% endblock %}">
                             <i class="fas fa-store"></i> Branches
                         </a>

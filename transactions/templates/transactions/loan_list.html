@@ -181,64 +181,68 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        {% for loan_item in loan.loanitem.all|slice:":1" %}
-                                        <div class="d-flex align-items-center mb-1">
-                                            {% if loan.item_photos %}
-                                                <div class="position-relative me-2" data-bs-toggle="modal" data-bs-target="#itemModal-{{ loan.id }}">
-                                                    <img src="{{ loan.item_photos|first_item_photo }}" 
-                                                         alt="Item Photo" 
-                                                         class="rounded border"
-                                                         style="width: 48px; height: 48px; object-fit: cover; cursor: pointer;">
-                                                    <div class="position-absolute bottom-0 end-0">
-                                                        <span class="badge bg-info rounded-circle" style="font-size: 0.6rem; width: 18px; height: 18px;">
-                                                            {% with count=loan.item_photos|item_photos_count %}
-                                                            {{ count }}
-                                                            {% endwith %}
-                                                        </span>
+                                        {% if loan.loanitem_set.all %}
+                                            {% for loan_item in loan.loanitem_set.all|slice:":1" %}
+                                            <div class="d-flex align-items-center mb-1">
+                                                {% if loan.item_photos %}
+                                                    <div class="position-relative me-2" data-bs-toggle="modal" data-bs-target="#itemModal-{{ loan.id }}">
+                                                        <img src="{{ loan.item_photos|first_item_photo }}" 
+                                                             alt="Item Photo" 
+                                                             class="rounded border"
+                                                             style="width: 48px; height: 48px; object-fit: cover; cursor: pointer;">
+                                                        <div class="position-absolute bottom-0 end-0">
+                                                            <span class="badge bg-info rounded-circle" style="font-size: 0.6rem; width: 18px; height: 18px;">
+                                                                {% with count=loan.item_photos|item_photos_count %}
+                                                                {{ count }}
+                                                                {% endwith %}
+                                                            </span>
+                                                        </div>
                                                     </div>
+                                                {% endif %}
+                                                <div>
+                                                    <a href="{% url 'loan_detail' loan.loan_number %}" class="d-block fw-bold text-primary">
+                                                        {{ loan_item.item.name }}
+                                                    </a>
+                                                    <small class="text-muted">
+                                                        {{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g
+                                                    </small>
                                                 </div>
-                                            {% endif %}
-                                            <div>
-                                                <a href="{% url 'loan_detail' loan.loan_number %}" class="d-block fw-bold text-primary">
-                                                    {{ loan_item.item.name }}
-                                                </a>
-                                                <small class="text-muted">
-                                                    {{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g
-                                                </small>
                                             </div>
-                                        </div>
-                                        
-                                        <!-- Item Photos Modal -->
-                                        {% if loan.item_photos %}
-                                        <div class="modal fade" id="itemModal-{{ loan.id }}" tabindex="-1" aria-hidden="true">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content">
-                                                    <div class="modal-header py-2">
-                                                        <h6 class="modal-title">Gold Item Photos</h6>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        <div class="row g-2 item-photos-container" data-loan-id="{{ loan.id }}">
-                                                            <!-- Photos will be loaded here via JavaScript -->
-                                                            <div class="text-center py-3">
-                                                                <div class="spinner-border text-primary" role="status">
-                                                                    <span class="visually-hidden">Loading...</span>
+                                            
+                                            <!-- Item Photos Modal -->
+                                            {% if loan.item_photos %}
+                                            <div class="modal fade" id="itemModal-{{ loan.id }}" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog modal-dialog-centered">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header py-2">
+                                                            <h6 class="modal-title">Gold Item Photos</h6>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <div class="row g-2 item-photos-container" data-loan-id="{{ loan.id }}">
+                                                                <!-- Photos will be loaded here via JavaScript -->
+                                                                <div class="text-center py-3">
+                                                                    <div class="spinner-border text-primary" role="status">
+                                                                        <span class="visually-hidden">Loading...</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
+                                                            <!-- Hidden item photos data -->
+                                                            <script type="application/json" class="item-photos-data">
+                                                                {{ loan.item_photos|safe }}
+                                                            </script>
                                                         </div>
-                                                        <!-- Hidden item photos data -->
-                                                        <script type="application/json" class="item-photos-data">
-                                                            {{ loan.item_photos|safe }}
-                                                        </script>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                            {% endif %}
+                                            
+                                            {% empty %}
+                                            <span class="text-muted">No items</span>
+                                            {% endfor %}
+                                        {% else %}
+                                            <span class="text-muted">No items</span>
                                         {% endif %}
-                                        
-                                        {% empty %}
-                                        <span class="text-muted">No items</span>
-                                        {% endfor %}
                                     </td>
                                     <td>₹{{ loan.principal_amount|floatformat:2 }}</td>
                                     <td>{{ loan.interest_rate }}%</td>

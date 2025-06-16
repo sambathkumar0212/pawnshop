@@ -9,6 +9,31 @@ from rest_framework import permissions
 from .models import Role
 
 
+class BranchManagerRequiredMixin(UserPassesTestMixin):
+    """
+    Mixin that restricts access to branch managers, regional managers, and admins.
+    Used primarily for views managing schemes and branch-specific content.
+    """
+    def test_func(self):
+        user = self.request.user
+        
+        # Superusers always have access
+        if user.is_superuser:
+            return True
+            
+        # Check if user is a branch manager
+        if hasattr(user, 'role') and user.role:
+            if user.role.role_type == Role.BRANCH_MANAGER:
+                return True
+            
+        # Check if user is a regional manager
+        if hasattr(user, 'role') and user.role:
+            if user.role.role_type == Role.REGIONAL_MANAGER:
+                return True
+                
+        return False
+
+
 class RoleRequiredMixin(UserPassesTestMixin):
     """
     Mixin that restricts access based on user role.

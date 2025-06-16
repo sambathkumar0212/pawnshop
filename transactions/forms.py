@@ -5,6 +5,7 @@ from .models import Loan, Payment, LoanExtension, Sale, LoanItem
 from inventory.models import Item, Category
 from inventory.forms import ItemForm
 from accounts.models import Customer
+from content_manager.models import Scheme
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Div
 from decimal import Decimal, InvalidOperation
@@ -22,10 +23,12 @@ class LoanForm(forms.ModelForm):
         })
     )
 
-    scheme = forms.ChoiceField(
-        choices=Loan.SCHEME_CHOICES,
-        initial='standard',
-        help_text="Select loan scheme: Standard (12%), Flexible (24% - no interest if paid within 23 days), or Premium (36% - no interest if paid within 30 days)"
+    # Replace the static scheme choices with a ModelChoiceField for Scheme
+    scheme = forms.ModelChoiceField(
+        queryset=Scheme.objects.filter(is_active=True),
+        empty_label="Select a Loan Scheme",
+        required=True,
+        help_text="Select a loan scheme to apply to this loan"
     )
 
     KARAT_CHOICES = [
@@ -460,23 +463,24 @@ class LoanForm(forms.ModelForm):
     def clean_scheme(self):
         scheme = self.cleaned_data.get('scheme')
         if not scheme:
-            # If somehow scheme is empty, default to standard
-            scheme = 'standard'
+            raise ValidationError("Please select a loan scheme.")
+        
+        # Set interest rate from the selected scheme
+        self.cleaned_data['interest_rate'] = scheme.interest_rate
+        
+        # Set processing fee percentage from the scheme
+        if scheme.processing_fee_percentage:
+            self.cleaned_data['processing_fee_percentage'] = scheme.processing_fee_percentage
             
-        interest_rate = None
-        if scheme == 'standard':
-            interest_rate = Decimal('12.00')
-        elif scheme == 'flexible':
-            interest_rate = Decimal('24.00')
-        elif scheme == 'premium':
-            interest_rate = Decimal('36.00')
-        else:
-            # If it's an invalid value, default to standard
-            scheme = 'standard'
-            interest_rate = Decimal('12.00')
-
-        # Set interest rate in cleaned_data
-        self.cleaned_data['interest_rate'] = interest_rate
+        # Calculate due date based on scheme duration
+        issue_date = self.cleaned_data.get('issue_date')
+        if issue_date and scheme.duration_days:
+            due_date = issue_date + timezone.timedelta(days=scheme.duration_days)
+            self.cleaned_data['due_date'] = due_date
+            
+            # Set grace period end date (5 days after due date)
+            self.cleaned_data['grace_period_end'] = due_date + timezone.timedelta(days=5)
+        
         return scheme
 
 class LoanExtensionForm(forms.ModelForm):

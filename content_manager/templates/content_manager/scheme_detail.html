@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% load scheme_math %}
+
+{% block title %}Scheme Details: {{ scheme.name }}{% endblock %}
+
+{% block schemes_active %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Loan Scheme Details</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'scheme_list' %}">Loan Schemes</a></li>
+        <li class="breadcrumb-item active">{{ scheme.name }}</li>
+    </ol>
+    
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Scheme Details Card -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-percentage me-1"></i>
+                        Scheme Information
+                    </div>
+                    <div>
+                        {% if scheme.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                        {% endif %}
+                        
+                        {% if scheme.branch %}
+                            <span class="badge bg-primary">Branch: {{ scheme.branch.name }}</span>
+                        {% else %}
+                            <span class="badge bg-info">Global Scheme</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5 class="card-title">{{ scheme.name }}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">Code: {{ scheme.code }}</h6>
+                            <p class="card-text">{{ scheme.description|default:"No description provided." }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-md-end">
+                                <p class="mb-1"><strong>Scheme Type:</strong> {{ scheme.get_scheme_type_display }}</p>
+                                <p class="mb-1"><strong>Created:</strong> {{ scheme.created_at|date:"d M Y" }}</p>
+                                <p class="mb-1"><strong>Last Updated:</strong> {{ scheme.updated_at|date:"d M Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="border-bottom pb-2 mb-3">Financial Parameters</h5>
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary">{{ scheme.interest_rate }}%</h3>
+                                    <p class="text-muted mb-0">Annual Interest Rate</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary">{{ scheme.processing_fee_percentage }}%</h3>
+                                    <p class="text-muted mb-0">Processing Fee</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary">
+                                        {{ scheme.interest_rate|div:12|floatformat:2 }}%
+                                    </h3>
+                                    <p class="text-muted mb-0">Monthly Interest</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="border-bottom pb-2 mb-3">Duration Settings</h5>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary">{{ scheme.duration_days }}</h3>
+                                    <p class="text-muted mb-0">Standard Duration (days)</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary">{{ scheme.no_interest_period_days }}</h3>
+                                    <p class="text-muted mb-0">No Interest Period (days)</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <h3 class="mb-0 text-primary">{{ scheme.minimum_period_days }}</h3>
+                                    <p class="text-muted mb-0">Minimum Period (days)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Example Calculation Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-calculator me-1"></i>
+                    Sample Loan Calculation
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Principal Amount</th>
+                                    <th>Processing Fee</th>
+                                    <th>Disbursement Amount</th>
+                                    <th>Monthly Interest</th>
+                                    <th>3-Month Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>₹10,000</td>
+                                    <td>₹{{ 10000|mul:scheme.processing_fee_percentage|div:100|floatformat:2 }}</td>
+                                    <td>₹{{ 10000|sub:10000|mul:scheme.processing_fee_percentage|div:100|floatformat:2 }}</td>
+                                    <td>₹{{ 10000|mul:scheme.interest_rate|div:1200|floatformat:2 }}</td>
+                                    <td>₹{{ 10000|mul:scheme.interest_rate|div:400|add:10000|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>₹50,000</td>
+                                    <td>₹{{ 50000|mul:scheme.processing_fee_percentage|div:100|floatformat:2 }}</td>
+                                    <td>₹{{ 50000|sub:50000|mul:scheme.processing_fee_percentage|div:100|floatformat:2 }}</td>
+                                    <td>₹{{ 50000|mul:scheme.interest_rate|div:1200|floatformat:2 }}</td>
+                                    <td>₹{{ 50000|mul:scheme.interest_rate|div:400|add:50000|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>₹100,000</td>
+                                    <td>₹{{ 100000|mul:scheme.processing_fee_percentage|div:100|floatformat:2 }}</td>
+                                    <td>₹{{ 100000|sub:100000|mul:scheme.processing_fee_percentage|div:100|floatformat:2 }}</td>
+                                    <td>₹{{ 100000|mul:scheme.interest_rate|div:1200|floatformat:2 }}</td>
+                                    <td>₹{{ 100000|mul:scheme.interest_rate|div:400|add:100000|floatformat:2 }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <small class="text-muted">* Calculations are approximate and shown for illustrative purposes</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- Actions Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-tools me-1"></i>
+                    Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'scheme_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Schemes
+                        </a>
+                        
+                        {% if scheme.branch == user.branch or user.is_superuser %}
+                            <a href="{% url 'scheme_update' scheme.pk %}" class="btn btn-primary">
+                                <i class="fas fa-edit"></i> Edit Scheme
+                            </a>
+                            
+                            <a href="{% url 'scheme_toggle_status' scheme.pk %}?next=detail" class="btn {% if scheme.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                                <i class="fas fa-{% if scheme.is_active %}toggle-off{% else %}toggle-on{% endif %}"></i>
+                                {% if scheme.is_active %}Deactivate{% else %}Activate{% endif %} Scheme
+                            </a>
+                            
+                            <a href="{% url 'scheme_delete' scheme.pk %}" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Delete Scheme
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Special Features Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-star me-1"></i>
+                    Scheme Features
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% if scheme.no_interest_period_days > 0 %}
+                            <li class="list-group-item d-flex align-items-center">
+                                <i class="fas fa-check-circle text-success me-2"></i>
+                                Interest-free if repaid within {{ scheme.no_interest_period_days }} days
+                            </li>
+                        {% endif %}
+                        
+                        {% if scheme.minimum_period_days > 0 %}
+                            <li class="list-group-item d-flex align-items-center">
+                                <i class="fas fa-lock me-2 text-warning"></i>
+                                Minimum period: {{ scheme.minimum_period_days }} days
+                            </li>
+                        {% endif %}
+                        
+                        {% if scheme.processing_fee_percentage > 0 %}
+                            <li class="list-group-item d-flex align-items-center">
+                                <i class="fas fa-money-bill me-2 text-danger"></i>
+                                Processing fee: {{ scheme.processing_fee_percentage }}% of principal
+                            </li>
+                        {% endif %}
+                        
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-calendar-alt me-2 text-primary"></i>
+                            Standard loan term: {{ scheme.duration_days }} days ({{ scheme.duration_days|div:30|floatformat:1 }} months)
+                        </li>
+                        
+                        <li class="list-group-item d-flex align-items-center">
+                            <i class="fas fa-percentage me-2 text-info"></i>
+                            Monthly interest: ₹{{ 1000|mul:scheme.interest_rate|div:1200|floatformat:2 }} per ₹1,000
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
