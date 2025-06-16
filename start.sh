@@ -7,43 +7,46 @@ echo "Starting application deployment process..."
 export DJANGO_SETTINGS_MODULE=pawnshop_management.settings
 export RENDER=true
 
-# EMERGENCY FIX FOR ACCOUNTS_CUSTOMUSER TABLE
-echo "Running emergency fix for accounts_customuser table..."
-python scripts/fix_accounts_table.py
-
-# Run post-deployment script after the fix
-echo "Running post-deployment script..."
-if [ -f "scripts/post_deploy.sh" ]; then
-    bash scripts/post_deploy.sh
-    echo "Post-deployment script completed."
-else
-    echo "Warning: Post-deployment script not found at scripts/post_deploy.sh"
-    
-    # Fallback: Run essential migration commands
-    echo "Running database migrations as fallback..."
-    python manage.py migrate --no-input
-    
-    # Create superuser if env vars are set
-    if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_PASSWORD" && -n "$DJANGO_SUPERUSER_EMAIL" ]]; then
-        echo "Creating superuser..."
-        python -c "
-import os
-import django
+# Check if database migrations are needed
+echo "Checking if migrations are needed..."
+python - <<EOF
+import os, django, sys
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
-from django.contrib.auth import get_user_model
-User = get_user_model()
-if not User.objects.filter(username='$DJANGO_SUPERUSER_USERNAME').exists():
-    User.objects.create_superuser('$DJANGO_SUPERUSER_USERNAME', 
-                                 '$DJANGO_SUPERUSER_EMAIL', 
-                                 '$DJANGO_SUPERUSER_PASSWORD')
-    print('Superuser created successfully')
-else:
-    print('Superuser already exists, skipping creation')
-        "
-    fi
+
+from django.db import connections, connection
+from django.db.migrations.executor import MigrationExecutor
+from django.db.utils import OperationalError, ProgrammingError
+
+# Quick connection test
+try:
+    connections['default'].ensure_connection()
+    print('✅ Database connection successful')
+    
+    # Only check migrations if connected successfully
+    executor = MigrationExecutor(connection)
+    plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
+    if plan:
+        print(f'⚠️ {len(plan)} pending migrations found')
+    else:
+        print('✅ No migrations needed')
+        sys.exit(0)  # Exit with success - no emergency fix needed
+except Exception as e:
+    print(f'⚠️ Database check failed: {e}')
+EOF
+
+# Only run emergency fix if needed
+if [ $? -ne 0 ]; then
+    echo "Running emergency fix for accounts_customuser table..."
+    timeout 60 python scripts/fix_accounts_table.py || echo "⚠️ Fix script timed out but proceeding anyway"
+else
+    echo "✅ Database check passed, skipping emergency fix"
 fi
 
-# Start the web server
+# Run minimal migrations only
+echo "Running essential migrations..."
+python manage.py migrate --no-input
+
+# Start the web server with optimized settings
 echo "Starting web server..."
-gunicorn pawnshop_management.wsgi:application --bind 0.0.0.0:$PORT --workers=2 --timeout=30
+gunicorn pawnshop_management.wsgi:application --bind 0.0.0.0:$PORT --workers=2 --timeout=120 --max-requests=1000 --log-level=info
