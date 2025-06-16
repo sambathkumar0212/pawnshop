@@ -53,18 +53,30 @@ INSTALLED_APPS = [
     'content_manager',  # Added content manager app
 ]
 
-MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Must appear at the top for proper CORS handling
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # For static file serving
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'pawnshop_management.middleware.DatabaseConnectionMiddleware',  # Custom middleware for database connections
-]
+# For minimal startup, remove optional middleware
+if os.environ.get('MINIMAL_STARTUP') == 'True':
+    MIDDLEWARE = [
+        'django.middleware.security.SecurityMiddleware',
+        'whitenoise.middleware.WhiteNoiseMiddleware',  # For static file serving
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+    ]
+else:
+    MIDDLEWARE = [
+        'corsheaders.middleware.CorsMiddleware',  # Must appear at the top for proper CORS handling
+        'django.middleware.security.SecurityMiddleware',
+        'whitenoise.middleware.WhiteNoiseMiddleware',  # For static file serving
+        'django.contrib.sessions.middleware.SessionMiddleware',
+        'django.middleware.common.CommonMiddleware',
+        'django.middleware.csrf.CsrfViewMiddleware',
+        'django.contrib.auth.middleware.AuthenticationMiddleware',
+        'django.contrib.messages.middleware.MessageMiddleware',
+        'django.middleware.clickjacking.XFrameOptionsMiddleware',
+        'pawnshop_management.middleware.DatabaseConnectionMiddleware',  # Custom middleware for database connections
+    ]
 
 ROOT_URLCONF = 'pawnshop_management.urls'
 
@@ -86,10 +98,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'pawnshop_management.wsgi.application'
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# Check if we're using minimal startup mode (no database checks)
+SKIP_DB_CHECKS = os.environ.get('SKIP_DB_CHECKS', '').lower() == 'true'
 
-# Database configuration
+# Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # Check if we're on Render.com production environment
@@ -101,15 +113,15 @@ IS_MIGRATION_COMMAND = 'makemigrations' in sys.argv or 'migrate' in sys.argv
 # Database URL from environment (if provided)
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-# Load environment variables from .env file
-env_file = '.env.development' if os.path.exists('.env.development') else None
-if env_file:
-    load_dotenv(env_file)
-    print(f"Loaded environment from {env_file}")
-
-# Configure database based on environment
-if IS_RENDER:
-    # We're in production on Render.com - use environment variables provided in Render dashboard
+# Simplified database configuration - use DATABASE_URL if available
+if DATABASE_URL:
+    # Use the DATABASE_URL environment variable directly
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
+    }
+    print(f"Using database configuration from DATABASE_URL")
+elif IS_RENDER:
+    # Fallback configuration for Render when DATABASE_URL is not set
     DATABASES = {
         'default': {
             'ENGINE': os.environ.get('ENGINE', 'django.db.backends.postgresql'),
@@ -118,46 +130,28 @@ if IS_RENDER:
             'PASSWORD': os.environ.get('PASSWORD', ''),
             'HOST': os.environ.get('HOST', 'dpg-d128v4k9c44c738361m0-a.oregon-postgres.render.com'),
             'PORT': os.environ.get('PORT', '5432'),
+            'CONN_MAX_AGE': 600,  # Connection pooling - keep connections open
+            'CONN_HEALTH_CHECKS': True,  # Health check connections before using them
+            'OPTIONS': {
+                'connect_timeout': 10,  # Shorter connect timeout
+                'sslmode': 'require'    # Require SSL for Render PostgreSQL
+            }
         }
     }
-    print(f"Using Render.com PostgreSQL database: NAME={DATABASES['default'].get('NAME')}, HOST={DATABASES['default'].get('HOST')}")
+    print(f"Using Render PostgreSQL configuration")
 else:
-    # Try to connect to PostgreSQL with the credentials from .env file
-    try:
-        # Get database credentials from environment variables
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': os.environ.get('DATABASE_NAME', 'pawnshop'),
-                'USER': os.environ.get('DATABASE_USER', 'sku316'),
-                'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'postgres'),
-                'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
-                'PORT': os.environ.get('DATABASE_PORT', '5432'),
-            }
+    # Local development - use SQLite for simplicity and reliability
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
-        # Test the connection if not running migrations
-        if not IS_MIGRATION_COMMAND:
-            import psycopg2
-            conn = psycopg2.connect(
-                dbname=DATABASES['default']['NAME'],
-                user=DATABASES['default']['USER'],
-                password=DATABASES['default']['PASSWORD'],
-                host=DATABASES['default']['HOST'],
-                port=DATABASES['default']['PORT'],
-                connect_timeout=3
-            )
-            conn.close()
-            print(f"Connected to PostgreSQL database: NAME={DATABASES['default'].get('NAME')}, HOST={DATABASES['default'].get('HOST')}")
-    except (ImportError, Exception) as e:
-        # Fall back to SQLite if PostgreSQL connection fails
-        print(f"Could not connect to PostgreSQL: {str(e)}. Using SQLite instead.")
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
-        print(f"Using SQLite database: {DATABASES['default'].get('NAME')}")
+    }
+    print(f"Using SQLite database for local development")
+
+# Skip testing database connections during startup in minimal mode
+if SKIP_DB_CHECKS:
+    print("Skipping database connection checks during startup")
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -247,11 +241,16 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'webmaster@localhost')
 
-# Face recognition settings
-FACE_RECOGNITION_MODEL = os.environ.get('FACE_RECOGNITION_MODEL', 'hog')  # or 'cnn' for GPU support
-FACE_RECOGNITION_TOLERANCE = float(os.environ.get('FACE_RECOGNITION_TOLERANCE', 0.6))
-FACE_IMAGES_DIR = BASE_DIR / 'media' / 'faces'
-
+# Lazy load face recognition only when needed to avoid startup issues
+if not SKIP_DB_CHECKS:
+    # Face recognition settings
+    FACE_RECOGNITION_MODEL = os.environ.get('FACE_RECOGNITION_MODEL', 'hog')  # or 'cnn' for GPU support
+    FACE_RECOGNITION_TOLERANCE = float(os.environ.get('FACE_RECOGNITION_TOLERANCE', 0.6))
+    FACE_IMAGES_DIR = BASE_DIR / 'media' / 'faces'
+else:
+    # Skip face recognition during minimal startup
+    print("Skipping face recognition initialization during minimal startup")
+    
 # Security settings (for production)
 if not DEBUG:
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() == 'true'
