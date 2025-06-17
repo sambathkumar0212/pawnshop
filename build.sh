@@ -12,27 +12,15 @@ export DJANGO_SETTINGS_MODULE=pawnshop_management.settings
 export DJANGO_MINIMAL_BUILD=True
 export RENDER=true  # Mark that we're running on Render
 
-# Enhanced DATABASE_URL checking
-if [[ -n "$DATABASE_URL" ]]; then
-  echo "✅ DATABASE_URL is properly configured"
-  
-  # Check for localhost references which won't work on Render
-  if [[ "$DATABASE_URL" == *"localhost"* || "$DATABASE_URL" == *"127.0.0.1"* ]]; then
-    echo "⚠️  ERROR: Your DATABASE_URL contains 'localhost' or '127.0.0.1', which won't work on Render!"
-    echo "Please update your DATABASE_URL to use Render's PostgreSQL service or another external database."
-  fi
-else
-  echo "⚠️  WARNING: No DATABASE_URL found! The application will fall back to SQLite."
-  echo "For production use, please set up a PostgreSQL database in your Render dashboard."
+# Copy SQLite environment file if it exists
+if [ -f .env.sqlite ]; then
+  echo "Using SQLite database configuration for all environments"
+  cp .env.sqlite .env
 fi
-
-# Install PostgreSQL client for diagnostics
-apt-get update -qq && apt-get install -qq -y postgresql-client || true
-echo "PostgreSQL client tools installed for diagnostics"
 
 # Print database configuration (without sensitive info)
 echo "Database configuration check:"
-python -c "import os; from django.conf import settings; import django; django.setup(); db = settings.DATABASES['default']; print(f\"DATABASE ENGINE: {db.get('ENGINE', 'Not set')}\"); print(f\"DATABASE NAME: {db.get('NAME', 'Not set')}\"); print(f\"DATABASE HOST: {db.get('HOST', 'Not set')}\")"
+python -c "import os; from django.conf import settings; import django; django.setup(); db = settings.DATABASES['default']; print(f\"DATABASE ENGINE: {db.get('ENGINE', 'Not set')}\"); print(f\"DATABASE NAME: {db.get('NAME', 'Not set')}\");"
 
 # Create a direct fix for the database schema issues
 echo "EMERGENCY FIX: Directly fixing database schema issues..."
@@ -44,7 +32,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
 
 from django.conf import settings
-from django.db import connection, connections
+from django.db import connection
 from django.db.utils import OperationalError, ProgrammingError
 
 def run_command(command):
@@ -57,39 +45,16 @@ def run_command(command):
         print(f"STDERR: {stderr.decode('utf-8')}")
     return process.returncode
 
-def check_table_exists(table_name):
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'")
-            return cursor.fetchone()[0] > 0
-    except (OperationalError, ProgrammingError) as e:
-        print(f"Error checking if table exists: {e}")
-        return False
-
-# Check if accounts_customuser table exists
-if check_table_exists('accounts_customuser'):
-    print("✅ accounts_customuser table exists, running normal migrations...")
-    run_command('python manage.py migrate')
+# Check if SQLite database file exists
+db_path = settings.DATABASES['default'].get('NAME')
+if os.path.exists(db_path):
+    print(f"✅ SQLite database exists at {db_path}")
 else:
-    print("⚠️ accounts_customuser table missing, applying emergency fix...")
-    
-    # Check if auth_user table exists (indicates standard Django auth tables exist)
-    if check_table_exists('auth_user'):
-        print("Found auth_user but not accounts_customuser - applying targeted migrations...")
-        
-        # Fake the core Django migrations
-        run_command('python manage.py migrate auth --fake')
-        run_command('python manage.py migrate contenttypes --fake')
-        run_command('python manage.py migrate sessions --fake')
-        
-        # Run the first migration for accounts app to create CustomUser
-        run_command('python manage.py migrate accounts 0001_initial')
-        
-        # Then run all remaining migrations
-        run_command('python manage.py migrate')
-    else:
-        print("Fresh database detected - running full migrations...")
-        run_command('python manage.py migrate')
+    print(f"⚠️ SQLite database not found at {db_path}, it will be created during migrations")
+
+# Run migrations to set up database schema
+print("Running migrations to set up or update database schema...")
+run_command('python manage.py migrate')
 
 # Create superuser if env vars are set
 if all(var in os.environ for var in ['DJANGO_SUPERUSER_USERNAME', 'DJANGO_SUPERUSER_EMAIL', 'DJANGO_SUPERUSER_PASSWORD']):
