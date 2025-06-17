@@ -104,50 +104,14 @@ SKIP_DB_CHECKS = os.environ.get('SKIP_DB_CHECKS', '').lower() == 'true'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Check if we're on Render.com production environment
-IS_RENDER = os.environ.get('RENDER', '').lower() == 'true'
-
-# Detect if we're running migrations command
-IS_MIGRATION_COMMAND = 'makemigrations' in sys.argv or 'migrate' in sys.argv
-
-# Database URL from environment (if provided)
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-# Simplified database configuration - use DATABASE_URL if available
-if DATABASE_URL:
-    # Use the DATABASE_URL environment variable directly
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL)
+# Database configuration - Always use SQLite regardless of environment
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-    print(f"Using database configuration from DATABASE_URL")
-elif IS_RENDER:
-    # Fallback configuration for Render when DATABASE_URL is not set
-    DATABASES = {
-        'default': {
-            'ENGINE': os.environ.get('ENGINE', 'django.db.backends.postgresql'),
-            'NAME': os.environ.get('NAME', 'pawnshop'),
-            'USER': os.environ.get('USER', 'pawnshop_admin'),
-            'PASSWORD': os.environ.get('PASSWORD', ''),
-            'HOST': os.environ.get('HOST', 'dpg-d128v4k9c44c738361m0-a.oregon-postgres.render.com'),
-            'PORT': os.environ.get('PORT', '5432'),
-            'CONN_MAX_AGE': 600,  # Connection pooling - keep connections open
-            'CONN_HEALTH_CHECKS': True,  # Health check connections before using them
-            'OPTIONS': {
-                'connect_timeout': 10,  # Shorter connect timeout
-                'sslmode': 'require'    # Require SSL for Render PostgreSQL
-            }
-        }
-    }
-    print(f"Using Render PostgreSQL configuration")
-else:
-    # Local development - use SQLite for simplicity and reliability
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
-    print(f"Using SQLite database for local development")
+}
+print(f"Using SQLite database in all environments")
 
 # Skip testing database connections during startup in minimal mode
 if SKIP_DB_CHECKS:
