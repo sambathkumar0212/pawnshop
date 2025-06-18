@@ -68,7 +68,7 @@ urlpatterns = [
     path('biometrics/', include('biometrics.urls')),
     path('reporting/', include('reporting.urls')),
     path('integrations/', include('integrations.urls')),
-    path('content-manager/', include('content_manager.urls')),  # Added content manager URLs
+    path('schemes/', include('schemes.urls')),  # Schemes management URLs
     path('api/', include('rest_framework.urls')),
     path('', include('accounts.urls')),  # Default route to accounts app
     # Migration status endpoint - for monitoring migrations

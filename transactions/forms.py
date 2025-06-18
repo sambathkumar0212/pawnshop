@@ -1,11 +1,12 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from .models import Loan, Payment, LoanExtension, Sale, LoanItem
 from inventory.models import Item, Category
 from inventory.forms import ItemForm
 from accounts.models import Customer
-from content_manager.models import Scheme
+from schemes.models import Scheme  # Changed from content_manager.models to schemes.models
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Div
 from decimal import Decimal, InvalidOperation
@@ -23,9 +24,9 @@ class LoanForm(forms.ModelForm):
         })
     )
 
-    # Replace the static scheme choices with a ModelChoiceField for Scheme
+    # Scheme field definition (will be properly configured in __init__)
     scheme = forms.ModelChoiceField(
-        queryset=Scheme.objects.filter(is_active=True),
+        queryset=Scheme.objects.none(),  # Empty queryset as placeholder, will set in __init__
         empty_label="Select a Loan Scheme",
         required=True,
         help_text="Select a loan scheme to apply to this loan"
@@ -79,7 +80,8 @@ class LoanForm(forms.ModelForm):
         max_digits=10,
         decimal_places=2,
         label="Today's 22K Gold Price (per gram)",
-        help_text="Enter today's market price for 22K gold per gram"
+        help_text="Enter today's market price for 22K gold per gram",
+        widget=forms.TextInput()  # Changed to TextInput
     )
     gross_weight = forms.DecimalField(
         required=False,
@@ -142,15 +144,36 @@ class LoanForm(forms.ModelForm):
             self.fields['due_date'].initial = today + timezone.timedelta(days=364)
             self.fields['grace_period_end'].initial = today + timezone.timedelta(days=369)  # due date + 5 days
 
+        # Filter schemes to match exactly what's shown in the Loan Schemes page
+        scheme_queryset = Scheme.objects.filter(status='active')
+        
+        # Print debug info - how many schemes were found
+        print(f"Found {scheme_queryset.count()} active schemes in schemes app")
+        for scheme in scheme_queryset:
+            print(f"  - {scheme.name} (Branch: {scheme.branch})")
+        
+        if self.user and not self.user.is_superuser:
+            # For branch users: Show active schemes that are either global or specific to their branch
+            branch_id = self.user.branch.id if hasattr(self.user, 'branch') and self.user.branch else None
+            if branch_id:
+                scheme_queryset = scheme_queryset.filter(
+                    Q(branch__isnull=True) | Q(branch_id=branch_id)
+                )
+                print(f"Filtered to {scheme_queryset.count()} schemes for branch {branch_id}")
+        
+        # Apply the same ordering as in the Loan Schemes page
+        self.fields['scheme'].queryset = scheme_queryset.order_by('name')
+        
+        # If no schemes are available, create a default one to prevent form errors
+        if not scheme_queryset.exists():
+            print("No schemes found in schemes app, consider creating some.")
+
         # Update principal_amount field to use integer values
         self.fields['principal_amount'] = forms.DecimalField(
             max_digits=10,
             decimal_places=0,
-            help_text="₹ Loan amount in Rupees",
-            widget=forms.NumberInput(attrs={
-                'data-show-words': 'true',
-                'step': '1'  # Ensure only whole numbers
-            })
+            help_text="",  # Removing help text as we'll display amount in words instead
+            widget=forms.TextInput()  # Changed to TextInput
         )
 
         # Update processing_fee field to use integer values
@@ -159,9 +182,7 @@ class LoanForm(forms.ModelForm):
             decimal_places=0,
             initial=0,
             help_text="Processing fee amount in Rupees",
-            widget=forms.NumberInput(attrs={
-                'step': '1'  # Ensure only whole numbers
-            })
+            widget=forms.TextInput()  # Changed to TextInput
         )
 
         # Configure customer field - filter by current branch if user has branch assigned
@@ -468,14 +489,15 @@ class LoanForm(forms.ModelForm):
         # Set interest rate from the selected scheme
         self.cleaned_data['interest_rate'] = scheme.interest_rate
         
-        # Set processing fee percentage from the scheme
-        if scheme.processing_fee_percentage:
-            self.cleaned_data['processing_fee_percentage'] = scheme.processing_fee_percentage
+        # Set processing fee percentage from the scheme's additional_conditions
+        if scheme.additional_conditions and 'processing_fee_percentage' in scheme.additional_conditions:
+            processing_fee_percentage = scheme.additional_conditions['processing_fee_percentage']
+            self.cleaned_data['processing_fee_percentage'] = processing_fee_percentage
             
-        # Calculate due date based on scheme duration
+        # Calculate due date based on scheme loan_duration
         issue_date = self.cleaned_data.get('issue_date')
-        if issue_date and scheme.duration_days:
-            due_date = issue_date + timezone.timedelta(days=scheme.duration_days)
+        if issue_date and scheme.loan_duration:
+            due_date = issue_date + timezone.timedelta(days=scheme.loan_duration)
             self.cleaned_data['due_date'] = due_date
             
             # Set grace period end date (5 days after due date)

@@ -113,12 +113,10 @@
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Scheme</label>
                                     <p class="mb-0">
-                                        {% if loan.scheme == 'standard' %}
-                                            <span class="badge bg-info">Standard</span> <small class="text-muted">(12%)</small>
-                                        {% elif loan.scheme == 'flexible' %}
-                                            <span class="badge bg-warning">Flexible</span> <small class="text-muted">(24% - no interest if paid within 23 days)</small>
-                                        {% elif loan.scheme == 'premium' %}
-                                            <span class="badge bg-primary">Premium</span> <small class="text-muted">(36% - no interest if paid within 30 days)</small>
+                                        <span class="badge bg-info">{{ loan.scheme.name }}</span>
+                                        <small class="text-muted">({{ loan.scheme.interest_rate }}%)</small>
+                                        {% if loan.scheme.no_interest_period_days %}
+                                            <small class="text-muted"> - no interest if paid within {{ loan.scheme.no_interest_period_days }} days</small>
                                         {% endif %}
                                     </p>
                                 </div>

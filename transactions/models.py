@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from accounts.models import Customer  # Import Customer from accounts app
+from schemes.models import Scheme  # Changed from content_manager.models to schemes.models
 import uuid
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
@@ -22,19 +23,19 @@ class Loan(models.Model):
         ('cancelled', 'Cancelled'),
     )
     
-    # Loan scheme choices
-    SCHEME_CHOICES = (
-        ('standard', 'Standard (12% p.a.)'),
-        ('flexible', 'Flexible (24% p.a. - No interest if paid within 23 days)'),
-        ('premium', 'Premium (36% p.a. - No interest if paid within 30 days)'),
-    )
-    
     # Basic loan information
     loan_number = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     customer = models.ForeignKey('accounts.Customer', on_delete=models.PROTECT, related_name='loans')
     branch = models.ForeignKey('branches.Branch', on_delete=models.PROTECT, related_name='loans')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    scheme = models.CharField(max_length=20, choices=SCHEME_CHOICES, default='standard')
+    
+    # Replace CharField scheme with ForeignKey to Scheme model
+    scheme = models.ForeignKey(
+        Scheme, 
+        on_delete=models.PROTECT, 
+        related_name='loans',
+        help_text="Loan scheme applied to this loan"
+    )
     
     # Financial details
     principal_amount = models.DecimalField(
@@ -189,69 +190,58 @@ class Loan(models.Model):
             return Decimal('0.00')
         
         days_elapsed = self.days_since_issue
+        principal_amount = self.principal_amount
         
-        # For flexible scheme, no interest if paid within 23 days
-        if self.scheme == 'flexible' and days_elapsed <= 23:
-            return self.principal_amount
+        # Get scheme details from the scheme model
+        if not self.scheme:
+            return principal_amount
             
-        # For premium scheme, no interest if paid within 30 days
-        if self.scheme == 'premium' and days_elapsed <= 30:
-            return self.principal_amount
+        # For schemes with no_interest_period_days, check if we're still in that period
+        if self.scheme.no_interest_period_days and days_elapsed <= self.scheme.no_interest_period_days:
+            return principal_amount
+            
+        # Calculate interest based on scheme interest rate
+        daily_rate = self.scheme.interest_rate / Decimal('36500')  # Convert annual rate to daily rate
+        interest = principal_amount * daily_rate * days_elapsed
         
-        # Calculate interest based on scheme
-        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else (
-            Decimal('0.0006575') if self.scheme == 'flexible' else Decimal('0.0009863')
-        )  # 0.0009863 is daily rate for 36% p.a.
-        interest = self.principal_amount * daily_rate * days_elapsed
-        
-        return self.principal_amount + interest
+        return principal_amount + interest
 
     @property
     def total_payable_mature(self):
         """Calculate total amount payable at maturity"""
-        if not self.due_date or self.status != 'active':
+        if not self.due_date or self.status != 'active' or not self.scheme:
             return Decimal('0.00')
         
         total_days = (self.due_date - self.issue_date).days
+        principal_amount = self.principal_amount
         
-        # For flexible scheme, no interest if paid within 23 days
-        if self.scheme == 'flexible' and total_days <= 23:
-            return self.principal_amount
+        # For schemes with no_interest_period_days, check if loan duration is within that period
+        if self.scheme.no_interest_period_days and total_days <= self.scheme.no_interest_period_days:
+            return principal_amount
             
-        # For premium scheme, no interest if paid within 30 days
-        if self.scheme == 'premium' and total_days <= 30:
-            return self.principal_amount
-        
         # Calculate interest based on scheme
-        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else (
-            Decimal('0.0006575') if self.scheme == 'flexible' else Decimal('0.0009863')
-        )  # 0.0009863 is daily rate for 36% p.a.
-        interest = self.principal_amount * daily_rate * total_days
+        daily_rate = self.scheme.interest_rate / Decimal('36500')  # Convert annual rate to daily rate
+        interest = principal_amount * daily_rate * total_days
         
-        return self.principal_amount + interest
+        return principal_amount + interest
     
     def calculate_interest(self):
         """Calculate interest on loan"""
-        if not self.due_date or self.status != 'active':
+        if not self.due_date or self.status != 'active' or not self.scheme:
             return Decimal('0.00')
         
         # Use the transaction date for calculating days elapsed
         current_date = timezone.now().date()
         days_elapsed = (current_date - self.issue_date).days
+        principal_amount = self.principal_amount
         
-        # For flexible scheme, no interest if paid within 23 days
-        if self.scheme == 'flexible' and days_elapsed <= 23:
+        # For schemes with no_interest_period_days, check if we're still in that period
+        if self.scheme.no_interest_period_days and days_elapsed <= self.scheme.no_interest_period_days:
             return Decimal('0.00')
             
-        # For premium scheme, no interest if paid within 30 days
-        if self.scheme == 'premium' and days_elapsed <= 30:
-            return Decimal('0.00')
-        
-        # Calculate interest based on scheme
-        daily_rate = Decimal('0.0003287') if self.scheme == 'standard' else (
-            Decimal('0.0006575') if self.scheme == 'flexible' else Decimal('0.0009863')
-        )  # 0.0009863 is daily rate for 36% p.a.
-        interest = self.principal_amount * daily_rate * days_elapsed
+        # Calculate interest based on scheme interest rate
+        daily_rate = self.scheme.interest_rate / Decimal('36500')  # Convert annual rate to daily rate
+        interest = principal_amount * daily_rate * days_elapsed
         
         return interest
 

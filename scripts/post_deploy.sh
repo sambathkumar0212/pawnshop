@@ -13,62 +13,86 @@ python -c "import os; from django.conf import settings; import django; django.se
 
 # Create a temporary Python script for checking the database
 cat > /tmp/check_db.py << EOL
-import os, django, psycopg2, sys
+import os, django, sys
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
 from django.conf import settings
+from django.db import connection
 
-# Get database connection details
-db = settings.DATABASES['default']
+# Get database type
+db_engine = settings.DATABASES['default']['ENGINE']
+is_sqlite = 'sqlite' in db_engine
+
 try:
-    # Connect to the database
-    conn = psycopg2.connect(
-        dbname=db.get('NAME', ''), 
-        user=db.get('USER', ''), 
-        password=db.get('PASSWORD', ''), 
-        host=db.get('HOST', ''), 
-        port=db.get('PORT', '5432')
-    )
-    
-    # Check if accounts_customuser exists
-    cur = conn.cursor()
-    cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='accounts_customuser');")
-    exists = cur.fetchone()[0]
-    
-    if not exists:
-        print('⚠️ accounts_customuser table missing! Applying emergency fix...')
-        
-        # Check if auth tables exist
-        cur.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='auth_user');")
-        auth_exists = cur.fetchone()[0]
-        
-        # Close connection before migrations
-        conn.close()
-        
-        if auth_exists:
-            print('auth_user exists but accounts_customuser is missing, need to reset migrations')
-            sys.exit(1)
-        else:
-            print('Creating fresh database schema')
-            sys.exit(2)
-    else:
-        print('✅ accounts_customuser table exists')
-        conn.close()
-        sys.exit(0)
+    # Check for critical tables
+    with connection.cursor() as cursor:
+        # Check for accounts_customuser
+        try:
+            if is_sqlite:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts_customuser';")
+            else:
+                cursor.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='accounts_customuser');")
+            
+            accounts_exists = cursor.fetchone()
+            accounts_exists = accounts_exists[0] if accounts_exists else False
+            
+            if not accounts_exists:
+                print('⚠️ accounts_customuser table missing!')
+                # Check if auth tables exist
+                if is_sqlite:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='auth_user';")
+                else:
+                    cursor.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='auth_user');")
+                
+                auth_exists = cursor.fetchone()
+                auth_exists = auth_exists[0] if auth_exists else False
+                
+                if auth_exists:
+                    print('auth_user exists but accounts_customuser is missing, need to reset migrations')
+                    sys.exit(1)
+                else:
+                    print('Creating fresh database schema')
+                    sys.exit(2)
+            else:
+                print('✅ accounts_customuser table exists')
+                
+            # Check for django_session table
+            try:
+                if is_sqlite:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='django_session';")
+                else:
+                    cursor.execute("SELECT EXISTS(SELECT * FROM information_schema.tables WHERE table_name='django_session');")
+                
+                session_exists = cursor.fetchone()
+                session_exists = session_exists[0] if session_exists else False
+                
+                if not session_exists:
+                    print('⚠️ django_session table missing!')
+                    sys.exit(3)
+                else:
+                    print('✅ django_session table exists')
+                    sys.exit(0)
+            except Exception as e:
+                print(f'⚠️ Error checking django_session table: {e}')
+                sys.exit(3)
+                
+        except Exception as e:
+            print(f'⚠️ Error checking accounts_customuser table: {e}')
+            sys.exit(4)
 except Exception as e:
     print(f'⚠️ Error checking database: {e}')
-    sys.exit(3)
+    sys.exit(5)
 EOL
 
 # Run the database check script
-echo "Checking for accounts_customuser table and applying emergency fix if needed..."
+echo "Checking database tables and applying emergency fixes if needed..."
 python /tmp/check_db.py
 DB_CHECK_RESULT=$?
 
 # Remove the temporary script
 rm /tmp/check_db.py
 
-# Special handling for accounts_customuser issue based on the exit code
+# Special handling for database issues based on the exit code
 if [ $DB_CHECK_RESULT -eq 0 ]; then
     echo "Database schema is correct, proceeding with normal migrations..."
     python manage.py migrate --no-input
@@ -88,10 +112,51 @@ elif [ $DB_CHECK_RESULT -eq 1 ]; then
 elif [ $DB_CHECK_RESULT -eq 2 ]; then
     echo "Creating fresh database schema..."
     python manage.py migrate --no-input
+elif [ $DB_CHECK_RESULT -eq 3 ]; then
+    echo "Fixing missing django_session table..."
+    # Run the specialized session table fix script
+    python scripts/fix_session_table.py
+    
+    # Continue with normal migrations for other apps
+    python manage.py migrate --no-input
 else
     echo "Using fallback migration approach..."
     python manage.py migrate --no-input
 fi
+
+# Extra check for django_session table to ensure it was created
+echo "Double-checking django_session table creation..."
+python -c "
+import os, django
+from django.db import connection
+from django.db.utils import OperationalError
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+
+try:
+    with connection.cursor() as cursor:
+        cursor.execute('SELECT COUNT(*) FROM django_session')
+        print('✅ django_session table exists and is accessible')
+except OperationalError:
+    print('❌ django_session table still missing, applying direct SQL fix')
+    
+    # Apply direct SQL fix if needed
+    from django.db import connection
+    from django.contrib.sessions.models import Session
+    
+    cursor = connection.cursor()
+    
+    # Create table using Django's model definition
+    from django.db import connections
+    from django.apps import apps
+    
+    session_model = apps.get_model('sessions', 'Session')
+    with connections['default'].schema_editor() as schema_editor:
+        schema_editor.create_model(session_model)
+    
+    print('Session table created with direct SQL')
+"
 
 # Verify migrations were applied correctly
 echo "Verifying migration status..."

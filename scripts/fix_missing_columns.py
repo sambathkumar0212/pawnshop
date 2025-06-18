@@ -6,48 +6,46 @@ python scripts/fix_missing_columns.py
 """
 import os
 import sys
-import django
 import traceback
-from django.db import connection
 
-# Set up Django environment
+# Add the parent directory to the Python path so Django can find the settings
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Now set up Django environment
+import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
+
+from django.db import connection
 
 def check_table_exists(table_name):
     """Check if a table exists in the database."""
     with connection.cursor() as cursor:
         cursor.execute(
-            """
-            SELECT EXISTS(
-                SELECT FROM information_schema.tables 
-                WHERE table_name = %s
-            );
-            """,
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=%s;",
             [table_name]
         )
-        return cursor.fetchone()[0]
+        return bool(cursor.fetchone())
 
 def check_column_exists(table, column):
     """Check if a column exists in a table."""
     with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT column_name
-            FROM information_schema.columns 
-            WHERE table_name = %s AND column_name = %s;
-            """,
-            [table, column]
-        )
-        return bool(cursor.fetchone())
+        cursor.execute(f"PRAGMA table_info({table});")
+        columns = [info[1] for info in cursor.fetchall()]
+        return column in columns
 
 def add_column(table, column, definition):
     """Add a column to a table if it doesn't exist."""
     try:
-        with connection.cursor() as cursor:
-            cursor.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition};")
-            print(f"✅ Added column {column} to table {table}")
-        return True
+        # First check if column exists to avoid error
+        if not check_column_exists(table, column):
+            with connection.cursor() as cursor:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition};")
+                print(f"✅ Added column {column} to table {table}")
+            return True
+        else:
+            print(f"✅ Column {column} already exists in {table}, no need to add")
+            return True
     except Exception as e:
         print(f"❌ Error adding column {column} to table {table}: {e}")
         traceback.print_exc()
@@ -113,6 +111,21 @@ def fix_region_reference():
     
     return True
 
+def fix_content_manager_scheme():
+    """Fix missing columns in content_manager_scheme table."""
+    if not check_table_exists('content_manager_scheme'):
+        print("❌ The content_manager_scheme table doesn't exist yet. Run migrations first.")
+        return False
+    
+    # Check if additional_conditions column exists
+    if not check_column_exists('content_manager_scheme', 'additional_conditions'):
+        print("Missing additional_conditions column in content_manager_scheme table. Adding it...")
+        add_column('content_manager_scheme', 'additional_conditions', 'TEXT DEFAULT \'{}\'')
+    else:
+        print("✅ additional_conditions column already exists in content_manager_scheme table.")
+    
+    return True
+
 def main():
     """Fix missing columns and relationships in the database."""
     print("Starting database schema fix script...")
@@ -123,6 +136,12 @@ def main():
             print("✅ Successfully fixed region references")
         else:
             print("⚠️ Some issues occurred while fixing region references")
+        
+        # Fix content manager scheme
+        if fix_content_manager_scheme():
+            print("✅ Successfully fixed content manager scheme")
+        else:
+            print("⚠️ Some issues occurred while fixing content manager scheme")
         
         # Add more fixes here if needed for other tables
         

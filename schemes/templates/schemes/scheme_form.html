@@ -1,0 +1,200 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if form.instance.id %}Update{% else %}Create New{% endif %} Scheme{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mt-4 mb-0">{% if form.instance.id %}Update{% else %}Create New{% endif %} Scheme</h1>
+        <div>
+            <a href="{% if form.instance.id %}{% url 'scheme_detail' form.instance.id %}{% else %}{% url 'scheme_list' %}{% endif %}" class="btn btn-secondary">
+                <i class="fas fa-times me-2"></i>Cancel
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-9">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-edit me-1"></i>
+                    Scheme Details
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Basic Information Section -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Basic Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form.name|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.status|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        {{ form.description|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Financial Details Section -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Financial Details</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        {{ form.interest_rate|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        {{ form.loan_duration|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        {{ form.processing_fee_percentage|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {{ form.minimum_amount|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.maximum_amount|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Conditions Section -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Additional Conditions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        {{ form.no_interest_period_days|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.grace_period_days|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        {{ form.late_fee_percentage|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {{ form.prepayment_penalty_percentage|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            {{ form.early_payment_discount }}
+                                            <label class="form-check-label" for="{{ form.early_payment_discount.id_for_label }}">
+                                                Early Payment Discount
+                                            </label>
+                                            <div class="form-text text-muted">{{ form.early_payment_discount.help_text }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        {{ form.custom_conditions|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dates and Branch Section -->
+                        <div class="card mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">Dates & Branch</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        {{ form.start_date|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        {{ form.end_date|as_crispy_field }}
+                                    </div>
+                                    <div class="col-md-4">
+                                        {{ form.branch|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <a href="{% if form.instance.pk %}{% url 'scheme_detail' form.instance.pk %}{% else %}{% url 'scheme_list' %}{% endif %}" class="btn btn-secondary me-2">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> {% if form.instance.pk %}Update{% else %}Create{% endif %} Scheme
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="col-lg-3">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Help
+                </div>
+                <div class="card-body">
+                    <h5>Scheme Settings Guide</h5>
+                    <ul class="help-list">
+                        <li><strong>Interest Rate:</strong> Annual rate as a percentage</li>
+                        <li><strong>Loan Duration:</strong> Standard period in days</li>
+                        <li><strong>No Interest Period:</strong> Days without interest if repaid early</li>
+                        <li><strong>Grace Period:</strong> Days after due date before late fees</li>
+                        <li><strong>Late Fee:</strong> Percentage charged on late payments</li>
+                        <li><strong>Prepayment Penalty:</strong> Fee for early repayment</li>
+                        <li><strong>Custom Conditions:</strong> Add any other specific terms</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize date inputs with today's date if empty
+        const today = new Date().toISOString().split('T')[0];
+        const startDateInput = document.getElementById('{{ form.start_date.id_for_label }}');
+        if (!startDateInput.value) {
+            startDateInput.value = today;
+        }
+    });
+</script>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .help-list {
+        padding-left: 1.25rem;
+    }
+    .help-list li {
+        margin-bottom: 0.5rem;
+    }
+</style>
+{% endblock %}

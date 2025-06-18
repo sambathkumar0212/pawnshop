@@ -261,6 +261,7 @@
                             </div>
                             <div class="col-md-6">
                                 {{ form.principal_amount|as_crispy_field }}
+                                <small id="principalAmountWords" class="text-muted d-block mt-1" style="font-style: italic;"></small>
                             </div>
                             <div class="col-md-6">
                                 {{ form.processing_fee|as_crispy_field }}
@@ -312,6 +313,155 @@
 
 <script>
     $(document).ready(function() {
+        // Convert a number to words function
+        function numberToWords(num) {
+            if (num === 0) return 'Zero';
+            
+            const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+            const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+            
+            const convertLessThanOneThousand = (num) => {
+                if (num === 0) return '';
+                if (num < 20) return ones[num];
+                
+                const ten = Math.floor(num / 10);
+                const unit = num % 10;
+                
+                return tens[ten] + (unit !== 0 ? '-' + ones[unit] : '');
+            };
+            
+            // Handle decimals
+            const numStr = num.toString();
+            const decimalIndex = numStr.indexOf('.');
+            let wholeNum = num;
+            let decimalNum = 0;
+            
+            if (decimalIndex !== -1) {
+                wholeNum = parseInt(numStr.substring(0, decimalIndex));
+                // Get decimal part and convert to cents (up to 2 decimal places)
+                const decimalStr = numStr.substring(decimalIndex + 1, decimalIndex + 3).padEnd(2, '0');
+                decimalNum = parseInt(decimalStr);
+            }
+            
+            // Convert the whole number part
+            const billion = Math.floor(wholeNum / 1000000000);
+            const million = Math.floor((wholeNum % 1000000000) / 1000000);
+            const thousand = Math.floor((wholeNum % 1000000) / 1000);
+            const remainder = wholeNum % 1000;
+            
+            let result = '';
+            
+            if (billion) result += convertLessThanOneThousand(billion) + ' Billion ';
+            if (million) result += convertLessThanOneThousand(million) + ' Million ';
+            if (thousand) result += convertLessThanOneThousand(thousand) + ' Thousand ';
+            if (remainder || result === '') result += convertLessThanOneThousand(remainder);
+            
+            // Add decimal part if exists
+            if (decimalNum > 0) {
+                result += ' and ' + convertLessThanOneThousand(decimalNum) + ' Cents';
+            } else {
+                result += ' Only';
+            }
+            
+            return result;
+        }
+        
+        // Function to update the amount in words
+        function updateAmountInWords() {
+            // Remove this function entirely as we'll use the AJAX call exclusively
+            // The AJAX call will handle this functionality
+        }
+        
+        // Add input event listener to principal amount field
+        $('#id_principal_amount').on('input', function() {
+            // Don't call updateAmountInWords here
+            // The calculateDistributionAmount function will handle this
+        });
+        
+        // Initialize on page load
+        // updateAmountInWords(); // Remove this line
+        
+        // Add showAlert function to window object so it can be called from loan-calculator.js
+        window.showAlert = function(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            if (!alertContainer) return;
+            
+            // Create alert element
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type || 'info'} alert-dismissible fade show`;
+            alertDiv.role = 'alert';
+            
+            // Add message and close button
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            // Add to container
+            alertContainer.appendChild(alertDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.classList.remove('show');
+                    setTimeout(() => {
+                        if (alertDiv.parentNode) alertDiv.parentNode.removeChild(alertDiv);
+                    }, 150);
+                }
+            }, 5000);
+        };
+
+        // Auto-update due date and grace period when issue date changes
+        $('#id_issue_date').on('change', function() {
+            // Get the scheme to determine loan period
+            const selectedScheme = $('#id_scheme').val();
+            const issueDate = new Date($(this).val());
+            
+            if (issueDate && !isNaN(issueDate.getTime())) {
+                // If scheme is selected, the loan-calculator.js will handle the date calculations
+                if (selectedScheme) {
+                    return;
+                }
+                
+                // If no scheme is selected, use default values
+                let loanPeriodMonths = 3;
+                let gracePeriodDays = 30;
+                
+                // Calculate due date (loan period months from issue date)
+                const dueDate = new Date(issueDate);
+                dueDate.setMonth(dueDate.getMonth() + loanPeriodMonths);
+                
+                // Calculate grace period end (grace period days after due date)
+                const gracePeriodEnd = new Date(dueDate);
+                gracePeriodEnd.setDate(gracePeriodEnd.getDate() + gracePeriodDays);
+                
+                // Format dates as YYYY-MM-DD for input fields
+                const formatDate = (date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                };
+                
+                // Update the due date and grace period end fields
+                $('#id_due_date').val(formatDate(dueDate));
+                $('#id_grace_period_end').val(formatDate(gracePeriodEnd));
+                
+                // Show notification that dates were updated
+                showAlert('Due date and grace period end date have been automatically updated based on loan date', 'info');
+            }
+        });
+        
+        // Also update dates when scheme changes, if issue date is already set
+        $('#id_scheme').on('change', function() {
+            const issueDate = $('#id_issue_date').val();
+            if (issueDate) {
+                // Trigger the issue date change event to update due date and grace period
+                $('#id_issue_date').trigger('change');
+            }
+        });
+
         // Set up customer change event to update branch field
         $('#id_customer').on('change', function() {
             const customerId = $(this).val();
@@ -888,12 +1038,18 @@
                 // Trigger the distribution amount calculation
                 calculateDistributionAmount();
                 
-                // Create info message
-                const messageDiv = $('<div class="gold-value-message small mt-1"></div>')
-                    .css('color', '#5470b0')
-                    .html(`<i class="fas fa-info-circle"></i> Gold value: ₹${goldValue.toFixed(0)} | Principal set to ₹${suggestedPrincipal} (75%) | Range: ₹${minPrincipal}-₹${maxPrincipal}`);
+                // Create concise help text
+                const helpText = `<i class="fas fa-info-circle"></i> Val: ₹${goldValue.toFixed(0)} | Range: ₹${minPrincipal}-₹${maxPrincipal} (50-85%)`;
                 
-                messageDiv.insertAfter('#div_id_principal_amount .form-text');
+                // Update the form-text element or create it if it doesn't exist
+                let formText = $('#div_id_principal_amount .form-text');
+                if (formText.length === 0) {
+                    formText = $('<div class="form-text gold-value-message small"></div>');
+                    formText.appendTo('#div_id_principal_amount');
+                } else {
+                    formText.addClass('gold-value-message');
+                }
+                formText.html(helpText);
             }
         }, 300);
 
@@ -916,6 +1072,15 @@
             $.get(`/transactions/number_to_words/${Math.round(distributionAmount)}`, function(response) {
                 $('#distributionAmountWords').text(response.words + ' Rupees Only');
             });
+            
+            // Also update the principal amount in words
+            if (principal > 0) {
+                $.get(`/transactions/number_to_words/${principal}`, function(response) {
+                    $('#principalAmountWords').text(response.words + ' Rupees Only');
+                });
+            } else {
+                $('#principalAmountWords').text('');
+            }
         };
 
         // Set up event handlers
