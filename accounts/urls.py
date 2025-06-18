@@ -42,6 +42,9 @@ urlpatterns = [
     path('face-id/enroll/', views.FaceEnrollmentView.as_view(), name='face_enroll'),
     path('face-id/login/', views.FaceLoginView.as_view(), name='face_login'),
     
+    # Deployment status check (no login required for easy access)
+    path('deployment-status/', views.check_deployment_status, name='deployment_status'),
+    
     # Dashboard
     path('', views.DashboardView.as_view(), name='dashboard'),
 ]

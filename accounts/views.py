@@ -749,3 +749,66 @@ class CustomerJsonView(LoginRequiredMixin, View):
             return JsonResponse(data)
         except Customer.DoesNotExist:
             return JsonResponse({'error': 'Customer not found'}, status=404)
+
+
+def check_deployment_status(request):
+    """
+    A simple diagnostic endpoint to check deployment status.
+    Will be visible at /accounts/deployment-status/ when added to urls.py
+    """
+    status = {
+        'timestamp': str(timezone.now()),
+        'deployment_logs': [],
+        'session_table_exists': False,
+        'marker_files': []
+    }
+    
+    # Check if deployment_logs table exists and query it
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='deployment_logs'")
+            if cursor.fetchone():
+                cursor.execute("SELECT script_name, execution_time, status, message FROM deployment_logs ORDER BY execution_time DESC LIMIT 5")
+                logs = cursor.fetchall()
+                status['deployment_logs'] = [
+                    {'script': script, 'time': time, 'status': status, 'message': msg} 
+                    for script, time, status, msg in logs
+                ]
+    except Exception as e:
+        status['deployment_logs_error'] = str(e)
+    
+    # Check if django_session table exists
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM django_session")
+            count = cursor.fetchone()[0]
+            status['session_table_exists'] = True
+            status['session_count'] = count
+    except Exception as e:
+        status['session_table_error'] = str(e)
+    
+    # Check for marker files
+    import os
+    for path in ['/tmp/post_deploy_success.log', 'post_deploy_success.log', 'static/post_deploy_success.log']:
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    status['marker_files'].append({
+                        'path': path,
+                        'content': f.read().strip()
+                    })
+            except:
+                status['marker_files'].append({
+                    'path': path,
+                    'content': 'Could not read file'
+                })
+    
+    # Look for any marker files in the current directory
+    import glob
+    for marker in glob.glob('post_deploy_ran_*.marker'):
+        status['marker_files'].append({
+            'path': marker,
+            'modified': str(datetime.fromtimestamp(os.path.getmtime(marker)))
+        })
+    
+    return JsonResponse(status)
