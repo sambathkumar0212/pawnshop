@@ -19,6 +19,9 @@ services:
     # The DATABASE_URL should be set in the Render dashboard Environment section
     # and Render will automatically inject it as an environment variable
 
+    # Pre-deployment command to run migrations before the application starts
+    preDeployCommand: python manage.py migrate --noinput && python scripts/fix_session_table.py
+    
     # Configure post-deployment script to run migrations and setup roles
     postDeployCommand: ./scripts/post_deploy.sh
     

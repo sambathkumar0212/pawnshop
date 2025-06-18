@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-
+        
 echo "Starting application deployment process..."
 
 # Set environment variables
@@ -11,13 +11,36 @@ export RENDER=true
 echo "Checking and fixing database schema issues..."
 timeout 60 python scripts/fix_missing_columns.py || echo "⚠️ Column fix script timed out but proceeding anyway"
 
+# Run migrations BEFORE starting Gunicorn to ensure database is ready
+echo "Running migrations before starting application server..."
+python manage.py migrate --noinput
+MIGRATE_STATUS=$?
+
+if [ $MIGRATE_STATUS -eq 0 ]; then
+  echo "✅ Initial migrations completed successfully!"
+else
+  echo "⚠️ Initial migrations had issues, trying specialized migration script..."
+  python scripts/run_migrations.py
+  
+  # Fix django_session table specifically if needed
+  echo "Ensuring django_session table exists..."
+  python scripts/fix_session_table.py
+fi
+
+# Create migration status file
+echo "Creating migration status file..."
+MIGRATION_STATUS_DIR="static/status"
+mkdir -p $MIGRATION_STATUS_DIR
+python scripts/check_migrations.py > $MIGRATION_STATUS_DIR/migrations.json
+echo "Last migration check: $(date)" > $MIGRATION_STATUS_DIR/migration_status.txt
+
 # Log some diagnostic info
 echo "PORT=$PORT"
 echo "PYTHON_VERSION=$(python --version)"
 echo "Current directory: $(pwd)"
 
-# Start the application in the background
-echo "Starting web server in background..."
+# Start the application server after migrations have completed
+echo "Starting web server..."
 {
   gunicorn minimal_wsgi:application \
     --bind 0.0.0.0:$PORT \
@@ -40,53 +63,9 @@ echo "Starting web server in background..."
   exit 0  # Exit if we had to fall back to normal mode
 }
 
-# Give the server a moment to start
-echo "Waiting for server to start..."
-sleep 10
-
-# Now run migrations in the background
-echo "Running migrations in production environment..."
-{
-  # Create a temporary log file
-  MIGRATION_LOG="/tmp/migration_$(date +%Y%m%d_%H%M%S).log"
-  echo "Logging migrations to $MIGRATION_LOG"
-  
-  # Unset minimal startup variables to allow full Django initialization
-  unset SKIP_DB_CHECKS
-  unset MINIMAL_STARTUP
-  
-  # Run the migrations script
-  python scripts/run_migrations.py > $MIGRATION_LOG 2>&1
-  MIGRATION_STATUS=$?
-  
-  if [ $MIGRATION_STATUS -eq 0 ]; then
-    echo "✅ Migrations completed successfully!"
-  else
-    echo "⚠️ Migrations failed! Check $MIGRATION_LOG for details"
-  fi
-  
-  # Check migration status and create a status file in a static directory
-  echo "Creating migration status file..."
-  MIGRATION_STATUS_DIR="static/status"
-  mkdir -p $MIGRATION_STATUS_DIR
-  
-  # Run migration check script and save the output
-  python scripts/check_migrations.py > $MIGRATION_STATUS_DIR/migrations.json
-  if [ $? -eq 0 ]; then
-    echo "✅ All migrations are properly applied"
-    echo "SUCCESS" > $MIGRATION_STATUS_DIR/migration_status.txt
-  else
-    echo "⚠️ Migration status check indicates issues"
-    echo "INCOMPLETE" > $MIGRATION_STATUS_DIR/migration_status.txt
-  fi
-  
-  # Add timestamp to status file
-  echo "Last checked: $(date)" >> $MIGRATION_STATUS_DIR/migration_status.txt
-} &
-
 # Keep the main process running to prevent container from stopping
 # This works because gunicorn is running as a daemon
-echo "Server is now running with migrations executing in the background"
+echo "Server is now running with migrations completed beforehand"
 echo "You can check migration status at /static/status/migrations.json"
 echo "Monitoring logs..."
 
