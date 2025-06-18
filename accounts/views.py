@@ -15,6 +15,11 @@ import base64
 import os
 from django.conf import settings
 import datetime
+from django.db import connection
+from django.utils import timezone
+from datetime import datetime
+import os
+import glob
 
 from .models import CustomUser, Role, UserActivity, Customer
 from .forms import UserFaceCreateForm, UserUpdateForm
@@ -788,7 +793,6 @@ def check_deployment_status(request):
         status['session_table_error'] = str(e)
     
     # Check for marker files
-    import os
     for path in ['/tmp/post_deploy_success.log', 'post_deploy_success.log', 'static/post_deploy_success.log']:
         if os.path.exists(path):
             try:
@@ -797,18 +801,48 @@ def check_deployment_status(request):
                         'path': path,
                         'content': f.read().strip()
                     })
-            except:
+            except Exception as e:
                 status['marker_files'].append({
                     'path': path,
-                    'content': 'Could not read file'
+                    'content': f'Could not read file: {str(e)}'
                 })
     
     # Look for any marker files in the current directory
-    import glob
-    for marker in glob.glob('post_deploy_ran_*.marker'):
-        status['marker_files'].append({
-            'path': marker,
-            'modified': str(datetime.fromtimestamp(os.path.getmtime(marker)))
-        })
+    try:
+        for marker in glob.glob('post_deploy_ran_*.marker'):
+            status['marker_files'].append({
+                'path': marker,
+                'modified': str(datetime.fromtimestamp(os.path.getmtime(marker)))
+            })
+    except Exception as e:
+        status['marker_files_error'] = str(e)
+        
+    # Check docker/container info if available
+    try:
+        import socket
+        status['hostname'] = socket.gethostname()
+    except Exception:
+        pass
+        
+    # Check if django_session table definition exists in migrations
+    try:
+        import os
+        django_session_migration_exists = False
+        migration_paths = []
+        
+        # Look in Django's install directory for sessions migrations
+        from importlib import util
+        django_spec = util.find_spec('django')
+        if django_spec and django_spec.submodule_search_locations:
+            django_path = django_spec.submodule_search_locations[0]
+            sessions_migrations_path = os.path.join(django_path, 'contrib', 'sessions', 'migrations')
+            if os.path.exists(sessions_migrations_path):
+                migration_paths.append(sessions_migrations_path)
+                django_session_migration_exists = True
+                
+        status['django_session_migration_exists'] = django_session_migration_exists
+        status['migration_paths'] = migration_paths
+    except Exception as e:
+        status['migration_lookup_error'] = str(e)
     
     return JsonResponse(status)
