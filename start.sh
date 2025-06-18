@@ -7,6 +7,10 @@ echo "Starting application deployment process..."
 export DJANGO_SETTINGS_MODULE=pawnshop_management.settings
 export RENDER=true
 
+# Add the current directory to the Python path to fix import issues
+export PYTHONPATH="$PYTHONPATH:$(pwd)"
+echo "PYTHONPATH set to: $PYTHONPATH"
+
 # First, let's fix any critical database schema issues
 echo "Checking and fixing database schema issues..."
 timeout 60 python scripts/fix_missing_columns.py || echo "⚠️ Column fix script timed out but proceeding anyway"
@@ -38,11 +42,15 @@ echo "Last migration check: $(date)" > $MIGRATION_STATUS_DIR/migration_status.tx
 echo "PORT=$PORT"
 echo "PYTHON_VERSION=$(python --version)"
 echo "Current directory: $(pwd)"
+echo "Directory contents:"
+ls -la
+echo "Python path:"
+python -c "import sys; print(sys.path)"
 
 # Start the application server after migrations have completed
 echo "Starting web server..."
 {
-  gunicorn minimal_wsgi:application \
+  gunicorn pawnshop_management.wsgi:application \
     --bind 0.0.0.0:$PORT \
     --workers=1 \
     --threads=4 \
@@ -53,7 +61,7 @@ echo "Starting web server..."
     --daemon
 } || {
   echo "⚠️ Failed to start gunicorn as daemon, falling back to normal mode"
-  exec gunicorn minimal_wsgi:application \
+  exec gunicorn pawnshop_management.wsgi:application \
     --bind 0.0.0.0:$PORT \
     --workers=1 \
     --threads=4 \
