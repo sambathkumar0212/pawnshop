@@ -31,6 +31,62 @@ else
   python scripts/fix_session_table.py
 fi
 
+# Create superuser if environment variables are set
+echo "Checking for superuser credentials..."
+if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_PASSWORD" && -n "$DJANGO_SUPERUSER_EMAIL" ]]; then
+    echo "Creating superuser from environment variables..."
+    python -c "
+import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+from django.contrib.auth import get_user_model
+User = get_user_model()
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME')
+email = os.environ.get('DJANGO_SUPERUSER_EMAIL')
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
+
+if User.objects.filter(username=username).exists():
+    print(f'Superuser {username} already exists. Updating password...')
+    user = User.objects.get(username=username)
+    user.set_password(password)
+    user.email = email
+    user.is_staff = True
+    user.is_superuser = True
+    user.is_active = True
+    user.save()
+    print(f'Superuser {username} updated successfully')
+else:
+    print(f'Creating new superuser {username}...')
+    User.objects.create_superuser(username=username, email=email, password=password)
+    print(f'Superuser {username} created successfully')
+"
+else
+    # Create default superuser if environment variables aren't set
+    echo "Creating default superuser 'admin'..."
+    python -c "
+import os
+import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+from django.contrib.auth import get_user_model
+User = get_user_model()
+username = 'admin'
+email = 'admin@example.com'
+password = 'admin123'  # You should change this immediately after first login!
+
+if not User.objects.filter(username=username).exists():
+    User.objects.create_superuser(username=username, email=email, password=password)
+    print('Default superuser created. Username: admin, Password: admin123')
+    print('IMPORTANT: Please change this password immediately after logging in!')
+else:
+    print('Default superuser already exists')
+"
+    # Create a file to record the default admin credentials
+    echo "Default admin credentials: username=admin, password=admin123" > static/admin_credentials.txt
+    echo "IMPORTANT: Change this password immediately after logging in!" >> static/admin_credentials.txt
+fi
+
 # Create migration status file
 echo "Creating migration status file..."
 MIGRATION_STATUS_DIR="static/status"
