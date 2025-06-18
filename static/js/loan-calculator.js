@@ -109,64 +109,24 @@ document.addEventListener('DOMContentLoaded', function() {
         const maxPrincipal = Math.round(goldValue * 0.85); // 85% of gold value
         const suggestedPrincipal = Math.round(goldValue * 0.75); // 75% of gold value
         
-        // Create a display element for the gold value information
-        const displayDiv = document.createElement('div');
-        displayDiv.id = 'gold-value-display';
-        displayDiv.className = 'card mb-3 mt-2';
-        displayDiv.innerHTML = `
-            <div class="card-header bg-primary text-white">
-                <i class="fas fa-calculator me-2"></i> Gold Value & Principal Range
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="border rounded p-2 text-center mb-2">
-                            <div class="small text-muted">Gold Value</div>
-                            <div class="fw-bold">₹${goldValue.toFixed(0)}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="border rounded p-2 text-center mb-2 bg-light">
-                            <div class="small text-muted">Min Principal (50%)</div>
-                            <div class="fw-bold text-danger">₹${minPrincipal}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="border rounded p-2 text-center mb-2 bg-light">
-                            <div class="small text-muted">Max Principal (85%)</div>
-                            <div class="fw-bold text-success">₹${maxPrincipal}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-12">
-                        <div class="border rounded p-2 text-center mb-2 bg-light">
-                            <div class="small text-muted">Suggested Principal (75%)</div>
-                            <div class="fw-bold text-primary">₹${suggestedPrincipal}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="d-grid mt-2">
-                    <button type="button" id="setSuggestedPrincipal" class="btn btn-sm btn-primary">
-                        Set Suggested Principal (75%): ₹${suggestedPrincipal}
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        // Insert the display element before the principal amount field
+        // Instead of creating and displaying the gold-value-display div,
+        // we'll just update the help text with the calculated values
         const principalFormGroup = document.getElementById('div_id_principal_amount');
         if (principalFormGroup) {
-            principalFormGroup.insertAdjacentElement('beforebegin', displayDiv);
+            // Create or update help text
+            let helpText = principalFormGroup.querySelector('.form-text');
+            if (!helpText) {
+                helpText = document.createElement('div');
+                helpText.className = 'form-text';
+                principalFormGroup.appendChild(helpText);
+            }
             
-            // Add event listener to the "Set Suggested Principal" button
-            document.getElementById('setSuggestedPrincipal').addEventListener('click', function() {
-                if (principalInput) {
-                    principalInput.value = suggestedPrincipal;
-                    principalInput.dispatchEvent(new Event('input')); // Trigger input event to update dependent fields
-                    showNotification('Principal amount set to suggested value of ₹' + suggestedPrincipal, 'success');
-                }
-            });
+            helpText.innerHTML = `
+                <i class="fas fa-info-circle"></i> Gold Value: ₹${goldValue.toFixed(0)} | 
+                Suggested (75%): ₹${suggestedPrincipal} | 
+                Min (50%): ₹${minPrincipal} | 
+                Max (85%): ₹${maxPrincipal}
+            `;
             
             // Check if the current principal is within the range
             const currentPrincipal = parseFloat(principalInput.value) || 0;
@@ -305,9 +265,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const gracePeriodDays = 
                     (scheme.additional_conditions && scheme.additional_conditions.grace_period_days) || 30;
                 
-                // Get minimum period days from additional_conditions if it exists
-                const minimumPeriodDays = 
-                    (scheme.additional_conditions && scheme.additional_conditions.minimum_period_days) || 0;
+                // Get no interest period days from additional_conditions or default to 0
+                const noInterestPeriodDays = 
+                    (scheme.additional_conditions && scheme.additional_conditions.no_interest_period_days) || 0;
                 
                 // Create scheme details HTML
                 const schemeDetailsHTML = `
@@ -320,6 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div class="col-md-6">
                                 <p><strong>Loan Period:</strong> ${scheme.loan_duration} days</p>
+                                <p><strong>No Interest Period:</strong> ${noInterestPeriodDays} days</p>
                                 <p><strong>Grace Period:</strong> ${gracePeriodDays} days</p>
                             </div>
                         </div>
@@ -336,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (schemeHelpText) {
                     const helpTextHTML = `
                         <strong>${scheme.name}:</strong> ${scheme.interest_rate}% interest | 
-                        ${scheme.loan_duration} days term | ${gracePeriodDays} days grace period | 
+                        ${scheme.loan_duration} days term | ${noInterestPeriodDays} days no interest period | 
                         ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'} scheme
                     `;
                     schemeHelpText.innerHTML = helpTextHTML;

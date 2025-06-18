@@ -6,6 +6,8 @@ from django.contrib import messages
 from django.http import JsonResponse, Http404
 from django.db.models import Q
 from django.utils import timezone
+import decimal
+from decimal import Decimal
 
 from .models import Scheme, SchemeAuditLog
 from .forms import SchemeForm
@@ -261,7 +263,15 @@ class SchemeUpdateView(SchemeMixin, PermissionRequiredMixin, UpdateView):
             scheme.additional_conditions = form.cleaned_data['additional_conditions']
         
         # Store changes for audit log
-        changes = {field: getattr(scheme, field) for field in form.changed_data if hasattr(scheme, field)}
+        changes = {}
+        for field in form.changed_data:
+            if hasattr(scheme, field):
+                value = getattr(scheme, field)
+                # Convert Decimal objects to float for JSON serialization
+                if isinstance(value, (Decimal, decimal.Decimal)):
+                    changes[field] = float(value)
+                else:
+                    changes[field] = value
         
         # Add additional conditions changes to audit log if they've changed
         if 'additional_conditions' in form.changed_data:

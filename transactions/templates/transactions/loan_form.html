@@ -5,303 +5,347 @@
 {% block title %}{% if form.instance.pk %}Edit Loan{% else %}New Loan{% endif %} - Pawnshop Management{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="row mb-4">
+<div class="container-fluid py-2">
+    <div class="row mb-2">
         <div class="col">
             <div class="d-flex justify-content-between align-items-center">
                 <h2>
                     <i class="fas fa-hand-holding-usd me-2"></i>
                     {% if form.instance.pk %}Edit Loan{% else %}New Loan{% endif %}
                 </h2>
-                <a href="{% url 'loan_list' %}" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Loans
+                <a href="{% url 'loan_list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Loans
                 </a>
             </div>
         </div>
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card shadow">
-                <div class="card-body">
-                    <!-- Add debugging information and error messages at the top of the form -->
-                    {% if messages %}
-                    <div class="mb-4">
-                        {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    
-                    {% if form.errors %}
-                    <div class="alert alert-danger mb-4">
-                        <h5 class="alert-heading">Please correct the following errors:</h5>
-                        <ul class="mb-0">
-                            {% for field in form %}
-                                {% for error in field.errors %}
-                                <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+    <!-- Add debugging information and error messages in a collapsible panel -->
+    {% if messages or form.errors %}
+    <div class="row mb-2">
+        <div class="col">
+            <div class="accordion" id="accordionMessages">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingMessages">
+                        <button class="accordion-button p-2 {% if not messages and not form.errors %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMessages" aria-expanded="{% if messages or form.errors %}true{% else %}false{% endif %}" aria-controls="collapseMessages">
+                            <i class="fas fa-exclamation-triangle me-2 text-warning"></i>Messages & Errors
+                        </button>
+                    </h2>
+                    <div id="collapseMessages" class="accordion-collapse collapse {% if messages or form.errors %}show{% endif %}" aria-labelledby="headingMessages" data-bs-parent="#accordionMessages">
+                        <div class="accordion-body p-2">
+                            {% if messages %}
+                                {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show py-2 mb-2" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
                                 {% endfor %}
-                            {% endfor %}
-                            {% for error in form.non_field_errors %}
-                            <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    {% endif %}
-                    
-                    <!-- Alert container for dynamic notifications -->
-                    <div id="alertContainer" class="mb-3"></div>
-                    
-                    <form method="post" id="loanForm" enctype="multipart/form-data" novalidate>
-                        {% csrf_token %}
-                        <input type="hidden" name="customer_face_capture" id="customerFaceCapture" value="{% if form.instance.customer_face_capture %}{{ form.instance.customer_face_capture|escapejs }}{% endif %}">
-                        <input type="hidden" name="item_photos" id="itemPhotosData" value="">
-                        
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-user me-2"></i>Customer & Authentication
-                                </h5>
-                            </div>
+                            {% endif %}
                             
-                            <!-- Customer and Biometric Authentication Row -->
+                            {% if form.errors %}
+                            <div class="alert alert-danger py-2 mb-2">
+                                <h6 class="alert-heading">Please correct the following errors:</h6>
+                                <ul class="mb-0 small">
+                                    {% for field in form %}
+                                        {% for error in field.errors %}
+                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Alert container for dynamic notifications -->
+    <div id="alertContainer" class="mb-2"></div>
+    
+    <div class="row">
+        <div class="col-lg-12">
+            <form method="post" id="loanForm" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="customer_face_capture" id="customerFaceCapture" value="{% if form.instance.customer_face_capture %}{{ form.instance.customer_face_capture|escapejs }}{% endif %}">
+                <input type="hidden" name="item_photos" id="itemPhotosData" value="">
+                <input type="hidden" name="interest_rate" id="id_interest_rate" value="12.00">
+                
+                <div class="card shadow mb-3">
+                    <div class="card-body p-2">
+                        <div class="row g-2">
+                            <!-- Left column - essential information -->
                             <div class="col-md-8">
-                                <div class="row">
-                                    <div class="col-12 mb-3">
-                                        {{ form.customer|as_crispy_field }}
+                                <!-- Primary Loan Info Section -->
+                                <div class="card mb-2">
+                                    <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-info-circle me-1"></i>Primary Loan Info
+                                        </h6>
                                     </div>
-                                    <div class="col-12">
-                                        {{ form.branch|as_crispy_field }}
+                                    <div class="card-body p-2">
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                {{ form.customer|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.branch|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.scheme|as_crispy_field }}
+                                                <div id="scheme-info" class="alert alert-info py-1 px-2 small mb-0 mt-1" style="display: none;">
+                                                    <span id="scheme-details"></span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.issue_date|as_crispy_field }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Gold Item Details Section -->
+                                <div class="card">
+                                    <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-gem me-1"></i>Gold Item Details
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-2">
+                                            <!-- First row: Item Name (left) and Ornament Type/Item Category (right) -->
+                                            <div class="col-md-6">
+                                                {{ form.item_name|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.item_category|as_crispy_field }}
+                                            </div>
+                                            
+                                            <!-- Second row: Item Description (left) and Today's 22K Gold Price (right) -->
+                                            <div class="col-md-6">
+                                                {{ form.item_description|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.market_price_22k|as_crispy_field }}
+                                            </div>
+                                            
+                                            <!-- Remaining fields -->
+                                            <div class="col-md-6">
+                                                <div class="row g-2">
+                                                    <div class="col-md-12">
+                                                        {{ form.gold_karat|as_crispy_field }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="row g-2">
+                                                    <div class="col-4">
+                                                        {{ form.gross_weight|as_crispy_field }}
+                                                    </div>
+                                                    <div class="col-4">
+                                                        {{ form.stone_weight|as_crispy_field }}
+                                                    </div>
+                                                    <div class="col-4">
+                                                        {{ form.net_weight|as_crispy_field }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Total Items Count Display (moved to last row and size reduced) -->
+                                            <div class="col-md-6 mt-2">
+                                                <!-- Empty space or you can add another field here if needed -->
+                                            </div>
+                                            <div class="col-md-6 mt-2">
+                                                <div id="totalItemsDisplay" style="display: none;">
+                                                    <div class="d-flex align-items-center">
+                                                        <small class="text-muted me-2">Total Items:</small>
+                                                        <div class="input-group input-group-sm" style="max-width: 120px;">
+                                                            <span class="input-group-text bg-success text-white py-0">
+                                                                <i class="fas fa-list-ol"></i>
+                                                            </span>
+                                                            <input type="text" class="form-control form-control-sm py-0" id="calculatedTotalItems" readonly>
+                                                        </div>
+                                                        <small class="ms-2 text-muted fst-italic" style="font-size: 0.7rem;">
+                                                            (from "ring-6, chain-1")
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
+                            <!-- Right column - photos, biometrics, gold items, financial details -->
                             <div class="col-md-4">
                                 <!-- Biometric Authentication Section -->
-                                <div class="card h-100">
-                                    <div class="card-header bg-light">
-                                        <div class="form-check form-switch">
+                                <div class="card mb-2">
+                                    <div class="card-header bg-light py-1">
+                                        <div class="form-check form-switch mb-0">
                                             <input class="form-check-input" type="checkbox" id="enableBiometricAuth">
-                                            <label class="form-check-label" for="enableBiometricAuth">
-                                                <i class="fas fa-fingerprint me-2"></i>Use Biometric Authentication
+                                            <label class="form-check-label small" for="enableBiometricAuth">
+                                                <i class="fas fa-fingerprint me-1"></i>Use Biometric Authentication
                                             </label>
                                         </div>
                                     </div>
-                                    <div class="card-body" id="biometricAuthSection" style="display: none;">
+                                    <div class="card-body p-2" id="biometricAuthSection" style="display: none;">
                                         <div id="biometricStatus"></div>
-                                        <div class="text-center mb-2">
-                                            <button type="button" class="btn btn-outline-primary" id="verifyBiometricBtn">
-                                                <i class="fas fa-fingerprint me-2"></i>Verify Customer Biometric
+                                        <div class="text-center mb-1">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="verifyBiometricBtn">
+                                                <i class="fas fa-fingerprint me-1"></i>Verify Customer Biometric
                                             </button>
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Customer Photo Section -->
+                                <div class="card mb-2">
+                                    <div class="card-header bg-light py-1">
+                                        <small><strong><i class="fas fa-user-circle me-1"></i>Customer Photo</strong></small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-1">
+                                            <div class="col-6">
+                                                <div id="cameraView" class="border rounded" style="height: 120px; position: relative;">
+                                                    <video id="cameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                                                    <canvas id="photoCanvas" style="display:none;"></canvas>
+                                                </div>
+                                                <div class="d-grid gap-1 mt-1">
+                                                    <button type="button" class="btn btn-xs btn-primary" id="captureBtn">
+                                                        <i class="fas fa-camera me-1"></i>Capture
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div id="photoPreview" class="border rounded d-flex align-items-center justify-content-center bg-light" style="height: 120px;">
+                                                    {% if form.instance.pk and form.instance.customer_face_capture %}
+                                                        <img id="capturedPhoto" class="img-fluid" style="max-height: 120px;" src="{{ form.instance.customer_face_capture }}">
+                                                    {% else %}
+                                                        <span id="noCaptureText" class="small text-muted">{% if form.instance.pk %}No photo{% else %}{% endif %}</span>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="d-grid gap-1 mt-1">
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary" id="retakeBtn">
+                                                        <i class="fas fa-redo me-1"></i>Retake
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Gold Item Photos Section -->
+                                <div class="card mb-2">
+                                    <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+                                        <small><strong><i class="fas fa-camera me-1"></i>Gold Item Photos</strong> <span class="badge bg-danger" id="photoCountBadge">0</span></small>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-1">
+                                            <div class="col-6">
+                                                <div id="itemCameraView" class="border rounded" style="height: 120px; position: relative;">
+                                                    <video id="itemCameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
+                                                    <canvas id="itemPhotoCanvas" style="display:none;"></canvas>
+                                                </div>
+                                                <div class="d-grid gap-1 mt-1">
+                                                    <button type="button" class="btn btn-xs btn-primary" id="captureItemBtn">
+                                                        <i class="fas fa-camera me-1"></i>Capture Item
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="border rounded p-1 bg-light position-relative" style="height: 120px; overflow-y: auto;">
+                                                    <div id="noItemPhotosText" class="text-center text-muted p-1 small">
+                                                        <small>No photos</small>
+                                                    </div>
+                                                    <div id="itemPhotosContainer" class="row g-1" {% if not form.instance.pk %}style="display: none;"{% endif %}>
+                                                        {% if form.instance.pk and item_photos_list %}
+                                                            {% for photo in item_photos_list %}
+                                                                <div class="col-6">
+                                                                    <div class="position-relative">
+                                                                        <img src="{{ photo }}" class="img-thumbnail" alt="Item photo">
+                                                                        <div class="bg-dark bg-opacity-50 text-white position-absolute bottom-0 start-0 end-0 small text-center">
+                                                                            #{{ forloop.counter }}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            {% endfor %}
+                                                        {% endif %}
+                                                    </div>
+                                                    <button type="button" class="btn btn-xs btn-outline-danger position-absolute bottom-0 end-0 m-1" id="clearItemPhotosBtn" {% if not form.instance.pk or not item_photos_list %}disabled{% endif %}>
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-12 pt-1">
+                                                <p class="mb-0 small text-muted" style="font-size: 0.7rem;"><i class="fas fa-info-circle"></i> Take photos from different angles</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Financial Details Section - Moved below Gold Item Photos -->
+                                <div class="card mb-2">
+                                    <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+                                        <h6 class="card-title mb-0">
+                                            <i class="fas fa-money-bill-wave me-1"></i>Financial Details
+                                        </h6>
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="row g-2">
+                                            <div class="col-md-6">
+                                                {{ form.principal_amount|as_crispy_field }}
+                                                <small id="principalAmountWords" class="text-muted d-block mt-0 mb-2" style="font-size: 0.75rem; font-style: italic;"></small>
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ form.distribution_amount|as_crispy_field }}
+                                                <small id="distributionAmountWords" class="text-muted d-block mt-0 mb-2" style="font-size: 0.75rem; font-style: italic;"></small>
+                                            </div>
+                                            <div class="col-md-4">
+                                                {{ form.processing_fee|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-8">
+                                                <div class="row g-2">
+                                                    <div class="col-6">
+                                                        {{ form.due_date|as_crispy_field }}
+                                                    </div>
+                                                    <div class="col-6">
+                                                        {{ form.grace_period_end|as_crispy_field }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="row mb-3">
+                        <!-- Submit Button Row -->
+                        <div class="row mt-2">
                             <div class="col-12">
-                                <h5 class="card-title mb-2 d-flex align-items-center">
-                                    <i class="fas fa-camera me-2"></i>Photos
-                                    <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#photoSection">
-                                        <i class="fas fa-chevron-down"></i>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="{% url 'loan_list' %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Cancel
+                                    </a>
+                                    <button type="submit" class="btn btn-sm btn-primary" id="submitLoanBtn">
+                                        <i class="fas fa-save me-1"></i>
+                                        {% if form.instance.pk %}Update{% else %}Create{% endif %} Loan
                                     </button>
-                                </h5>
-                                <div id="photoSection" class="collapse show">
-                                    <div class="row g-2">
-                                        <!-- Customer Photo -->
-                                        <div class="col-md-6">
-                                            <div class="card card-sm h-100">
-                                                <div class="card-header py-1 px-2 bg-light">
-                                                    <small><strong>Customer Photo</strong></small>
-                                                </div>
-                                                <div class="card-body p-2">
-                                                    <div class="row g-2">
-                                                        <div class="col-md-6">
-                                                            <div id="cameraView" class="border rounded" style="height: 150px; position: relative;">
-                                                                <video id="cameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
-                                                                <canvas id="photoCanvas" style="display:none;"></canvas>
-                                                            </div>
-                                                            <div class="d-grid gap-1 mt-1">
-                                                                <button type="button" class="btn btn-sm btn-primary" id="captureBtn">
-                                                                    <i class="fas fa-camera me-1"></i>Capture
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <div id="photoPreview" class="border rounded d-flex align-items-center justify-content-center bg-light" style="height: 150px;">
-                                                                {% if form.instance.pk and form.instance.customer_face_capture %}
-                                                                    <img id="capturedPhoto" class="img-fluid" style="max-height: 150px;" src="{{ form.instance.customer_face_capture }}">
-                                                                {% else %}
-                                                                    <span id="noCaptureText" class="small text-muted">{% if form.instance.pk %}No photo{% else %}{% endif %}</span>
-                                                                {% endif %}
-                                                            </div>
-                                                            <div class="d-grid gap-1 mt-1">
-                                                                <button type="button" class="btn btn-sm btn-outline-secondary" id="retakeBtn">
-                                                                    <i class="fas fa-redo me-1"></i>Retake
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- Gold Item Photos -->
-                                        <div class="col-md-6">
-                                            <div class="card card-sm h-100">
-                                                <div class="card-header py-1 px-2 bg-light">
-                                                    <small><strong>Gold Item Photos</strong> <span class="badge bg-danger" id="photoCountBadge">0</span></small>
-                                                </div>
-                                                <div class="card-body p-2">
-                                                    <div class="row g-2">
-                                                        <div class="col-md-6">
-                                                            <div id="itemCameraView" class="border rounded" style="height: 150px; position: relative;">
-                                                                <video id="itemCameraStream" style="width: 100%; height: 100%; object-fit: cover;" autoplay playsinline></video>
-                                                                <canvas id="itemPhotoCanvas" style="display:none;"></canvas>
-                                                            </div>
-                                                            <div class="d-grid gap-1 mt-1">
-                                                                <button type="button" class="btn btn-sm btn-primary" id="captureItemBtn">
-                                                                    <i class="fas fa-camera me-1"></i>Capture Item
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div class="col-md-6">
-                                                            <div class="border rounded p-1 bg-light position-relative" style="height: 150px; overflow-y: auto;">
-                                                                <div id="noItemPhotosText" class="text-center text-muted p-2 small">
-                                                                    <small>No photos available</small>
-                                                                </div>
-                                                                <div id="itemPhotosContainer" class="row g-1" {% if not form.instance.pk %}style="display: none;"{% endif %}>
-                                                                    {% if form.instance.pk and item_photos_list %}
-                                                                        {% for photo in item_photos_list %}
-                                                                            <div class="col-6">
-                                                                                <div class="position-relative">
-                                                                                    <img src="{{ photo }}" class="img-thumbnail" alt="Item photo">
-                                                                                    <div class="bg-dark bg-opacity-50 text-white position-absolute bottom-0 start-0 end-0 small text-center">
-                                                                                        Photo {{ forloop.counter }}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        {% endfor %}
-                                                                    {% endif %}
-                                                                </div>
-                                                                <button type="button" class="btn btn-sm btn-outline-danger position-absolute bottom-0 end-0 m-1" id="clearItemPhotosBtn" {% if not form.instance.pk or not item_photos_list %}disabled{% endif %}>
-                                                                    <i class="fas fa-trash-alt"></i>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="card-footer p-1 bg-light">
-                                                    <p class="mb-0 small text-muted"><i class="fas fa-info-circle"></i> Take multiple photos from different angles</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    {% if not form.instance.pk %}
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="continueIterateBtn">
+                                        <i class="fas fa-plus-circle me-1"></i>Save & Create Another
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Gold Item Details Section -->
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-gem me-2"></i>Gold Item Details
-                                </h5>
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.item_name|as_crispy_field }}
-                                <!-- Total Items Count Display -->
-                                <div id="totalItemsDisplay" class="mb-3" style="display: none;">
-                                    <label class="form-label">Total Items Count</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text bg-success text-white">
-                                            <i class="fas fa-list-ol"></i>
-                                        </span>
-                                        <input type="text" class="form-control" id="calculatedTotalItems" readonly>
-                                    </div>
-                                    <div class="form-text text-muted">
-                                        <small><i class="fas fa-info-circle"></i> Automatically calculated from item name (format: "ring-6, chain-1")</small>
-                                    </div>
-                                </div>
-                                <!-- Item Description (moved from below) -->
-                                {{ form.item_description|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.item_category|as_crispy_field }}
-                                <!-- Other item details like market price, karat, weight, etc. -->
-                                {{ form.market_price_22k|as_crispy_field }}
-                                {{ form.gold_karat|as_crispy_field }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ form.gross_weight|as_crispy_field }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ form.stone_weight|as_crispy_field }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ form.net_weight|as_crispy_field }}
-                            </div>
-                        </div>
-
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-money-bill-wave me-2"></i>Loan Details
-                                </h5>
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.scheme|as_crispy_field }}
-                                <div id="scheme-info" class="alert alert-info small mb-0 mt-2" style="display: none;">
-                                    <span id="scheme-details"></span>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.principal_amount|as_crispy_field }}
-                                <small id="principalAmountWords" class="text-muted d-block mt-1" style="font-style: italic;"></small>
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.processing_fee|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.distribution_amount|as_crispy_field }}
-                            </div>
-                            <!-- Interest rate field removed from UI -->
-                            <input type="hidden" id="id_interest_rate" name="interest_rate" value="12.00">
-                        </div>
-                        
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <h5 class="card-title mb-3">
-                                    <i class="fas fa-calendar me-2"></i>Dates
-                                </h5>
-                            </div>
-                            <div class="col-md-4">
-                                {{ form.issue_date|as_crispy_field }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ form.due_date|as_crispy_field }}
-                            </div>
-                            <div class="col-md-4">
-                                {{ form.grace_period_end|as_crispy_field }}
-                            </div>
-                        </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'loan_list' %}" class="btn btn-outline-secondary me-md-2">
-                                <i class="fas fa-times me-2"></i>Cancel
-                            </a>
-                            <button type="submit" class="btn btn-primary" id="submitLoanBtn">
-                                <i class="fas fa-save me-2"></i>
-                                {% if form.instance.pk %}Update{% else %}Create{% endif %} Loan
-                            </button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>
@@ -491,7 +535,7 @@
         const capturedPhoto = document.getElementById('capturedPhoto') || document.createElement('img');
         capturedPhoto.id = 'capturedPhoto';
         capturedPhoto.className = 'img-fluid';
-        capturedPhoto.style.maxHeight = '150px';
+        capturedPhoto.style.maxHeight = '120px';
         capturedPhoto.style.display = 'none';
         
         const captureBtn = document.getElementById('captureBtn');
@@ -1025,12 +1069,22 @@
                 const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
                 const goldValue = marketPrice * netWeight * purityRatio;
                 
-                // Calculate suggested principal (75% of gold value)
-                const suggestedPrincipal = Math.round(goldValue * 0.75);
+                // Calculate standard principal (75% of gold value)
+                const standardPrincipal = goldValue * 0.75;
                 
-                // Calculate minimum and maximum allowed values
-                const minPrincipal = Math.round(goldValue * 0.5);
-                const maxPrincipal = Math.round(goldValue * 0.85);
+                // Round to nearest multiple of 500
+                let suggestedPrincipal = Math.round(standardPrincipal / 500) * 500;
+                
+                // Calculate minimum (73%) and maximum (78%) allowed values
+                const minPrincipal = goldValue * 0.73;
+                const maxPrincipal = goldValue * 0.78;
+                
+                // Ensure the rounded amount stays between 73% and 78%
+                if (suggestedPrincipal < minPrincipal) {
+                    suggestedPrincipal = Math.ceil(minPrincipal / 500) * 500;
+                } else if (suggestedPrincipal > maxPrincipal) {
+                    suggestedPrincipal = Math.floor(maxPrincipal / 500) * 500;
+                }
 
                 // Set the suggested principal amount
                 $('#id_principal_amount').val(suggestedPrincipal);
@@ -1038,8 +1092,15 @@
                 // Trigger the distribution amount calculation
                 calculateDistributionAmount();
                 
-                // Create concise help text
-                const helpText = `<i class="fas fa-info-circle"></i> Val: ₹${goldValue.toFixed(0)} | Range: ₹${minPrincipal}-₹${maxPrincipal} (50-85%)`;
+                // Calculate actual percentage of rounded principal
+                const actualPercentage = (suggestedPrincipal / goldValue) * 100;
+                
+                // Calculate min and max principal values to display
+                const minPrincipalValue = Math.round(goldValue * 0.5);
+                const maxPrincipalValue = Math.round(goldValue * 0.85);
+                
+                // Updated help text showing min and max percentages with their values
+                const helpText = `<i class="fas fa-info-circle"></i> Gold Value: ₹${goldValue.toFixed(0)} | Principal: ₹${suggestedPrincipal} (${actualPercentage.toFixed(1)}%) | Min Principal (50%): ₹${minPrincipalValue} - Max Principal (85%): ₹${maxPrincipalValue}`;
                 
                 // Update the form-text element or create it if it doesn't exist
                 let formText = $('#div_id_principal_amount .form-text');

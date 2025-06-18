@@ -61,7 +61,7 @@ class LoanForm(forms.ModelForm):
         required=False,  # Making it optional
         label='Item Description',
         help_text='Optional: Detailed description of the item including any distinguishing marks or damaged parts',
-        widget=forms.Textarea(attrs={'rows': 3})
+        widget=forms.TextInput(attrs={'class': 'form-control'})
     )
     item_category = forms.ModelChoiceField(
         required=True,
@@ -164,6 +164,11 @@ class LoanForm(forms.ModelForm):
         # Apply the same ordering as in the Loan Schemes page
         self.fields['scheme'].queryset = scheme_queryset.order_by('name')
         
+        # Set "Standard Gold Loan" as the default selection if it exists
+        standard_gold_loan = scheme_queryset.filter(name='Standard Gold Loan').first()
+        if standard_gold_loan:
+            self.fields['scheme'].initial = standard_gold_loan
+        
         # If no schemes are available, create a default one to prevent form errors
         if not scheme_queryset.exists():
             print("No schemes found in schemes app, consider creating some.")
@@ -172,8 +177,7 @@ class LoanForm(forms.ModelForm):
         self.fields['principal_amount'] = forms.DecimalField(
             max_digits=10,
             decimal_places=0,
-            help_text="",  # Removing help text as we'll display amount in words instead
-            widget=forms.TextInput()  # Changed to TextInput
+            help_text=""  # Removing help text as we'll display amount in words instead
         )
 
         # Update processing_fee field to use integer values
