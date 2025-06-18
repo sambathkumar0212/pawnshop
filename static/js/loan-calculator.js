@@ -11,10 +11,27 @@ document.addEventListener('DOMContentLoaded', function() {
     const processingFeeInput = document.getElementById('id_processing_fee');
     const distributionAmountInput = document.getElementById('id_distribution_amount');
     const issueDateInput = document.getElementById('id_issue_date');
+    const dueDateInput = document.getElementById('id_due_date');
+    const gracePeriodEndInput = document.getElementById('id_grace_period_end');
+    
+    // Gold calculation related elements
+    const marketPriceInput = document.getElementById('id_market_price_22k');
+    const goldKaratSelect = document.getElementById('id_gold_karat');
+    const netWeightInput = document.getElementById('id_net_weight');
     
     // Get display containers
     const schemeInfoBox = document.getElementById('scheme-info');
     const loanMetricsBox = document.getElementById('loan-metrics');
+    
+    // Define karat purity constants
+    const KARAT_PURITY = {
+        '24': 0.999,
+        '22': 0.916,
+        '21': 0.875,
+        '20': 0.833,
+        '18': 0.750,
+        '14': 0.583
+    };
     
     // Function to format currency
     function formatCurrency(amount) {
@@ -66,21 +83,194 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Function to calculate gold value and display min/max principal amounts
+    function calculateGoldValueAndLimits() {
+        const marketPrice = parseFloat(marketPriceInput.value) || 0;
+        const selectedKarat = goldKaratSelect.value;
+        const netWeight = parseFloat(netWeightInput.value) || 0;
+        
+        // Remove any existing gold value display
+        const existingDisplay = document.getElementById('gold-value-display');
+        if (existingDisplay) {
+            existingDisplay.remove();
+        }
+        
+        // Check if we have all required values
+        if (marketPrice <= 0 || !selectedKarat || netWeight <= 0) {
+            return;
+        }
+        
+        // Calculate gold value based on purity ratio
+        const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
+        const goldValue = marketPrice * netWeight * purityRatio;
+        
+        // Calculate min and max principal amounts
+        const minPrincipal = Math.round(goldValue * 0.5); // 50% of gold value
+        const maxPrincipal = Math.round(goldValue * 0.85); // 85% of gold value
+        const suggestedPrincipal = Math.round(goldValue * 0.75); // 75% of gold value
+        
+        // Create a display element for the gold value information
+        const displayDiv = document.createElement('div');
+        displayDiv.id = 'gold-value-display';
+        displayDiv.className = 'card mb-3 mt-2';
+        displayDiv.innerHTML = `
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-calculator me-2"></i> Gold Value & Principal Range
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="border rounded p-2 text-center mb-2">
+                            <div class="small text-muted">Gold Value</div>
+                            <div class="fw-bold">₹${goldValue.toFixed(0)}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-2 text-center mb-2 bg-light">
+                            <div class="small text-muted">Min Principal (50%)</div>
+                            <div class="fw-bold text-danger">₹${minPrincipal}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border rounded p-2 text-center mb-2 bg-light">
+                            <div class="small text-muted">Max Principal (85%)</div>
+                            <div class="fw-bold text-success">₹${maxPrincipal}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="border rounded p-2 text-center mb-2 bg-light">
+                            <div class="small text-muted">Suggested Principal (75%)</div>
+                            <div class="fw-bold text-primary">₹${suggestedPrincipal}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-grid mt-2">
+                    <button type="button" id="setSuggestedPrincipal" class="btn btn-sm btn-primary">
+                        Set Suggested Principal (75%): ₹${suggestedPrincipal}
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Insert the display element before the principal amount field
+        const principalFormGroup = document.getElementById('div_id_principal_amount');
+        if (principalFormGroup) {
+            principalFormGroup.insertAdjacentElement('beforebegin', displayDiv);
+            
+            // Add event listener to the "Set Suggested Principal" button
+            document.getElementById('setSuggestedPrincipal').addEventListener('click', function() {
+                if (principalInput) {
+                    principalInput.value = suggestedPrincipal;
+                    principalInput.dispatchEvent(new Event('input')); // Trigger input event to update dependent fields
+                    showNotification('Principal amount set to suggested value of ₹' + suggestedPrincipal, 'success');
+                }
+            });
+            
+            // Check if the current principal is within the range
+            const currentPrincipal = parseFloat(principalInput.value) || 0;
+            if (currentPrincipal < minPrincipal) {
+                showNotification('Warning: Current principal is below the minimum recommended amount', 'warning');
+            } else if (currentPrincipal > maxPrincipal) {
+                showNotification('Warning: Current principal exceeds the maximum recommended amount', 'warning');
+            }
+        }
+    }
+    
+    // Function to calculate dates based on scheme duration
+    function calculateDates(issueDate, durationDays, graceDays = 30) {
+        if (!issueDate) return { dueDate: null, gracePeriodEnd: null };
+        
+        const issueDateObj = new Date(issueDate);
+        
+        // Calculate due date
+        const dueDateObj = new Date(issueDateObj);
+        dueDateObj.setDate(dueDateObj.getDate() + durationDays);
+        
+        // Calculate grace period end date
+        const gracePeriodEndObj = new Date(dueDateObj);
+        gracePeriodEndObj.setDate(gracePeriodEndObj.getDate() + graceDays);
+        
+        // Format dates as YYYY-MM-DD
+        const dueDate = dueDateObj.toISOString().split('T')[0];
+        const gracePeriodEnd = gracePeriodEndObj.toISOString().split('T')[0];
+        
+        return { dueDate, gracePeriodEnd };
+    }
+    
+    // Function to update dates based on scheme loan duration
+    function updateDatesFromScheme(scheme) {
+        // If issue date is not set, use today's date for calculations
+        // This ensures dates are always updated when scheme changes
+        let dateToUse = issueDateInput.value;
+        
+        if (!dateToUse) {
+            const today = new Date();
+            dateToUse = today.toISOString().split('T')[0];
+            
+            // Update the issue date input with today's date if it's empty
+            if (issueDateInput) {
+                issueDateInput.value = dateToUse;
+                showNotification('Issue date set to today', 'info');
+            }
+        }
+        
+        // Get grace period days from additional_conditions or default to 30
+        const gracePeriodDays = 
+            (scheme.additional_conditions && scheme.additional_conditions.grace_period_days) || 30;
+            
+        const { dueDate, gracePeriodEnd } = calculateDates(
+            dateToUse, 
+            scheme.loan_duration, 
+            gracePeriodDays
+        );
+        
+        // Update due date and grace period end inputs
+        if (dueDateInput && dueDate) {
+            dueDateInput.value = dueDate;
+        }
+        
+        if (gracePeriodEndInput && gracePeriodEnd) {
+            gracePeriodEndInput.value = gracePeriodEnd;
+        }
+        
+        // Show notification that dates were updated
+        showNotification('Due date and grace period end date have been automatically updated based on the selected scheme', 'info');
+    }
+    
+    // Function to show notification if that function exists in the parent scope
+    function showNotification(message, type) {
+        // Check if the parent scope has a showAlert function
+        if (typeof window.showAlert === 'function') {
+            window.showAlert(message, type);
+        } else {
+            console.info(message);
+        }
+    }
+    
     // Function to load scheme details
     function loadSchemeDetails() {
+        const schemeSelect = document.getElementById('id_scheme');
         const schemeId = schemeSelect.value;
         
         // Clear scheme info if no scheme selected
         if (!schemeId) {
             if (schemeInfoBox) {
+                schemeInfoBox.style.display = 'none';
                 schemeInfoBox.innerHTML = '';
-                schemeInfoBox.classList.add('d-none');
+            }
+            
+            // Reset help text to default when no scheme is selected
+            const schemeHelpText = document.querySelector('#div_id_scheme .form-text');
+            if (schemeHelpText) {
+                schemeHelpText.innerHTML = 'Select a loan scheme to apply to this loan';
             }
             return;
         }
         
-        // Fetch scheme details from API
-        fetch(`/api/schemes/${schemeId}/`)
+        // Fetch scheme details from API - using the correct URL pattern
+        fetch(`/schemes/${schemeId}/json/`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Failed to load scheme details');
@@ -88,7 +278,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(scheme => {
-                // Update interest rate and processing fee inputs with scheme values
+                // Set scheme info display to visible
+                if (schemeInfoBox) {
+                    schemeInfoBox.style.display = 'block';
+                }
+                
+                // Get processing fee percentage from additional_conditions or default to 2%
+                const processingFeePercentage = 
+                    (scheme.additional_conditions && scheme.additional_conditions.processing_fee_percentage) || 2;
+                
+                // Update interest rate input with scheme value
                 if (interestRateInput) {
                     interestRateInput.value = scheme.interest_rate;
                 }
@@ -96,64 +295,66 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Calculate processing fee based on principal amount and scheme percentage
                 if (processingFeeInput && principalInput.value) {
                     const principal = parseFloat(principalInput.value) || 0;
-                    const feePercentage = scheme.processing_fee_percentage;
-                    processingFeeInput.value = (principal * feePercentage / 100).toFixed(2);
+                    processingFeeInput.value = (principal * processingFeePercentage / 100).toFixed(2);
                 }
                 
-                // Display scheme details in the info box
-                if (schemeInfoBox) {
-                    schemeInfoBox.classList.remove('d-none');
-                    
-                    // Format date based on scheme duration
-                    let maturityDate = '';
-                    if (issueDateInput && issueDateInput.value) {
-                        const issueDate = new Date(issueDateInput.value);
-                        const durationDays = scheme.duration_days;
-                        const maturity = new Date(issueDate);
-                        maturity.setDate(maturity.getDate() + durationDays);
-                        
-                        // Format date as YYYY-MM-DD
-                        maturityDate = maturity.toISOString().split('T')[0];
-                    }
-                    
-                    schemeInfoBox.innerHTML = `
-                        <div class="card-body bg-light">
-                            <h5 class="card-title">${scheme.name} Details</h5>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p><strong>Type:</strong> ${scheme.scheme_type}</p>
-                                    <p><strong>Interest Rate:</strong> ${scheme.interest_rate}%</p>
-                                    <p><strong>Processing Fee:</strong> ${scheme.processing_fee_percentage}%</p>
-                                </div>
-                                <div class="col-md-6">
-                                    <p><strong>Duration:</strong> ${scheme.duration_days} days</p>
-                                    <p><strong>Min. Period:</strong> ${scheme.minimum_period_days} days</p>
-                                    ${maturityDate ? `<p><strong>Expected Maturity:</strong> ${maturityDate}</p>` : ''}
-                                </div>
+                // Always update dates when scheme changes, regardless of whether issue date is set
+                updateDatesFromScheme(scheme);
+                
+                // Get grace period days from additional_conditions or default to 30
+                const gracePeriodDays = 
+                    (scheme.additional_conditions && scheme.additional_conditions.grace_period_days) || 30;
+                
+                // Get minimum period days from additional_conditions if it exists
+                const minimumPeriodDays = 
+                    (scheme.additional_conditions && scheme.additional_conditions.minimum_period_days) || 0;
+                
+                // Create scheme details HTML
+                const schemeDetailsHTML = `
+                    <div class="card-body bg-light">
+                        <h5 class="card-title">${scheme.name} Details</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Type:</strong> ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'}</p>
+                                <p><strong>Interest Rate:</strong> ${scheme.interest_rate}%</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Loan Period:</strong> ${scheme.loan_duration} days</p>
+                                <p><strong>Grace Period:</strong> ${gracePeriodDays} days</p>
                             </div>
                         </div>
-                    `;
+                    </div>
+                `;
+                        
+                // Display scheme details in the info box
+                if (schemeInfoBox) {
+                    schemeInfoBox.innerHTML = schemeDetailsHTML;
                 }
                 
-                // After loading scheme details, calculate loan metrics
-                calculateLoanMetrics();
+                // Update the help text with scheme details
+                const schemeHelpText = document.querySelector('#div_id_scheme .form-text');
+                if (schemeHelpText) {
+                    const helpTextHTML = `
+                        <strong>${scheme.name}:</strong> ${scheme.interest_rate}% interest | 
+                        ${scheme.loan_duration} days term | ${gracePeriodDays} days grace period | 
+                        ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'} scheme
+                    `;
+                    schemeHelpText.innerHTML = helpTextHTML;
+                }
             })
             .catch(error => {
                 console.error('Error loading scheme details:', error);
-                if (schemeInfoBox) {
-                    schemeInfoBox.innerHTML = `
-                        <div class="alert alert-danger">
-                            Failed to load scheme details. Please try again or contact support.
-                        </div>
-                    `;
-                    schemeInfoBox.classList.remove('d-none');
-                }
+                showNotification('Error loading scheme details. Please try again.', 'danger');
             });
     }
     
     // Set up event listeners
     if (schemeSelect) {
-        schemeSelect.addEventListener('change', loadSchemeDetails);
+        // Adding a separate event listener for the scheme select to ensure dates always update
+        schemeSelect.addEventListener('change', function() {
+            // Load scheme details will update dates
+            loadSchemeDetails();
+        });
     }
     
     if (principalInput) {
@@ -167,6 +368,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 calculateLoanMetrics();
             }
         });
+    }
+    
+    // Add event listeners for gold value calculation
+    if (marketPriceInput) {
+        marketPriceInput.addEventListener('input', calculateGoldValueAndLimits);
+    }
+    
+    if (goldKaratSelect) {
+        goldKaratSelect.addEventListener('change', calculateGoldValueAndLimits);
+    }
+    
+    if (netWeightInput) {
+        netWeightInput.addEventListener('input', calculateGoldValueAndLimits);
     }
     
     if (interestRateInput) {
@@ -191,5 +405,12 @@ document.addEventListener('DOMContentLoaded', function() {
         loadSchemeDetails();
     } else {
         calculateLoanMetrics();
+    }
+    
+    // Calculate gold value if all required fields have values
+    if (marketPriceInput && marketPriceInput.value && 
+        goldKaratSelect && goldKaratSelect.value && 
+        netWeightInput && netWeightInput.value) {
+        calculateGoldValueAndLimits();
     }
 });

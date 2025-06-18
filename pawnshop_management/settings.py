@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'reporting',
     'biometrics',
     'integrations',
-    'content_manager',  # Added content manager app
+    'schemes',  # Schemes management app
 ]
 
 # For minimal startup, remove optional middleware
