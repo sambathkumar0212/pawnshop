@@ -1,6 +1,18 @@
 #!/bin/bash
 set -e
 
+# Create a timestamped log file to verify execution
+TIMESTAMP=$(date "+%Y-%m-%d_%H-%M-%S")
+LOG_FILE="post_deploy_executed_${TIMESTAMP}.log"
+LOGS_DIR="/tmp/pawnshop_logs"
+mkdir -p $LOGS_DIR
+
+echo "Post-deployment script started at $(date)" > ${LOGS_DIR}/${LOG_FILE}
+echo "Hostname: $(hostname)" >> ${LOGS_DIR}/${LOG_FILE}
+
+# Also create a marker file in a visible location
+touch "post_deploy_ran_${TIMESTAMP}.marker"
+
 echo "Running post-deployment tasks..."
 
 # Set environment variables
@@ -9,7 +21,97 @@ export RENDER=true
 
 # Print database configuration
 echo "Verifying database configuration..."
-python -c "import os; from django.conf import settings; import django; django.setup(); db = settings.DATABASES['default']; print(f\"DATABASE ENGINE: {db.get('ENGINE', 'Not set')}\"); print(f\"DATABASE NAME: {db.get('NAME', 'Not set')}\"); print(f\"DATABASE HOST: {db.get('HOST', 'Not set')}\")"
+DB_INFO=$(python -c "import os; from django.conf import settings; import django; django.setup(); db = settings.DATABASES['default']; print(f\"DATABASE ENGINE: {db.get('ENGINE', 'Not set')}\"); print(f\"DATABASE NAME: {db.get('NAME', 'Not set')}\"); print(f\"DATABASE HOST: {db.get('HOST', 'Not set')}\")")
+echo "$DB_INFO"
+echo "$DB_INFO" >> ${LOGS_DIR}/${LOG_FILE}
+
+# Write execution status to database for visibility
+echo "Recording execution in database..."
+python -c "
+import os, django, datetime
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+from django.db import connection, transaction
+from django.utils import timezone
+
+# Create a log table if it doesn't exist
+with connection.cursor() as cursor:
+    try:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS deployment_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                script_name VARCHAR(100),
+                execution_time TIMESTAMP,
+                status TEXT,
+                message TEXT
+            )
+        ''')
+        
+        # Insert a record to show this script ran
+        cursor.execute('''
+            INSERT INTO deployment_logs (script_name, execution_time, status, message)
+            VALUES (?, ?, ?, ?)
+        ''', ('post_deploy.sh', timezone.now(), 'STARTED', 'Post-deployment script execution started'))
+        
+    except Exception as e:
+        print(f'Error creating log table: {e}')
+"
+
+# DIRECT SQL FIX: Create django_session table if it doesn't exist
+echo "Creating django_session table directly if missing..."
+SESSION_RESULT=$(python -c "
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+from django.db import connection, DatabaseError
+
+# Check if django_session exists - using try/except to be safe
+try:
+    with connection.cursor() as cursor:
+        cursor.execute(\"SELECT COUNT(*) FROM django_session\")
+        print('✅ django_session table exists')
+except Exception as e:
+    print(f'⚠️ django_session table may not exist: {e}')
+    print('Creating django_session table with direct SQL...')
+    
+    # Create the django_session table with direct SQL based on Django's schema
+    # This handles both SQLite and PostgreSQL
+    with connection.cursor() as cursor:
+        if 'sqlite' in connection.vendor:
+            # SQLite syntax
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS django_session (
+                    session_key varchar(40) NOT NULL PRIMARY KEY,
+                    session_data text NOT NULL,
+                    expire_date datetime NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS django_session_expire_date_idx 
+                ON django_session (expire_date);
+            ''')
+        elif 'postgresql' in connection.vendor:
+            # PostgreSQL syntax
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS django_session (
+                    session_key varchar(40) NOT NULL PRIMARY KEY,
+                    session_data text NOT NULL,
+                    expire_date timestamp with time zone NOT NULL
+                );
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_indexes 
+                        WHERE indexname = 'django_session_expire_date_idx'
+                    ) THEN
+                        CREATE INDEX django_session_expire_date_idx 
+                        ON django_session (expire_date);
+                    END IF;
+                END
+                $$;
+            ''')
+        print('✅ django_session table created successfully')
+")
+echo "$SESSION_RESULT"
+echo "$SESSION_RESULT" >> ${LOGS_DIR}/${LOG_FILE}
 
 # Create a temporary Python script for checking the database
 cat > /tmp/check_db.py << EOL
@@ -126,7 +228,7 @@ fi
 
 # Extra check for django_session table to ensure it was created
 echo "Double-checking django_session table creation..."
-python -c "
+SESSION_VERIFY=$(python -c "
 import os, django
 from django.db import connection
 from django.db.utils import OperationalError
@@ -156,11 +258,15 @@ except OperationalError:
         schema_editor.create_model(session_model)
     
     print('Session table created with direct SQL')
-"
+")
+echo "$SESSION_VERIFY"
+echo "$SESSION_VERIFY" >> ${LOGS_DIR}/${LOG_FILE}
 
 # Verify migrations were applied correctly
 echo "Verifying migration status..."
-python manage.py showmigrations | grep -v "\[X\]" || true
+MIGRATION_STATUS=$(python manage.py showmigrations | grep -v "\[X\]" || true)
+echo "$MIGRATION_STATUS"
+echo "$MIGRATION_STATUS" >> ${LOGS_DIR}/${LOG_FILE}
 
 # Set up staff roles for multi-branch management
 echo "Setting up staff roles for multi-branch management..."
@@ -186,4 +292,27 @@ else:
   "
 fi
 
-echo "Post-deployment tasks completed!"
+# Complete the database log entry
+python -c "
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
+django.setup()
+from django.db import connection
+from django.utils import timezone
+
+with connection.cursor() as cursor:
+    try:
+        cursor.execute('''
+            INSERT INTO deployment_logs (script_name, execution_time, status, message)
+            VALUES (?, ?, ?, ?)
+        ''', ('post_deploy.sh', timezone.now(), 'COMPLETED', 'Post-deployment script completed successfully'))
+    except Exception as e:
+        print(f'Error logging completion: {e}')
+"
+
+echo "Post-deployment tasks completed at $(date)" >> ${LOGS_DIR}/${LOG_FILE}
+
+# Create visible notification files in multiple locations
+echo "Post-deploy script ran successfully at $(date)" > post_deploy_success.log
+echo "Post-deploy script ran successfully at $(date)" > /tmp/post_deploy_success.log
+echo "Post-deploy script ran successfully at $(date)" > static/post_deploy_success.log 2>/dev/null || true
