@@ -196,11 +196,12 @@
             text-transform: uppercase;
             letter-spacing: 1px; /* Reduced letter spacing */
         }
-        .rupee {
-            font-family: 'Arial Unicode MS', 'Lucida Sans Unicode', sans-serif;
-            font-weight: normal;
-            display: inline-block;
+        
+        /* Update rupee symbol styles */
+        .amount, .currency-symbol, .rupee {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Arial Unicode MS', 'Noto Sans', sans-serif;
         }
+        
         @media print {
             .receipt-container {
                 border: none;
@@ -250,13 +251,13 @@
                 <thead>
                     <tr>
                         <th>Description</th>
-                        <th style="text-align: right;">Amount (<span class="rupee">Rs.</span>)</th>
+                        <th style="text-align: right;">Amount (₹)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td>Payment towards Loan #{{ loan.loan_number }}</td>
-                        <td style="text-align: right; font-weight: bold;"><span class="rupee">Rs.</span> {{ payment.amount|floatformat:2 }}</td>
+                        <td style="text-align: right; font-weight: bold;">₹{{ payment.amount|floatformat:2 }}</td>
                     </tr>
                     {% if payment_type == 'full' %}
                     <tr>
@@ -275,24 +276,24 @@
             <table class="totals-table">
                 <tr>
                     <td class="total-label">Total Amount Paid:</td>
-                    <td class="total-amount"><span class="rupee">Rs.</span>{{ payment.amount|floatformat:2 }}</td>
+                    <td class="total-amount"><span class="currency-symbol">₹</span>{{ payment.amount|floatformat:2 }}</td>
                 </tr>
                 <tr>
                     <td class="total-label">Principal Amount:</td>
-                    <td class="total-amount"><span class="rupee">Rs.</span>{{ loan.principal_amount|floatformat:2 }}</td>
+                    <td class="total-amount"><span class="currency-symbol">₹</span>{{ loan.principal_amount|floatformat:2 }}</td>
                 </tr>
                 <tr>
                     <td class="total-label">Interest Accrued:</td>
-                    <td class="total-amount"><span class="rupee">Rs.</span>{{ interest_amount|floatformat:2 }}</td>
+                    <td class="total-amount"><span class="currency-symbol">₹</span>{{ interest_amount|floatformat:2 }}</td>
                 </tr>
                 <tr>
                     <td class="total-label">Total Paid Till Date:</td>
-                    <td class="total-amount"><span class="rupee">Rs.</span>{{ total_paid|floatformat:2 }}</td>
+                    <td class="total-amount"><span class="currency-symbol">₹</span>{{ total_paid|floatformat:2 }}</td>
                 </tr>
                 {% if remaining_balance > 0 %}
                 <tr>
                     <td class="total-label">Remaining Balance:</td>
-                    <td class="total-amount"><span class="rupee">Rs.</span>{{ remaining_balance|floatformat:2 }}</td>
+                    <td class="total-amount"><span class="currency-symbol">₹</span>{{ remaining_balance|floatformat:2 }}</td>
                 </tr>
                 {% else %}
                 <tr>

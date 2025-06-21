@@ -22,6 +22,16 @@ def subtract(value, arg):
     except (ValueError, TypeError):
         return 0
 
+@register.filter(name='replace_underscore')
+def replace_underscore(value):
+    """Replace underscores with spaces and capitalize each word"""
+    if not value:
+        return ""
+    try:
+        return value.replace('_', ' ')
+    except (ValueError, TypeError, AttributeError):
+        return value
+
 @register.filter(name='get_first_photo')
 def get_first_photo(item_photos):
     """Extract the first photo URL from JSON string of photos"""

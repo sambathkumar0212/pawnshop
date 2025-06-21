@@ -3,6 +3,7 @@
 {% load loan_tags %}
 {% load custom_filters %}
 {% load loan_filters %}
+{% load loan_interest %}
 
 {% block title %}Loan #{{ loan.loan_number }} - Pawnshop Management{% endblock %}
 
@@ -114,7 +115,6 @@
                                     <label class="small text-muted">Scheme</label>
                                     <p class="mb-0">
                                         <span class="badge bg-info">{{ loan.scheme.name }}</span>
-                                        <small class="text-muted">({{ loan.scheme.interest_rate }}%)</small>
                                         {% if loan.scheme.no_interest_period_days %}
                                             <small class="text-muted"> - no interest if paid within {{ loan.scheme.no_interest_period_days }} days</small>
                                         {% endif %}
@@ -126,30 +126,30 @@
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Principal Amount</label>
-                                    <p class="mb-0">₹{{ loan.principal_amount|floatformat:2 }}</p>
+                                    <p class="mb-0 rupee-symbol">₹{{ loan.principal_amount|floatformat:2 }}</p>
                                     <small class="text-muted" id="principalAmountWords" style="font-size: 0.75em;">
                                         {{ loan.principal_amount|number_to_words|title }} Rupees Only
                                     </small>
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Total Payable (Till Today)</label>
-                                    <p class="mb-0">₹{{ loan.total_payable_till_date|floatformat:0 }}</p>
+                                    <p class="mb-0 rupee-symbol">₹{{ loan.total_payable_till_date|floatformat:0 }}</p>
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Total Payable (Maturity)</label>
-                                    <p class="mb-0">₹{{ loan.total_payable_mature|floatformat:0 }}</p>
+                                    <p class="mb-0 rupee-symbol">₹{{ loan.total_payable_mature|floatformat:0 }}</p>
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Amount Already Paid</label>
-                                    <p class="mb-0">₹{{ loan.amount_paid|floatformat:2 }}</p>
+                                    <p class="mb-0 rupee-symbol">₹{{ loan.amount_paid|floatformat:2 }}</p>
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Net Payable (Still Due)</label>
-                                    <p class="mb-0 fw-bold text-danger">₹{{ loan.total_payable_till_date|subtract:loan.amount_paid|floatformat:0 }}</p>
+                                    <p class="mb-0 fw-bold text-danger rupee-symbol">₹{{ loan.total_payable_till_date|subtract:loan.amount_paid|floatformat:0 }}</p>
                                 </div>
                                 <div class="col-md-3 mb-2">
                                     <label class="small text-muted">Remaining Balance</label>
-                                    <p class="mb-0">₹{{ loan.remaining_balance|floatformat:0 }}</p>
+                                    <p class="mb-0 rupee-symbol">₹{{ loan.remaining_balance|floatformat:0 }}</p>
                                 </div>
                             </div>
                         </div>
@@ -168,55 +168,50 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="text-muted">Processing Fee</label>
-                            <p class="mb-0">₹{{ loan.processing_fee|floatformat:2 }}</p>
+                            <p class="mb-0 rupee-symbol">₹{{ loan.processing_fee }}</p>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="text-muted">Distribution Amount</label>
-                            <p class="mb-0">₹{{ loan.distribution_amount|floatformat:2 }}</p>
+                            <p class="mb-0 rupee-symbol">₹{{ loan.distribution_amount|floatformat:2 }}</p>
                             <small class="text-muted" id="distributionAmountWords" style="font-size: 0.65rem;">
                                 {{ loan.distribution_amount|number_to_words|title }} Rupees Only
                             </small>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="text-muted">Interest Rate</label>
-                            <p class="mb-0">
-                                {% if loan.scheme == 'standard' %}
-                                    12% per annum
-                                {% elif loan.scheme == 'flexible' %}
-                                    24% per annum
-                                    {% if loan.days_since_issue <= 23 %}
-                                        <span class="badge bg-success ms-1">No interest applies</span>
-                                    {% endif %}
-                                {% elif loan.scheme == 'premium' %}
-                                    36% per annum
-                                    {% if loan.days_since_issue <= 30 %}
-                                        <span class="badge bg-success ms-1">No interest applies</span>
-                                    {% endif %}
-                                {% else %}
-                                    {{ loan.interest_rate }}% per annum
-                                {% endif %}
-                            </p>
+                        
+                        <!-- Monthly Interest Section -->
+                        <div class="col-md-12 mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-chart-line me-2"></i>Monthly Interest Details</h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label class="text-muted">Monthly Rate</label>
+                                            <p class="mb-0">{{ loan|monthly_interest_rate }}%</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="text-muted">Monthly Interest Amount</label>
+                                            <p class="mb-0 rupee-symbol">₹{{ loan|monthly_interest_amount|floatformat:2 }}</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="text-muted">Interest Till Date</label>
+                                            <p class="mb-0 rupee-symbol">₹{{ loan.monthly_interest_till_date|floatformat:2 }}</p>
+                                            <small class="text-muted">Based on completed months</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
-                        <!-- New No Interest End Date section -->
-                        {% if loan.scheme == 'flexible' or loan.scheme == 'premium' %}
+                        <!-- No Interest End Date section -->
+                        {% if loan.scheme.no_interest_period_days %}
                         <div class="col-md-6 mb-3">
                             <label class="text-muted">No Interest End Date</label>
                             <p class="mb-0">
-                                {% if loan.scheme == 'flexible' %}
-                                    <strong>{{ loan.issue_date|date_add_days:23|date:'d M, Y' }}</strong>
-                                    {% if loan.days_since_issue <= 23 %}
-                                        <span class="badge bg-success ms-1">{{ 23|subtract:loan.days_since_issue }} days remaining</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary ms-1">Expired</span>
-                                    {% endif %}
-                                {% elif loan.scheme == 'premium' %}
-                                    <strong>{{ loan.issue_date|date_add_days:30|date:'d M, Y' }}</strong>
-                                    {% if loan.days_since_issue <= 30 %}
-                                        <span class="badge bg-success ms-1">{{ 30|subtract:loan.days_since_issue }} days remaining</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary ms-1">Expired</span>
-                                    {% endif %}
+                                <strong>{{ loan.issue_date|date_add_days:loan.scheme.no_interest_period_days|date:'d M, Y' }}</strong>
+                                {% if loan.days_since_issue <= loan.scheme.no_interest_period_days %}
+                                    <span class="badge bg-success ms-1">{{ loan.scheme.no_interest_period_days|subtract:loan.days_since_issue }} days remaining</span>
+                                {% else %}
+                                    <span class="badge bg-secondary ms-1">Expired</span>
                                 {% endif %}
                             </p>
                         </div>
@@ -225,32 +220,36 @@
                         <div class="col-md-6 mb-3">
                             <label class="text-muted">Loan Scheme Details</label>
                             <p class="mb-0">
-                                {% if loan.scheme == 'standard' %}
-                                    <small class="text-muted d-block">Can only close after 3 months</small>
-                                {% elif loan.scheme == 'flexible' %}
-                                    <small class="text-muted d-block">
-                                        {% if loan.days_since_issue <= 23 %}
-                                            <span class="text-success">No interest if repaid today! ({{ 23|subtract:loan.days_since_issue }} days remaining)</span>
-                                            <i class="fas fa-info-circle ms-1 text-primary" data-bs-toggle="tooltip" data-bs-placement="top" 
-                                               title="Zero interest if repaid by {{ loan.issue_date|date_add_days:23|date:'d M, Y' }}"></i>
-                                        {% else %}
-                                            No interest if repaid within 23 days (expired)
-                                            <i class="fas fa-info-circle ms-1 text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" 
-                                               title="Zero interest period ended on {{ loan.issue_date|date_add_days:23|date:'d M, Y' }}"></i>
-                                        {% endif %}
-                                    </small>
-                                {% elif loan.scheme == 'premium' %}
-                                    <small class="text-muted d-block">
-                                        {% if loan.days_since_issue <= 30 %}
-                                            <span class="text-success">No interest if repaid today! ({{ 30|subtract:loan.days_since_issue }} days remaining)</span>
-                                            <i class="fas fa-info-circle ms-1 text-primary" data-bs-toggle="tooltip" data-bs-placement="top" 
-                                               title="Zero interest if repaid by {{ loan.issue_date|date_add_days:30|date:'d M, Y' }}"></i>
-                                        {% else %}
-                                            No interest if repaid within 30 days (expired)
-                                            <i class="fas fa-info-circle ms-1 text-secondary" data-bs-toggle="tooltip" data-bs-placement="top" 
-                                               title="Zero interest period ended on {{ loan.issue_date|date_add_days:30|date:'d M, Y' }}"></i>
-                                        {% endif %}
-                                    </small>
+                                <small class="text-muted d-block" style="font-size: 0.75rem;">{{ loan.scheme.description }}</small>
+                                
+                                {% if loan.scheme.no_interest_period_days %}
+                                    {% if loan.days_since_issue <= loan.scheme.no_interest_period_days %}
+                                        <small class="text-success d-block" style="font-size: 0.75rem;">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            No interest if repaid today! ({{ loan.scheme.no_interest_period_days|subtract:loan.days_since_issue }} days remaining)
+                                        </small>
+                                        <small class="text-muted d-block" style="font-size: 0.75rem;">
+                                            <i class="fas fa-calendar-day me-1"></i>
+                                            Zero interest period ends on {{ loan.issue_date|date_add_days:loan.scheme.no_interest_period_days|date:'d M, Y' }}
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted d-block" style="font-size: 0.75rem;">
+                                            <i class="fas fa-calendar-times me-1"></i>
+                                            No interest period ended on {{ loan.issue_date|date_add_days:loan.scheme.no_interest_period_days|date:'d M, Y' }}
+                                        </small>
+                                    {% endif %}
+                                {% endif %}
+                                
+                                {% if loan.scheme.additional_conditions %}
+                                    <div class="scheme-conditions mt-1" style="font-size: 0.75rem;">
+                                    {% for key, value in loan.scheme.additional_conditions.items %}
+                                        <small class="text-muted d-block">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            <span class="text-secondary">{{ key|title|replace_underscore }}:</span> 
+                                            <span class="text-dark">{{ value }}</span>
+                                        </small>
+                                    {% endfor %}
+                                    </div>
                                 {% endif %}
                             </p>
                         </div>
@@ -567,3 +566,10 @@
     });
 </script>
 {% endblock %}
+
+<!-- Add consistent rupee symbol styles -->
+<style>
+    .rupee-symbol {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Arial Unicode MS', 'Noto Sans', sans-serif;
+    }
+</style>

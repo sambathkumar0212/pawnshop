@@ -93,7 +93,7 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
         if customer_id:
             initial['customer'] = customer_id
         return initial
-    
+
     def form_valid(self, form):
         # Set created_by
         form.instance.created_by = self.request.user
@@ -101,9 +101,30 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
         # Set branch if not specified
         if not form.instance.branch and self.request.user.branch:
             form.instance.branch = self.request.user.branch
+        
+        # Generate loan number (YYYY-MM-BRANCH-XXXX format)
+        from django.utils import timezone
+        import random
+        import string
+        
+        current_date = timezone.now()
+        branch_code = str(form.instance.branch.id).zfill(2) if form.instance.branch else "00"
+        
+        # Keep trying to generate a unique loan number until we succeed
+        while True:
+            random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            loan_number = f"{current_date.year}-{current_date.month:02d}-{branch_code}-{random_chars}"
+            
+            # Check if this loan number already exists
+            if not Loan.objects.filter(loan_number=loan_number).exists():
+                form.instance.loan_number = loan_number
+                break
             
         # Ensure interest rate is set based on scheme before saving
-        form.instance.interest_rate = 24.00 if form.instance.scheme == 'flexible' else 12.00
+        if form.instance.scheme:
+            form.instance.interest_rate = form.instance.scheme.interest_rate
+        else:
+            form.instance.interest_rate = 12.00
         
         # Process customer face capture photo
         customer_face_capture = self.request.POST.get('customer_face_capture')
@@ -151,7 +172,7 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
         self._process_and_save_photos(self.object)
         
         return response
-    
+
     def _process_and_save_photos(self, loan):
         """Process and save photos to the filesystem if they are in base64 format."""
         import json
@@ -176,8 +197,8 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
                         photos_dir = os.path.join(settings.MEDIA_ROOT, 'inventory_images')
                         os.makedirs(photos_dir, exist_ok=True)
                         
-                        # Generate a unique filename
-                        filename = f"loan_{loan.id}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
+                        # Generate a unique filename that includes loan number
+                        filename = f"loan_{loan.loan_number}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
                         filepath = os.path.join(photos_dir, filename)
                         
                         # Save the image
@@ -201,7 +222,7 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
                 if not loan.item_photos or loan.item_photos == "null":
                     loan.item_photos = "[]"
                     loan.save()
-    
+
     def get_success_url(self):
         return reverse('loan_detail', kwargs={'loan_number': self.object.loan_number})
 
@@ -214,6 +235,12 @@ class LoanDetailView(LoginRequiredMixin, DetailView):
     
     def get_object(self, queryset=None):
         """Override to check branch-based access permissions"""
+        loan_identifier = self.kwargs.get('loan_number')
+        
+        # Check for empty or invalid loan number
+        if not loan_identifier:
+            raise Http404("Invalid loan number")
+            
         obj = super().get_object(queryset=queryset)
         user = self.request.user
         
@@ -373,9 +400,9 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
         loan = self.get_object()
         # Ensure scheme is properly initialized
         initial['scheme'] = loan.scheme
-        # Set interest rate based on scheme
-        if loan.scheme == 'flexible':
-            initial['interest_rate'] = 24.00
+        # Set interest rate based on scheme's interest_rate property
+        if loan.scheme:
+            initial['interest_rate'] = loan.scheme.interest_rate
         else:
             initial['interest_rate'] = 12.00
         return initial
@@ -454,19 +481,19 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
         # Ensure scheme is properly set before saving
         if 'scheme' in form.cleaned_data:
             form.instance.scheme = form.cleaned_data['scheme']
-            # Update interest rate based on scheme
-            if form.instance.scheme == 'flexible':
-                form.instance.interest_rate = 24.00
+            # Update interest rate based on scheme object
+            if form.instance.scheme and hasattr(form.instance.scheme, 'interest_rate'):
+                form.instance.interest_rate = form.instance.scheme.interest_rate
             else:
                 form.instance.interest_rate = 12.00
         
         # Process customer photo - ensure we don't lose it when updating
-        customer_photo = self.request.POST.get('customer_face_capture')
-        if customer_photo:
+        customer_face_capture = self.request.POST.get('customer_face_capture')
+        if customer_face_capture:
             # Make sure it's a proper data URL
-            if customer_photo.startswith('data:image/'):
-                print(f"Found customer photo in POST data, length: {len(customer_photo)}")
-                form.instance.customer_face_capture = customer_photo
+            if customer_face_capture.startswith('data:image/'):
+                print(f"Found customer photo in POST data, length: {len(customer_face_capture)}")
+                form.instance.customer_face_capture = customer_face_capture
             else:
                 print("Received customer_face_capture but format is invalid")
         else:
@@ -588,8 +615,8 @@ class LoanUpdateView(LoginRequiredMixin, ManagerPermissionMixin, UpdateView):
                         photos_dir = os.path.join(settings.MEDIA_ROOT, 'inventory_images')
                         os.makedirs(photos_dir, exist_ok=True)
                         
-                        # Generate a unique filename
-                        filename = f"loan_{loan.id}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
+                        # Generate a unique filename that includes loan number
+                        filename = f"loan_{loan.loan_number}_item_{i+1}_{uuid.uuid4().hex}.{image_format}"
                         filepath = os.path.join(photos_dir, filename)
                         
                         # Save the image
@@ -837,23 +864,29 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
         # Add payment history to context
         context['payments'] = loan.payments.order_by('-payment_date')
         
-        # Check loan scheme restrictions
-        if loan.scheme == 'standard':
-            # For standard scheme, check if loan is at least 3 months old
-            loan_age = (timezone.now().date() - loan.issue_date).days
-            if loan_age < 90:  # 3 months = 90 days
-                context['scheme_restriction'] = {
-                    'message': f'This loan cannot be fully repaid until {loan.issue_date + timezone.timedelta(days=90)}',
-                    'days_remaining': 90 - loan_age
-                }
-        elif loan.scheme == 'flexible':
-            # For flexible scheme, check if loan is within 25 days for zero interest
-            loan_age = (timezone.now().date() - loan.issue_date).days
-            if loan_age <= 25:
-                context['scheme_benefit'] = {
-                    'message': 'Early repayment benefit: No interest will be charged if fully repaid today!',
-                    'days_remaining': 25 - loan_age
-                }
+        # Check loan scheme restrictions - using scheme object properties
+        if loan.scheme:
+            # Check for minimum term restriction (e.g., 3 months for standard scheme)
+            min_term_days = 0
+            if loan.scheme.additional_conditions and 'minimum_term_days' in loan.scheme.additional_conditions:
+                min_term_days = loan.scheme.additional_conditions.get('minimum_term_days', 0)
+            
+            if min_term_days > 0:
+                loan_age = (timezone.now().date() - loan.issue_date).days
+                if loan_age < min_term_days:
+                    context['scheme_restriction'] = {
+                        'message': f'This loan cannot be fully repaid until {loan.issue_date + timezone.timedelta(days=min_term_days)}',
+                        'days_remaining': min_term_days - loan_age
+                    }
+            
+            # Check if loan is within no-interest period
+            if loan.scheme.no_interest_period_days:
+                loan_age = (timezone.now().date() - loan.issue_date).days
+                if loan_age <= loan.scheme.no_interest_period_days:
+                    context['scheme_benefit'] = {
+                        'message': 'Early repayment benefit: No interest will be charged if fully repaid today!',
+                        'days_remaining': loan.scheme.no_interest_period_days - loan_age
+                    }
         
         # Check for newly created payment ID in session
         if 'new_payment_id' in self.request.session:
@@ -882,17 +915,19 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
         # Get the current outstanding balance
         current_total_paid = loan.amount_paid
         
-        # Calculate current payable amount with interest till date
+        # Calculate current payable amount based on loan's total_payable_till_date
         principal_amount = loan.principal_amount
+        total_payable_till_today = loan.total_payable_till_date
         
-        # Calculate interest based on scheme and elapsed time
-        if loan.scheme == 'flexible' and loan_age <= 25:
-            interest_amount = Decimal('0.00')
+        # Check if we're in a no-interest period for the scheme
+        interest_amount = Decimal('0.00')
+        if loan.scheme and loan.scheme.no_interest_period_days and loan_age <= loan.scheme.no_interest_period_days:
+            # No interest applies if we're within the no-interest period
+            total_payable_till_today = principal_amount
         else:
-            daily_rate = Decimal('0.0003287') if loan.scheme == 'standard' else Decimal('0.0006575')
-            interest_amount = principal_amount * daily_rate * loan_age
+            # Otherwise use the calculated interest from the loan model
+            interest_amount = total_payable_till_today - principal_amount
         
-        total_payable_till_today = principal_amount + interest_amount
         remaining_balance = max(Decimal('0.00'), total_payable_till_today - current_total_paid)
         rounded_payable = remaining_balance.quantize(Decimal('1'), rounding=ROUND_HALF_UP)
         
@@ -901,10 +936,15 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
         
         if is_full_payment:
             # Check scheme restrictions for full payment
-            if loan.scheme == 'standard' and loan_age < 90:
-                # Standard scheme requires 3 months minimum period
+            min_term_days = 0
+            if loan.scheme and loan.scheme.additional_conditions and 'minimum_term_days' in loan.scheme.additional_conditions:
+                min_term_days = loan.scheme.additional_conditions.get('minimum_term_days', 0)
+            
+            if min_term_days > 0 and loan_age < min_term_days:
+                # Scheme requires a minimum loan period
+                min_term_date = loan.issue_date + timezone.timedelta(days=min_term_days)
                 messages.error(self.request, 
-                    f'This loan cannot be fully repaid until {loan.issue_date + timezone.timedelta(days=90)}')
+                    f'This loan cannot be fully repaid until {min_term_date}')
                 return redirect('loan_detail', loan_number=loan.loan_number)
             
             # Set amount to calculated payable amount
@@ -942,9 +982,15 @@ class PaymentCreateView(LoginRequiredMixin, CreateView):
             # Check if the partial payment actually completes the loan
             if current_total_paid + payment_amount >= total_payable_till_today:
                 # This payment will actually complete the loan
-                if loan.scheme == 'standard' and loan_age < 90:
+                min_term_days = 0
+                if loan.scheme and loan.scheme.additional_conditions and 'minimum_term_days' in loan.scheme.additional_conditions:
+                    min_term_days = loan.scheme.additional_conditions.get('minimum_term_days', 0)
+                
+                if min_term_days > 0 and loan_age < min_term_days:
+                    # Scheme requires a minimum loan period
+                    min_term_date = loan.issue_date + timezone.timedelta(days=min_term_days)
                     messages.error(self.request, 
-                        f'This payment would close the loan, but the loan cannot be fully repaid until {loan.issue_date + timezone.timedelta(days=90)}')
+                        f'This payment would close the loan, but the loan cannot be fully repaid until {min_term_date}')
                     return redirect('loan_detail', loan_number=loan.loan_number)
                 
                 # Add a note about loan closure
@@ -1101,7 +1147,7 @@ class LoanDocumentView(LoginRequiredMixin, View):
         
         # Default base64 placeholder image for customer photo (minimal version)
         default_customer_photo = "iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5gQaDyoKQAHnpAAAA+1JREFUaN7tmm1IVEEUht+Z3VxXs7TdVikRIlMhkEgogxDCQrGPBCMsP37RD21D/RH0L/xRUJFA/QiMwC9E0NAfJUVEaYmGJWUUUUFFJZG2rru3H+ruuO7u3L1z72p04ID7dWbmnPec887ZO8A0pmlM07j+2DFy5I+4/r9YSYa7MX4QCSRsKTR0Fbgd6olObJyXhEJX+gbPsQ15E+iEo02rpf6MgR9gOFU5Ksv4ISDBqaYMPcQIn51zQcr4pZBAx8xkZcxZmxA3BNrryPb1syWgdNdVXwxzNr+W6wvNmUKNAZdnCJHRqKAEsOQk7HoWi8S1Bs6Fc2Gl6IfDSFWl8bPv84LInywiKoYNOImHCTMDXCus2ITOPGmfmjNkIbRMiTwLnkIfJ/xJx9OESkDZFNJbIPpOIfdggxLnPbdWNnQV4EY6AyDPkXf2gwlZdtwbhRG+sVJrYDDcxEn+uWhCFi751Jzb67iapgbrppCaIQw4Pzc7ya9k2HwLtVAXmnzCN3rKtBIIf4j9FB5aSIi0sJIVIvAQS8jcBe9qBX+qDpn47Nxs5HtvuVYzrd9ByDmkqd5lu+XLGDJw430Gl/PrvTfSfgm7+gYR97x1ED88UyL280r7Nsf3vePRpFBroMH7ky6F3K5mjHSJ/2n0h3HbH03MsE+MdL5cStHVBfLQBcGJezoH53Pi4N1/14UkfnEFz7RcoXp37qiWqA402CT/XV8/BNb5qVSubK9IxhsOAlHO5ykJSF6oMpHAThZjkBDARO/XkRnQMsIXeCnfeNU0YRbid/oG5ji2Uw5CI524/x4x7i4p441DgOHTnTdciRxaSHCYyzEQiSC10Ymlg1ay8Un3UydIcEEo5zN8QWPyfcM19aGeZRXja+O3FTGBLiXD52aCZw1oeAAAAAA="
-        
+                
         # Default base64 placeholder image for item photo (minimal version)
         default_item_photo = "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"""
                 

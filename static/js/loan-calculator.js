@@ -35,28 +35,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to format currency
     function formatCurrency(amount) {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
+        return '₹' + parseFloat(amount).toLocaleString('en-IN', {
+            maximumFractionDigits: 2,
             minimumFractionDigits: 2
-        }).format(amount);
+        });
     }
     
     // Function to calculate loan metrics
     function calculateLoanMetrics() {
         // Get input values
-        const principal = parseFloat(principalInput.value) || 0;
+        const principal = parseInt(principalInput.value) || 0;
         const interestRate = parseFloat(interestRateInput.value) || 0;
-        const processingFee = parseFloat(processingFeeInput.value) || 0;
+        const processingFee = parseInt(processingFeeInput.value) || 0;
         
         // Calculate metrics
-        const interestAmount = (principal * interestRate / 100);
+        const interestAmount = Math.round(principal * interestRate / 100);
         const totalRepayment = principal + interestAmount;
         const distributionAmount = principal - processingFee;
         
+        // Calculate monthly interest
+        const monthlyInterestRate = interestRate / 12;
+        const monthlyInterestAmount = Math.round(principal * monthlyInterestRate / 100);
+        const perThousandRate = Math.round((monthlyInterestRate / 100) * 1000);
+        
         // Update distribution amount input
         if (distributionAmountInput) {
-            distributionAmountInput.value = distributionAmount.toFixed(2);
+            distributionAmountInput.value = Math.round(distributionAmount);
         }
         
         // Update loan metrics display
@@ -68,13 +72,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="row">
                             <div class="col-md-6">
                                 <p><strong>Principal Amount:</strong> ${formatCurrency(principal)}</p>
-                                <p><strong>Interest Rate:</strong> ${interestRate}%</p>
+                                <p><strong>Interest Rate:</strong> ${interestRate}% per annum</p>
                                 <p><strong>Processing Fee:</strong> ${formatCurrency(processingFee)}</p>
                             </div>
                             <div class="col-md-6">
                                 <p><strong>Interest Amount:</strong> ${formatCurrency(interestAmount)}</p>
                                 <p><strong>Total Repayment:</strong> ${formatCurrency(totalRepayment)}</p>
                                 <p><strong>Distribution Amount:</strong> ${formatCurrency(distributionAmount)}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-3 bg-light p-2 rounded">
+                            <div class="col-12">
+                                <h6 class="text-primary"><strong>Monthly Interest Information</strong></h6>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Monthly Rate:</strong> ${monthlyInterestRate.toFixed(2)}%</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Monthly Interest:</strong> ${formatCurrency(monthlyInterestAmount)}</p>
+                                <p><strong>Rate per ₹1,000:</strong> ${formatCurrency(perThousandRate)}</p>
                             </div>
                         </div>
                     </div>
@@ -85,78 +101,65 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to calculate gold value and display min/max principal amounts
     function calculateGoldValueAndLimits() {
+        // Get input values
         const marketPrice = parseFloat(marketPriceInput.value) || 0;
-        const selectedKarat = goldKaratSelect.value;
+        const goldKarat = goldKaratSelect.value || '22';
         const netWeight = parseFloat(netWeightInput.value) || 0;
         
-        // Remove any existing gold value display
-        const existingDisplay = document.getElementById('gold-value-display');
-        if (existingDisplay) {
-            existingDisplay.remove();
-        }
+        // Get purity ratio for the selected karat
+        const purityRatio = KARAT_PURITY[goldKarat] || 0.916;  // Default to 22k if not found
         
-        // Check if we have all required values
-        if (marketPrice <= 0 || !selectedKarat || netWeight <= 0) {
-            return;
-        }
-        
-        // Calculate gold value based on purity ratio
-        const purityRatio = KARAT_PURITY[selectedKarat] / KARAT_PURITY['22'];
+        // Calculate gold value
         const goldValue = marketPrice * netWeight * purityRatio;
         
-        // Calculate min and max principal amounts
-        const minPrincipal = Math.round(goldValue * 0.5); // 50% of gold value
-        const maxPrincipal = Math.round(goldValue * 0.85); // 85% of gold value
-        const suggestedPrincipal = Math.round(goldValue * 0.75); // 75% of gold value
+        // Update gold value display if element exists
+        const goldValueDisplay = document.getElementById('gold-value-display');
+        if (goldValueDisplay) {
+            goldValueDisplay.textContent = formatCurrency(goldValue);
+        }
         
-        // Instead of creating and displaying the gold-value-display div,
-        // we'll just update the help text with the calculated values
-        const principalFormGroup = document.getElementById('div_id_principal_amount');
-        if (principalFormGroup) {
-            // Create or update help text
-            let helpText = principalFormGroup.querySelector('.form-text');
-            if (!helpText) {
-                helpText = document.createElement('div');
-                helpText.className = 'form-text';
-                principalFormGroup.appendChild(helpText);
-            }
-            
-            helpText.innerHTML = `
-                <i class="fas fa-info-circle"></i> Gold Value: ₹${goldValue.toFixed(0)} | 
-                Suggested (75%): ₹${suggestedPrincipal} | 
-                Min (50%): ₹${minPrincipal} | 
-                Max (85%): ₹${maxPrincipal}
-            `;
-            
-            // Check if the current principal is within the range
-            const currentPrincipal = parseFloat(principalInput.value) || 0;
-            if (currentPrincipal < minPrincipal) {
-                showNotification('Warning: Current principal is below the minimum recommended amount', 'warning');
-            } else if (currentPrincipal > maxPrincipal) {
-                showNotification('Warning: Current principal exceeds the maximum recommended amount', 'warning');
-            }
+        // Calculate and display min/max loan amounts if elements exist
+        const minLoanDisplay = document.getElementById('min-loan-display');
+        const maxLoanDisplay = document.getElementById('max-loan-display');
+        
+        if (minLoanDisplay) {
+            const minLoan = goldValue * 0.5;  // 50% of gold value
+            minLoanDisplay.textContent = formatCurrency(minLoan);
+        }
+        
+        if (maxLoanDisplay) {
+            const maxLoan = goldValue * 0.85;  // 85% of gold value
+            maxLoanDisplay.textContent = formatCurrency(maxLoan);
         }
     }
     
     // Function to calculate dates based on scheme duration
     function calculateDates(issueDate, durationDays, graceDays = 30) {
-        if (!issueDate) return { dueDate: null, gracePeriodEnd: null };
+        if (!issueDate) return { dueDate: '', gracePeriodEnd: '' };
         
-        const issueDateObj = new Date(issueDate);
+        // Parse issue date
+        const date = new Date(issueDate);
         
-        // Calculate due date
-        const dueDateObj = new Date(issueDateObj);
-        dueDateObj.setDate(dueDateObj.getDate() + durationDays);
+        // Calculate due date (issue date + duration days)
+        const dueDate = new Date(date);
+        dueDate.setDate(date.getDate() + parseInt(durationDays));
         
-        // Calculate grace period end date
-        const gracePeriodEndObj = new Date(dueDateObj);
-        gracePeriodEndObj.setDate(gracePeriodEndObj.getDate() + graceDays);
+        // Calculate grace period end (due date + grace days)
+        const gracePeriodEnd = new Date(dueDate);
+        gracePeriodEnd.setDate(dueDate.getDate() + parseInt(graceDays));
         
         // Format dates as YYYY-MM-DD
-        const dueDate = dueDateObj.toISOString().split('T')[0];
-        const gracePeriodEnd = gracePeriodEndObj.toISOString().split('T')[0];
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
         
-        return { dueDate, gracePeriodEnd };
+        return {
+            dueDate: formatDate(dueDate),
+            gracePeriodEnd: formatDate(gracePeriodEnd)
+        };
     }
     
     // Function to update dates based on scheme loan duration
@@ -187,25 +190,20 @@ document.addEventListener('DOMContentLoaded', function() {
         );
         
         // Update due date and grace period end inputs
-        if (dueDateInput && dueDate) {
-            dueDateInput.value = dueDate;
-        }
+        if (dueDateInput) dueDateInput.value = dueDate;
+        if (gracePeriodEndInput) gracePeriodEndInput.value = gracePeriodEnd;
         
-        if (gracePeriodEndInput && gracePeriodEnd) {
-            gracePeriodEndInput.value = gracePeriodEnd;
+        // Show notification about date updates
+        if (dueDate && gracePeriodEnd) {
+            showNotification(`Due date set to ${dueDate} and grace period to ${gracePeriodEnd}`, 'info');
         }
-        
-        // Show notification that dates were updated
-        showNotification('Due date and grace period end date have been automatically updated based on the selected scheme', 'info');
     }
     
     // Function to show notification if that function exists in the parent scope
     function showNotification(message, type) {
-        // Check if the parent scope has a showAlert function
-        if (typeof window.showAlert === 'function') {
-            window.showAlert(message, type);
-        } else {
-            console.info(message);
+        // Check if notification function exists in parent scope (global)
+        if (typeof window.showToast === 'function') {
+            window.showToast(message, type || 'info');
         }
     }
     
@@ -254,8 +252,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Calculate processing fee based on principal amount and scheme percentage
                 if (processingFeeInput && principalInput.value) {
-                    const principal = parseFloat(principalInput.value) || 0;
-                    processingFeeInput.value = (principal * processingFeePercentage / 100).toFixed(2);
+                    const principal = parseInt(principalInput.value) || 0;
+                    processingFeeInput.value = Math.round(principal * processingFeePercentage / 100);
                 }
                 
                 // Always update dates when scheme changes, regardless of whether issue date is set
@@ -269,6 +267,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 const noInterestPeriodDays = 
                     (scheme.additional_conditions && scheme.additional_conditions.no_interest_period_days) || 0;
                 
+                // Calculate monthly interest rate
+                const monthlyInterestRate = scheme.interest_rate / 12;
+                const perThousandRate = (monthlyInterestRate / 100) * 1000;
+                
                 // Create scheme details HTML
                 const schemeDetailsHTML = `
                     <div class="card-body bg-light">
@@ -276,7 +278,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="row">
                             <div class="col-md-6">
                                 <p><strong>Type:</strong> ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'}</p>
-                                <p><strong>Interest Rate:</strong> ${scheme.interest_rate}%</p>
+                                <p><strong>Interest Rate:</strong> ${scheme.interest_rate}% per annum</p>
+                                <p><strong>Monthly Interest:</strong> ${monthlyInterestRate.toFixed(2)}% per month</p>
+                                <p><strong>Per ₹1,000 Rate:</strong> ₹${perThousandRate.toFixed(2)}</p>
                             </div>
                             <div class="col-md-6">
                                 <p><strong>Loan Period:</strong> ${scheme.loan_duration} days</p>
@@ -297,15 +301,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (schemeHelpText) {
                     const helpTextHTML = `
                         <strong>${scheme.name}:</strong> ${scheme.interest_rate}% interest | 
+                        Monthly rate: ${monthlyInterestRate.toFixed(2)}% | 
                         ${scheme.loan_duration} days term | ${noInterestPeriodDays} days no interest period | 
                         ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'} scheme
                     `;
                     schemeHelpText.innerHTML = helpTextHTML;
                 }
+                
+                // Calculate loan metrics with updated values
+                calculateLoanMetrics();
             })
             .catch(error => {
                 console.error('Error loading scheme details:', error);
-                showNotification('Error loading scheme details. Please try again.', 'danger');
+                showNotification('Failed to load scheme details: ' + error.message, 'error');
             });
     }
     

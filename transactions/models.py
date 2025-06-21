@@ -13,45 +13,46 @@ from .utils import item_photo_path
 
 class Loan(models.Model):
     """Pawn loan model"""
-    # Loan status choices
-    STATUS_CHOICES = (
-        ('active', 'Active'),
-        ('repaid', 'Repaid'),
-        ('defaulted', 'Defaulted'),
-        ('extended', 'Extended'),
-        ('foreclosed', 'Foreclosed'),
-        ('cancelled', 'Cancelled'),
+    # Loan ID with prefix for easier identification
+    loan_number = models.CharField(
+        max_length=50, 
+        unique=True,
+        null=False,  # Ensure null is not allowed
+        blank=False, # Ensure blank is not allowed
+        help_text="Unique loan identifier"
     )
     
-    # Basic loan information
-    loan_number = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    # Customer and branch relationships
     customer = models.ForeignKey('accounts.Customer', on_delete=models.PROTECT, related_name='loans')
     branch = models.ForeignKey('branches.Branch', on_delete=models.PROTECT, related_name='loans')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    items = models.ManyToManyField('inventory.Item', through='LoanItem')
+    scheme = models.ForeignKey('schemes.Scheme', on_delete=models.PROTECT, null=True, blank=True)
     
-    # Replace CharField scheme with ForeignKey to Scheme model
-    scheme = models.ForeignKey(
-        Scheme, 
-        on_delete=models.PROTECT, 
-        related_name='loans',
-        help_text="Loan scheme applied to this loan"
+    # Status choices
+    STATUS_CHOICES = (
+        ('active', _('Active')),
+        ('repaid', _('Repaid')),
+        ('defaulted', _('Defaulted')),
+        ('extended', _('Extended')),
+        ('foreclosed', _('Foreclosed')),
     )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     
     # Financial details
     principal_amount = models.DecimalField(
         max_digits=12,
-        decimal_places=0,  # Changed to 0 for integers
+        decimal_places=0,
         validators=[MinValueValidator(0)]
     )
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=12.00)
-    processing_fee = models.DecimalField(
-        max_digits=12,
-        decimal_places=0,  # Changed to 0 for integers
-        validators=[MinValueValidator(0)]
+    processing_fee = models.IntegerField(
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text="Processing fee amount in whole Rupees"
     )
     distribution_amount = models.DecimalField(
         max_digits=12,
-        decimal_places=0,  # Changed to 0 for integers
+        decimal_places=0,
         validators=[MinValueValidator(0)]
     )
     
@@ -66,21 +67,12 @@ class Loan(models.Model):
     
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='created_loans'
+        'accounts.CustomUser', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='loans_created'
     )
-    last_updated = models.DateTimeField(auto_now=True)
-    last_updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='updated_loans'
-    )
-    notes = models.TextField(blank=True)
-
+    
     class Meta:
         verbose_name = _('loan')
         verbose_name_plural = _('loans')
@@ -93,6 +85,46 @@ class Loan(models.Model):
 
     def __str__(self):
         return f"Loan #{self.loan_number} - {self.customer.full_name}"
+    
+    @property
+    def monthly_interest(self):
+        """Calculate monthly interest details for the loan.
+        
+        Returns a dictionary with monthly interest rate, amount, and per thousand rate
+        """
+        from decimal import Decimal
+        
+        # Calculate monthly interest rate (annual rate / 12)
+        monthly_rate = Decimal(self.interest_rate) / Decimal('12')
+        
+        # Calculate monthly interest amount
+        monthly_amount = (self.principal_amount * monthly_rate) / Decimal('100')
+        
+        # Calculate rate per 1000 of principal
+        per_thousand = (monthly_rate * Decimal('10')) # per Rs. 1,000
+        
+        return {
+            'rate': round(monthly_rate, 2),
+            'amount': round(monthly_amount, 2),
+            'per_thousand': round(per_thousand, 2)
+        }
+    
+    @property
+    def is_overdue(self):
+        # A loan is overdue if the due date has passed and it's still active
+        return self.status == 'active' and self.due_date < timezone.now().date()
+    
+    @property
+    def days_since_issue(self):
+        # Number of days since the loan was issued
+        return (timezone.now().date() - self.issue_date).days
+    
+    @property
+    def days_remaining(self):
+        # Number of days remaining until the due date
+        if self.due_date >= timezone.now().date():
+            return (self.due_date - timezone.now().date()).days
+        return 0
 
     def save(self, *args, **kwargs):
         # Handle base64 photos
@@ -189,7 +221,6 @@ class Loan(models.Model):
         if self.status != 'active':
             return Decimal('0.00')
         
-        days_elapsed = self.days_since_issue
         principal_amount = self.principal_amount
         
         # Get scheme details from the scheme model
@@ -197,14 +228,11 @@ class Loan(models.Model):
             return principal_amount
             
         # For schemes with no_interest_period_days, check if we're still in that period
-        if self.scheme.no_interest_period_days and days_elapsed <= self.scheme.no_interest_period_days:
+        if self.scheme.no_interest_period_days and self.days_since_issue <= self.scheme.no_interest_period_days:
             return principal_amount
             
-        # Calculate interest based on scheme interest rate
-        daily_rate = self.scheme.interest_rate / Decimal('36500')  # Convert annual rate to daily rate
-        interest = principal_amount * daily_rate * days_elapsed
-        
-        return principal_amount + interest
+        # Use monthly interest calculation instead of daily
+        return principal_amount + self.monthly_interest_till_date()
 
     @property
     def total_payable_mature(self):
@@ -212,18 +240,26 @@ class Loan(models.Model):
         if not self.due_date or self.status != 'active' or not self.scheme:
             return Decimal('0.00')
         
-        total_days = (self.due_date - self.issue_date).days
         principal_amount = self.principal_amount
         
         # For schemes with no_interest_period_days, check if loan duration is within that period
-        if self.scheme.no_interest_period_days and total_days <= self.scheme.no_interest_period_days:
+        if self.scheme.no_interest_period_days and (self.due_date - self.issue_date).days <= self.scheme.no_interest_period_days:
             return principal_amount
             
-        # Calculate interest based on scheme
-        daily_rate = self.scheme.interest_rate / Decimal('36500')  # Convert annual rate to daily rate
-        interest = principal_amount * daily_rate * total_days
+        # Calculate months between issue date and due date
+        months = ((self.due_date.year - self.issue_date.year) * 12 + 
+                 self.due_date.month - self.issue_date.month)
         
-        return principal_amount + interest
+        # If there's any partial month, count it as a full month
+        if self.due_date.day > self.issue_date.day:
+            months += 1
+            
+        # Calculate interest using monthly rate
+        monthly_info = self.monthly_interest
+        monthly_amount = monthly_info['amount']
+        total_interest = monthly_amount * Decimal(str(months))
+        
+        return principal_amount + total_interest
     
     def calculate_interest(self):
         """Calculate interest on loan"""
@@ -244,6 +280,56 @@ class Loan(models.Model):
         interest = principal_amount * daily_rate * days_elapsed
         
         return interest
+        
+    @property
+    def monthly_interest(self):
+        """Calculate monthly interest rate and amount for the loan"""
+        if not self.scheme or not self.principal_amount:
+            return {
+                'rate': Decimal('0.00'),
+                'amount': Decimal('0.00'),
+                'per_thousand': Decimal('0.00')
+            }
+        
+        # Calculate monthly interest rate
+        monthly_rate = self.scheme.interest_rate / Decimal('12')
+        
+        # Calculate monthly interest amount
+        monthly_interest_amount = (self.principal_amount * monthly_rate) / Decimal('100')
+        
+        # Calculate per thousand rate (how much interest per 1000 of principal)
+        per_thousand = (monthly_rate / Decimal('100')) * Decimal('1000')
+        
+        return {
+            'rate': monthly_rate.quantize(Decimal('0.01')),
+            'amount': monthly_interest_amount.quantize(Decimal('0.01')),
+            'per_thousand': per_thousand.quantize(Decimal('0.01'))
+        }
+    
+    def monthly_interest_till_date(self):
+        """Calculate total monthly interest accumulated till date including current month for active loans"""
+        if not self.issue_date or not self.scheme:
+            return Decimal('0.00')
+        
+        current_date = timezone.now().date()
+        months_elapsed = ((current_date.year - self.issue_date.year) * 12 + 
+                        current_date.month - self.issue_date.month)
+        
+        # For active loans, always charge current month interest
+        if self.status == 'active':
+            # If we're in a different month than issue date, or if at least 1 day has passed in same month
+            if months_elapsed > 0 or (months_elapsed == 0 and current_date.day > self.issue_date.day):
+                months_elapsed += 1
+            
+        # Ensure we don't have negative months
+        if months_elapsed < 0:
+            months_elapsed = 0
+            
+        # Get monthly interest rate and amount
+        monthly_info = self.monthly_interest
+        monthly_amount = monthly_info['amount']
+        
+        return monthly_amount * Decimal(str(months_elapsed))
 
 class LoanItem(models.Model):
     """Model to track items in a loan with their gold details"""
@@ -254,7 +340,7 @@ class LoanItem(models.Model):
     gold_karat = models.DecimalField(max_digits=4, decimal_places=2, help_text="Purity of gold in karats")
     gross_weight = models.DecimalField(max_digits=7, decimal_places=3, help_text="Total weight of the ornament in grams")
     net_weight = models.DecimalField(max_digits=7, decimal_places=3, help_text="Weight of pure gold content in grams")
-    stone_weight = models.DecimalField(max_digits=7, decimal_places=3, null=True, blank=True, help_text="Weight of stones if any in grams")
+    stone_weight = models.DecimalField(max_digits=7, decimal_places=3, help_text="Weight of stones if any in grams", null=True, blank=True)
     market_price_22k = models.DecimalField(max_digits=10, decimal_places=2, help_text="Market price of 22K gold per gram at the time of loan")
     
     class Meta:

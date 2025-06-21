@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 {% load custom_filters %}
+{% load loan_interest %}
 
 {% block title %}Record Payment - Loan #{{ loan.loan_number }} - Pawnshop Management{% endblock %}
 
@@ -68,6 +69,18 @@
                                 <tr>
                                     <td>Principal Amount</td>
                                     <td class="text-end">₹{{ loan.principal_amount|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Monthly Interest Rate</td>
+                                    <td class="text-end">{{ loan|monthly_interest_rate }}%</td>
+                                </tr>
+                                <tr>
+                                    <td>Monthly Interest Amount</td>
+                                    <td class="text-end">₹{{ loan|monthly_interest_amount|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Interest Accumulated (Complete Months)</td>
+                                    <td class="text-end">₹{{ loan.monthly_interest_till_date|floatformat:2 }}</td>
                                 </tr>
                                 <tr>
                                     <td>Interest (till today)</td>

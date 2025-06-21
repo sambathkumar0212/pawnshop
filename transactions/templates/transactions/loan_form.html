@@ -1119,13 +1119,13 @@
             const principalStr = cleanNumericInput($('#id_principal_amount').val());
             const principal = Math.round(parseFloat(principalStr)) || 0;
             
-            // Calculate processing fee as 1% of principal amount
+            // Calculate processing fee as 1% of principal amount, rounded to nearest integer
             const processingFeeAmount = Math.round(principal * 0.01);
             
-            // Set the processing fee amount
-            $('#id_processing_fee').val(processingFeeAmount);
+            // Set the processing fee amount as an integer
+            $('#id_processing_fee').val(Math.round(processingFeeAmount));
             
-            // Calculate and set distribution amount
+            // Calculate and set distribution amount as integer
             const distributionAmount = principal - processingFeeAmount;
             $('#id_distribution_amount').val(Math.round(distributionAmount));
 
@@ -1136,7 +1136,7 @@
             
             // Also update the principal amount in words
             if (principal > 0) {
-                $.get(`/transactions/number_to_words/${principal}`, function(response) {
+                $.get(`/transactions/number_to_words/${Math.round(principal)}`, function(response) {
                     $('#principalAmountWords').text(response.words + ' Rupees Only');
                 });
             } else {

@@ -119,7 +119,7 @@ class Item(models.Model):
         'transactions.Loan',
         through='transactions.LoanItem',
         through_fields=('item', 'loan'),
-        related_name='items'
+        related_name='loan_items'  # Changed from 'items' to 'loan_items'
     )
     
     # Additional metadata

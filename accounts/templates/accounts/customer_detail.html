@@ -135,28 +135,30 @@
                                     <td>
                                         {% if loan.item_photos %}
                                             <div class="position-relative" style="width: 48px; height: 48px;" data-bs-toggle="tooltip" title="Loan #{{ loan.loan_number }}">
+                                                {% if loan.loan_number %}
                                                 <a href="{% url 'loan_detail' loan.loan_number %}">
                                                     <img src="{{ loan.item_photos|first_item_photo }}" 
                                                          alt="Item Photo" 
                                                          class="rounded border"
                                                          style="width: 100%; height: 100%; object-fit: cover;">
                                                 </a>
+                                                {% endif %}
                                                 <div class="position-absolute bottom-0 end-0">
                                                     <span class="badge bg-info rounded-circle" style="font-size: 0.6rem; width: 18px; height: 18px;">
                                                         {{ loan.item_photos|item_photos_count }}
                                                     </span>
                                                 </div>
                                             </div>
-                                        {% else %}
-                                            <div class="rounded bg-light d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
-                                                <i class="fas fa-image text-secondary"></i>
-                                            </div>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% for loan_item in loan.loanitem_set.all %}
                                         <div class="mb-1">
+                                            {% if loan.loan_number %}
                                             <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan_item.item.name }}</a>
+                                            {% else %}
+                                            {{ loan_item.item.name }}
+                                            {% endif %}
                                             <small class="text-muted">({{ loan_item.gold_karat }}K, {{ loan_item.net_weight }}g)</small>
                                         </div>
                                         {% endfor %}
@@ -178,12 +180,14 @@
                                     </td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
-                                            <a href="{% url 'payment_create' loan.id %}" class="btn btn-outline-success" title="Make Payment">
+                                            {% if loan.loan_number %}
+                                            <a href="{% url 'payment_create' loan.loan_number %}" class="btn btn-outline-success" title="Make Payment">
                                                 <i class="fas fa-dollar-sign"></i>
                                             </a>
-                                            <a href="{% url 'loan_extend' loan.id %}" class="btn btn-outline-info" title="Extend Loan">
+                                            <a href="{% url 'loan_extend' loan.loan_number %}" class="btn btn-outline-info" title="Extend Loan">
                                                 <i class="fas fa-calendar-plus"></i>
                                             </a>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
@@ -267,7 +271,11 @@
                                 {% for loan in loans %}
                                 <tr>
                                     <td>
-                                        <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a>
+                                        {% if loan.loan_number %}
+                                            <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan.loan_number }}</a>
+                                        {% else %}
+                                            <span class="text-muted">No ID</span>
+                                        {% endif %}
                                     </td>
                                     <td>₹{{ loan.principal_amount|floatformat:2 }}</td>
                                     <td>

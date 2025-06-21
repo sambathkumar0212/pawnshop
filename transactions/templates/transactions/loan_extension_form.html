@@ -45,7 +45,7 @@
                             </tr>
                             <tr>
                                 <th>Principal Amount</th>
-                                <td>₹{{ loan.principal_amount }}</td>
+                                <td class="rupee">₹{{ loan.principal_amount }}</td>
                             </tr>
                             <tr>
                                 <th>Item</th>
@@ -114,6 +114,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 {{ form.extension_fee|as_crispy_field }}
+                                <small class="text-muted d-block">Current Fee: ₹{{ extension_fee }}</small>
                             </div>
                         </div>
                         
@@ -330,4 +331,11 @@
         });
     });
 </script>
+
+<!-- Add rupee symbol font styles -->
+<style>
+    .rupee {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Arial Unicode MS', 'Noto Sans', sans-serif;
+    }
+</style>
 {% endblock %}

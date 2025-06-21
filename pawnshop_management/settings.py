@@ -209,7 +209,9 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'webmaster@localhost')
 if not SKIP_DB_CHECKS:
     # Face recognition settings
     FACE_RECOGNITION_MODEL = os.environ.get('FACE_RECOGNITION_MODEL', 'hog')  # or 'cnn' for GPU support
-    FACE_RECOGNITION_TOLERANCE = float(os.environ.get('FACE_RECOGNITION_TOLERANCE', 0.6))
+    # Extract just the float value, ignoring any comments
+    face_tolerance_value = os.environ.get('FACE_RECOGNITION_TOLERANCE', '0.6').split('#')[0].strip()
+    FACE_RECOGNITION_TOLERANCE = float(face_tolerance_value)
     FACE_IMAGES_DIR = BASE_DIR / 'media' / 'faces'
 else:
     # Skip face recognition during minimal startup

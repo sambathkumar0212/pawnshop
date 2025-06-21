@@ -191,7 +191,11 @@
                                 <td>
                                     {% for loan_item in loan.loanitem_set.all %}
                                     <div class="mb-1">
+                                        {% if loan.loan_number %}
                                         <a href="{% url 'loan_detail' loan.loan_number %}">{{ loan_item.item.name }}</a>
+                                        {% else %}
+                                        {{ loan_item.item.name }}
+                                        {% endif %}
                                         <small class="text-muted">({{ loan_item.gold_karat }}K)</small>
                                     </div>
                                     {% endfor %}

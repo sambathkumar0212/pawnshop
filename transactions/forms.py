@@ -111,9 +111,14 @@ class LoanForm(forms.ModelForm):
     )
     processing_fee = forms.DecimalField(
         max_digits=10,
-        decimal_places=0,  # Changed to 0 decimal places for integer
-        initial=0.01,  # Default 1%
-        help_text="Processing fee percentage (default 1%)"
+        decimal_places=0,  # Keep this as 0 for integers
+        initial=0,
+        help_text="Processing fee amount in Rupees",
+        widget=forms.NumberInput(attrs={
+            'step': '1',  # Only allow whole numbers
+            'min': '0',   # Prevent negative values
+            'pattern': '[0-9]*'  # Only allow digits
+        })
     )
 
     class Meta:
@@ -121,13 +126,12 @@ class LoanForm(forms.ModelForm):
         fields = [
             'customer', 'branch', 'scheme', 'principal_amount', 'processing_fee',
             'distribution_amount', 'interest_rate', 'issue_date', 'due_date',
-            'grace_period_end', 'notes'
+            'grace_period_end'
         ]
         widgets = {
             'issue_date': forms.DateInput(attrs={'type': 'date'}),
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             'grace_period_end': forms.DateInput(attrs={'type': 'date'}),
-            'notes': forms.Textarea(attrs={'rows': 3}),
         }
         labels = {
             'issue_date': 'Loan Date',
@@ -137,20 +141,8 @@ class LoanForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Set default dates for new loans
-        if not self.instance.pk:  # Only for new loans
-            today = timezone.now().date()
-            self.fields['issue_date'].initial = today
-            self.fields['due_date'].initial = today + timezone.timedelta(days=364)
-            self.fields['grace_period_end'].initial = today + timezone.timedelta(days=369)  # due date + 5 days
-
         # Filter schemes to match exactly what's shown in the Loan Schemes page
         scheme_queryset = Scheme.objects.filter(status='active')
-        
-        # Print debug info - how many schemes were found
-        print(f"Found {scheme_queryset.count()} active schemes in schemes app")
-        for scheme in scheme_queryset:
-            print(f"  - {scheme.name} (Branch: {scheme.branch})")
         
         if self.user and not self.user.is_superuser:
             # For branch users: Show active schemes that are either global or specific to their branch
@@ -160,9 +152,14 @@ class LoanForm(forms.ModelForm):
                     Q(branch__isnull=True) | Q(branch_id=branch_id)
                 )
                 print(f"Filtered to {scheme_queryset.count()} schemes for branch {branch_id}")
+
+        # Order schemes by most recently modified first
+        self.fields['scheme'].queryset = scheme_queryset.order_by('-updated_at')
         
-        # Apply the same ordering as in the Loan Schemes page
-        self.fields['scheme'].queryset = scheme_queryset.order_by('name')
+        # Print debug info - how many schemes were found
+        print(f"Found {scheme_queryset.count()} active schemes in schemes app")
+        for scheme in scheme_queryset.order_by('-updated_at'):  # Keep same ordering in debug output
+            print(f"  - {scheme.name} (Branch: {scheme.branch}, Last modified: {scheme.updated_at})")
         
         # Set "Standard Gold Loan" as the default selection if it exists
         standard_gold_loan = scheme_queryset.filter(name='Standard Gold Loan').first()
@@ -355,22 +352,22 @@ class LoanForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
 
-        # Convert string inputs to Decimal and ensure they are integers
+        # Ensure principal_amount and processing_fee are integers
         try:
-            if 'market_price_22k' in cleaned_data:
-                cleaned_data['market_price_22k'] = Decimal(cleaned_data['market_price_22k'])
             if 'principal_amount' in cleaned_data:
-                cleaned_data['principal_amount'] = Decimal(str(int(float(cleaned_data['principal_amount']))))
-        except (ValueError, TypeError, InvalidOperation):
-            raise ValidationError("Please enter valid whole numbers for principal amount")
+                cleaned_data['principal_amount'] = int(float(cleaned_data['principal_amount']))
+            if 'processing_fee' in cleaned_data:
+                cleaned_data['processing_fee'] = int(float(cleaned_data['processing_fee']))
+        except (ValueError, TypeError):
+            raise ValidationError("Please enter valid whole numbers for principal amount and processing fee")
 
         # Calculate processing fee and distribution amount
         principal_amount = cleaned_data.get('principal_amount')
         if principal_amount:
-            # Processing fee is fixed at 1% of the principal amount
-            processing_fee_amount = (principal_amount * Decimal('0.01')).to_integral_value()
-            cleaned_data['processing_fee'] = processing_fee_amount
-            cleaned_data['distribution_amount'] = principal_amount - processing_fee_amount
+            # Processing fee is fixed at 1% of the principal amount, rounded to nearest integer
+            processing_fee = round(float(principal_amount) * 0.01)
+            cleaned_data['processing_fee'] = processing_fee
+            cleaned_data['distribution_amount'] = principal_amount - processing_fee
 
         # Check if at least one item is being added
         # For new item creation, check required fields
