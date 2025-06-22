@@ -57,6 +57,34 @@ class Role(models.Model):
         
     def __str__(self):
         return self.name
+    
+    def get_permission_groups(self):
+        """Returns permissions grouped by app label"""
+        from django.contrib.contenttypes.models import ContentType
+        from itertools import groupby
+        from operator import attrgetter
+        
+        permissions = self.permissions.select_related('content_type').order_by('content_type__app_label')
+        return {
+            app_label: list(perms)
+            for app_label, perms in groupby(permissions, key=lambda p: p.content_type.app_label)
+        }
+    
+    def has_permission(self, perm_codename):
+        """Check if role has a specific permission"""
+        return self.permissions.filter(codename=perm_codename).exists()
+    
+    def add_permissions(self, *codenames):
+        """Add multiple permissions by codename"""
+        from django.contrib.auth.models import Permission
+        perms = Permission.objects.filter(codename__in=codenames)
+        self.permissions.add(*perms)
+    
+    def remove_permissions(self, *codenames):
+        """Remove multiple permissions by codename"""
+        from django.contrib.auth.models import Permission
+        perms = Permission.objects.filter(codename__in=codenames)
+        self.permissions.remove(*perms)
 
 
 class Region(models.Model):

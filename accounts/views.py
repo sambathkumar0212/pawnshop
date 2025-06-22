@@ -25,6 +25,7 @@ from .forms import UserFaceCreateForm, UserUpdateForm
 from branches.models import Branch
 from inventory.models import Item
 from transactions.models import Loan, Sale
+from .utils import assign_role_to_user
 
 
 class CustomLoginView(LoginView):
