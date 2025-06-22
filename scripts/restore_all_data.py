@@ -9,6 +9,7 @@ import json
 import datetime
 import logging
 from decimal import Decimal
+import shutil
 
 # Configure logging
 logging.basicConfig(
@@ -42,6 +43,16 @@ from biometrics.models import BiometricSetting
 from integrations.models import Integration, POSIntegration, AccountingIntegration, CRMIntegration
 
 
+# Custom JSON encoder to handle Decimal, datetime, etc.
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        if hasattr(obj, 'isoformat'):
+            return obj.isoformat()
+        return super().default(obj)
+
+
 def parse_time_str(time_str):
     """Parse a time string like '09:00' into a datetime.time object"""
     try:
@@ -52,20 +63,83 @@ def parse_time_str(time_str):
         return None
 
 
+def check_fixtures_for_backup():
+    """Check if there are fixture files that can be used as backups"""
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    fixture_paths = [
+        os.path.join(project_root, 'schemes', 'fixtures', 'default_schemes.json'),
+    ]
+    
+    for path in fixture_paths:
+        if os.path.exists(path):
+            logger.info(f"✅ Found fixture file that can be used for backup: {path}")
+            return True
+    
+    return False
+
+
+def create_backup_of_default_data(data_dict):
+    """Create a backup file from the default data we just created"""
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backups')
+    os.makedirs(backup_dir, exist_ok=True)
+    
+    # Save to a backup file
+    backup_file = os.path.join(backup_dir, f'default_data_backup_{timestamp}.json')
+    with open(backup_file, 'w') as f:
+        json.dump(data_dict, f, indent=2, cls=CustomJSONEncoder)
+    
+    # Also save as the latest version
+    latest_file = os.path.join(backup_dir, 'all_data_backup_latest.json')
+    with open(latest_file, 'w') as f:
+        json.dump(data_dict, f, indent=2, cls=CustomJSONEncoder)
+    
+    logger.info(f"✅ Default data backed up to {backup_file}")
+    logger.info(f"✅ Latest version saved to {latest_file}")
+
+
 def restore_data():
     """Restore all critical data from the latest backup file"""
     logger.info("Starting data restoration...")
     
-    backup_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backups')
+    # Create backup directory if it doesn't exist
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    backup_dir = os.path.join(project_root, 'backups')
     if not os.path.exists(backup_dir):
-        logger.error(f"❌ Backup directory does not exist: {backup_dir}")
-        return False
+        logger.warning(f"⚠️ Backup directory does not exist, creating it now: {backup_dir}")
+        os.makedirs(backup_dir, exist_ok=True)
+    
+    # Check for alternative backup sources
+    has_fixtures = check_fixtures_for_backup()
     
     # Find backup file
     backup_file = os.path.join(backup_dir, 'all_data_backup_latest.json')
     if not os.path.exists(backup_file):
-        logger.error(f"❌ Backup file not found: {backup_file}")
-        return False
+        # If the file does not exist, try to find any JSON file in the backups directory
+        json_files = [f for f in os.listdir(backup_dir) if f.endswith('.json')] if os.path.exists(backup_dir) else []
+        
+        if json_files:
+            # Sort files by modification time (most recent first)
+            json_files.sort(key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)), reverse=True)
+            backup_file = os.path.join(backup_dir, json_files[0])
+            logger.warning(f"⚠️ Using alternative backup file: {json_files[0]}")
+        else:
+            logger.error(f"❌ No backup files found in directory: {backup_dir}")
+            
+            # Check if we should try using fixture data
+            if has_fixtures:
+                logger.info("Trying to use fixture data as backup...")
+                # Copy fixtures to backup directory if they exist
+                fixture_path = os.path.join(project_root, 'schemes', 'fixtures', 'default_schemes.json')
+                if os.path.exists(fixture_path):
+                    backup_file = os.path.join(backup_dir, 'schemes_fixture_backup.json')
+                    shutil.copy2(fixture_path, backup_file)
+                    logger.info(f"✅ Copied scheme fixtures to: {backup_file}")
+                else:
+                    logger.warning("No suitable fixtures found to use as backup")
+                    return False
+            else:
+                return False
     
     try:
         # Load backup data
@@ -293,6 +367,16 @@ def restore_data():
 
 def create_defaults_if_empty():
     """Create default data if there's nothing in the database"""
+    logger.info("Creating default data as no backup was found or restoration failed")
+    
+    # Dictionary to store all default data to back up
+    default_data = {
+        'branches': [],
+        'branch_settings': [],
+        'schemes': [],
+        'categories': []
+    }
+    
     # Check if branches exist
     if Branch.objects.count() == 0:
         logger.info("No branches found. Creating default branch...")
@@ -308,13 +392,43 @@ def create_defaults_if_empty():
         )
         
         # Create default branch settings
-        BranchSettings.objects.create(
+        settings = BranchSettings.objects.create(
             branch=branch,
             max_loan_amount=5000.00,
             default_interest_rate=10.00,
             loan_duration_days=30,
             grace_period_days=15
         )
+        
+        # Add to default data
+        default_data['branches'].append({
+            'id': branch.id,
+            'name': branch.name,
+            'address': branch.address,
+            'city': branch.city,
+            'state': branch.state,
+            'zip_code': branch.zip_code,
+            'phone': branch.phone,
+            'email': branch.email,
+            'is_active': branch.is_active,
+            'opening_time': '09:00',
+            'closing_time': '18:00'
+        })
+        
+        default_data['branch_settings'].append({
+            'id': settings.id,
+            'branch_id': settings.branch_id,
+            'max_loan_amount': str(settings.max_loan_amount),
+            'default_interest_rate': str(settings.default_interest_rate),
+            'loan_duration_days': settings.loan_duration_days,
+            'grace_period_days': settings.grace_period_days,
+            'allow_online_payments': settings.allow_online_payments,
+            'require_id_verification': settings.require_id_verification,
+            'enable_face_recognition': settings.enable_face_recognition,
+            'enable_email_notifications': settings.enable_email_notifications,
+            'enable_sms_notifications': settings.enable_sms_notifications,
+            'auction_delay_days': settings.auction_delay_days
+        })
         
         logger.info(f"✅ Created default branch: {branch.name}")
     
@@ -341,6 +455,24 @@ def create_defaults_if_empty():
                 }
             )
             
+            # Add to default data
+            default_data['schemes'].append({
+                'id': scheme.id,
+                'name': scheme.name,
+                'description': scheme.description,
+                'interest_rate': str(scheme.interest_rate),
+                'loan_duration': scheme.loan_duration,
+                'minimum_amount': str(scheme.minimum_amount),
+                'maximum_amount': str(scheme.maximum_amount),
+                'additional_conditions': scheme.additional_conditions,
+                'start_date': scheme.start_date.isoformat(),
+                'end_date': None,
+                'status': scheme.status,
+                'branch_id': scheme.branch_id,
+                'created_by_id': scheme.created_by_id,
+                'updated_by_id': scheme.updated_by_id
+            })
+            
             logger.info(f"✅ Created default scheme: {scheme.name}")
         except Exception as e:
             logger.error(f"❌ Error creating default scheme: {str(e)}")
@@ -366,7 +498,23 @@ def create_defaults_if_empty():
         
         for cat_data in categories:
             category = Category.objects.create(**cat_data)
+            
+            # Add to default data
+            default_data['categories'].append({
+                'id': category.id,
+                'name': category.name,
+                'description': category.description,
+                'parent_id': None,
+                'is_active': True
+            })
+            
             logger.info(f"✅ Created default category: {category.name}")
+    
+    # Create a backup of the default data we just created
+    try:
+        create_backup_of_default_data(default_data)
+    except Exception as e:
+        logger.error(f"❌ Error creating backup of default data: {str(e)}")
 
 
 if __name__ == "__main__":
