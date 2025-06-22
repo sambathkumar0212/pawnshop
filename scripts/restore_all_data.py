@@ -29,6 +29,8 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
 
+logger.info("Using PostgreSQL database for data restoration")
+
 from django.db import transaction
 from django.contrib.auth.models import Permission
 from django.utils.dateparse import parse_date, parse_datetime

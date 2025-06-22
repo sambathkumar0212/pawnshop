@@ -11,6 +11,10 @@ import sys  # Import sys for command-line argument detection
 # Load environment variables from .env file
 load_dotenv()
 
+# Determine the environment
+ENVIRONMENT = os.environ.get('DJANGO_ENV', 'development')
+print(f"Running in {ENVIRONMENT} environment")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -104,14 +108,53 @@ SKIP_DB_CHECKS = os.environ.get('SKIP_DB_CHECKS', '').lower() == 'true'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Database configuration - Always use SQLite regardless of environment
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database configuration based on environment
+if ENVIRONMENT == 'production':
+    # Production PostgreSQL database from environment variables
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME'),
+            'USER': os.environ.get('DB_USER'),
+            'PASSWORD': os.environ.get('DB_PASSWORD'),
+            'HOST': os.environ.get('DB_HOST'),
+            'PORT': os.environ.get('DB_PORT'),
+            'OPTIONS': {
+                'sslmode': os.environ.get('DB_SSLMODE', 'require'),
+            },
+        }
     }
-}
-print(f"Using SQLite database in all environments")
+    
+    # Validate that all required production database settings are provided
+    required_db_settings = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT']
+    missing_settings = [setting for setting in required_db_settings if not os.environ.get(setting)]
+    if missing_settings:
+        raise ValueError(f"Missing required database settings for production: {', '.join(missing_settings)}")
+    
+    print(f"Using Production PostgreSQL database at {DATABASES['default']['HOST']}")
+else:
+    # Development PostgreSQL database (local)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DB_NAME', 'pawnshop_dev'),
+            'USER': os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
+            'HOST': os.environ.get('DB_HOST', 'localhost'),
+            'PORT': os.environ.get('DB_PORT', '5432'),
+        }
+    }
+    print(f"Using Development PostgreSQL database at {DATABASES['default']['HOST']}")
+
+    # Fallback to SQLite if local PostgreSQL is not configured
+    if os.environ.get('USE_SQLITE', '').lower() == 'true':
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+        print("Using SQLite database for development")
 
 # Skip testing database connections during startup in minimal mode
 if SKIP_DB_CHECKS:
