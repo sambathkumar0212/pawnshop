@@ -9,12 +9,11 @@ from django.utils import timezone
 from django import forms
 from django.http import JsonResponse, Http404
 from django.contrib.auth import login
-from biometrics.models import FaceEnrollment, FaceAuthLog, CustomerFaceEnrollment
+from django.core.files.base import ContentFile
+from django.conf import settings
 import json
 import base64
 import os
-from django.conf import settings
-import datetime
 from django.db import connection
 from django.utils import timezone
 from datetime import datetime
@@ -242,19 +241,23 @@ class RoleCreateView(LoginRequiredMixin, CreateView):
     permission_required = 'accounts.add_role'
 
 
-class RoleUpdateView(LoginRequiredMixin, UpdateView):
+class RoleUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     model = Role
     template_name = 'accounts/role_form.html'
-    fields = ['name', 'description', 'permissions']
+    fields = ['name', 'role_type', 'category', 'description', 'permissions']
     success_url = reverse_lazy('role_list')
     permission_required = 'accounts.change_role'
     
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        if self.object:
-            # Initialize permissions with existing values
-            form.fields['permissions'].initial = [p.pk for p in self.object.permissions.all()]
+        # Pre-select existing permissions
+        form.fields['permissions'].initial = self.object.permissions.all()
         return form
+        
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f'Role "{form.instance.name}" was updated successfully.')
+        return response
 
 
 class RoleDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
