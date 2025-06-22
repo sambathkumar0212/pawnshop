@@ -110,28 +110,40 @@ SKIP_DB_CHECKS = os.environ.get('SKIP_DB_CHECKS', '').lower() == 'true'
 
 # Database configuration based on environment
 if ENVIRONMENT == 'production':
-    # Production PostgreSQL database from environment variables
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.environ.get('DB_NAME'),
-            'USER': os.environ.get('DB_USER'),
-            'PASSWORD': os.environ.get('DB_PASSWORD'),
-            'HOST': os.environ.get('DB_HOST'),
-            'PORT': os.environ.get('DB_PORT'),
-            'OPTIONS': {
-                'sslmode': os.environ.get('DB_SSLMODE', 'require'),
-            },
+    # First try to use DATABASE_URL if provided
+    if os.environ.get('DATABASE_URL'):
+        DATABASES = {
+            'default': dj_database_url.config(
+                conn_max_age=600,
+                conn_health_checks=True,
+                ssl_require=True,
+            )
         }
-    }
+        print(f"Using Production PostgreSQL database from DATABASE_URL")
+    else:
+        # Fallback to individual environment variables
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': os.environ.get('DB_NAME'),
+                'USER': os.environ.get('DB_USER'),
+                'PASSWORD': os.environ.get('DB_PASSWORD'),
+                'HOST': os.environ.get('DB_HOST'),
+                'PORT': os.environ.get('DB_PORT'),
+                'OPTIONS': {
+                    'sslmode': os.environ.get('DB_SSLMODE', 'require'),
+                },
+                'CONN_MAX_AGE': 600,
+            }
+        }
     
-    # Validate that all required production database settings are provided
-    required_db_settings = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT']
-    missing_settings = [setting for setting in required_db_settings if not os.environ.get(setting)]
-    if missing_settings:
-        raise ValueError(f"Missing required database settings for production: {', '.join(missing_settings)}")
+        # Validate that all required production database settings are provided
+        required_db_settings = ['DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT']
+        missing_settings = [setting for setting in required_db_settings if not os.environ.get(setting)]
+        if missing_settings:
+            raise ValueError(f"Missing required database settings for production: {', '.join(missing_settings)}")
     
-    print(f"Using Production PostgreSQL database at {DATABASES['default']['HOST']}")
+        print(f"Using Production PostgreSQL database at {DATABASES['default']['HOST']}")
 else:
     # Development PostgreSQL database (local)
     DATABASES = {

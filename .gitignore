@@ -35,6 +35,8 @@ pawnshop_env/
 .env
 .venv
 ENV/
+.env.*
+!.env.*.template
 
 # IDE
 .idea/
