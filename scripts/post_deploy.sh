@@ -172,6 +172,10 @@ else:
 "
 fi
 
+# Restore all critical data from backups
+echo "Restoring all data from backups..."
+python scripts/restore_all_data.py
+
 # Complete the database log entry
 python -c "
 import os, django

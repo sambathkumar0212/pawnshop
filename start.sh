@@ -31,6 +31,10 @@ else
   python scripts/fix_session_table.py
 fi
 
+# Restore all critical data (this ensures all important data exists even if post_deploy.sh failed)
+echo "Ensuring all critical data is restored..."
+python scripts/restore_all_data.py || echo "⚠️ Data restoration had issues, but continuing"
+
 # Create superuser if environment variables are set
 echo "Checking for superuser credentials..."
 if [[ -n "$DJANGO_SUPERUSER_USERNAME" && -n "$DJANGO_SUPERUSER_PASSWORD" && -n "$DJANGO_SUPERUSER_EMAIL" ]]; then

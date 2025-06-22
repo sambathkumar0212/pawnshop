@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.utils.translation import gettext_lazy as _
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 
 class Role(models.Model):
@@ -85,7 +87,29 @@ class Role(models.Model):
         from django.contrib.auth.models import Permission
         perms = Permission.objects.filter(codename__in=codenames)
         self.permissions.remove(*perms)
+    
+    def apply_default_permissions(self):
+        """Apply default permissions for this role type"""
+        from .permissions import get_role_permissions
+        
+        # Get the default permissions for this role type
+        role_permissions = get_role_permissions()
+        if self.role_type in role_permissions:
+            # Get permission objects for the codenames
+            from django.contrib.auth.models import Permission
+            perm_codenames = role_permissions[self.role_type]
+            permissions = Permission.objects.filter(codename__in=perm_codenames)
+            
+            # Assign permissions to the role
+            self.permissions.set(permissions)
 
+
+# Signal handler to automatically apply default permissions when a role is created or updated
+@receiver(post_save, sender=Role)
+def set_default_permissions(sender, instance, created, **kwargs):
+    """Set default permissions when a role is created or updated"""
+    # We need to use post_save because ManyToManyField can only be modified after the instance is saved
+    instance.apply_default_permissions()
 
 class Region(models.Model):
     """Region model for grouping branches"""
