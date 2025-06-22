@@ -13,6 +13,9 @@ import time
 import logging
 import traceback
 from django.db import connection
+from django.conf import settings
+import datetime
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -27,62 +30,94 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pawnshop_management.settings')
 django.setup()
 
 def backup_database():
-    """Create a backup of the database schema if possible."""
-    try:
-        from django.conf import settings
-        
-        # Check if we're using PostgreSQL
-        if 'postgresql' in settings.DATABASES['default']['ENGINE']:
-            logger.info("Creating database schema backup before migrations...")
+    """Create a backup of the database schema and data if possible."""
+    if not settings.DEBUG and not os.environ.get('SKIP_BACKUP'):
+        try:
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_dir = os.path.join(settings.BASE_DIR, 'backups')
+            os.makedirs(backup_dir, exist_ok=True)
             
-            # Get database connection info
-            db_name = settings.DATABASES['default'].get('NAME', '')
-            db_user = settings.DATABASES['default'].get('USER', '')
-            db_host = settings.DATABASES['default'].get('HOST', '')
-            db_port = settings.DATABASES['default'].get('PORT', '')
-            
-            # Create timestamp for backup filename
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"/tmp/db_schema_backup_{timestamp}.sql"
-            
-            # Export schema only (no data)
-            cmd = f"PGPASSWORD=$PASSWORD pg_dump -U {db_user} -h {db_host} -p {db_port} -s -f {filename} {db_name}"
-            logger.info(f"Running backup command: {cmd}")
-            exit_code = os.system(cmd)
-            
-            if exit_code == 0:
-                logger.info(f"Database schema backed up to {filename}")
-                return filename
-            else:
-                logger.warning("Database backup failed, but proceeding with migrations")
-                return None
+            if 'sqlite' in settings.DATABASES['default']['ENGINE']:
+                import shutil
+                db_path = settings.DATABASES['default']['NAME']
+                backup_path = os.path.join(backup_dir, f'db_backup_{timestamp}.sqlite3')
+                shutil.copy2(db_path, backup_path)
+                logger.info(f"✅ SQLite database backed up to {backup_path}")
+                return backup_path
+            elif 'postgresql' in settings.DATABASES['default']['ENGINE']:
+                backup_path = os.path.join(backup_dir, f'db_backup_{timestamp}.sql')
+                db_settings = settings.DATABASES['default']
+                pg_dump_cmd = f"pg_dump -h {db_settings['HOST']} -U {db_settings['USER']} -F c -b -v -f {backup_path} {db_settings['NAME']}"
+                os.environ['PGPASSWORD'] = db_settings['PASSWORD']
+                ret = os.system(pg_dump_cmd)
+                if ret == 0:
+                    logger.info(f"✅ PostgreSQL database backed up to {backup_path}")
+                    return backup_path
+                else:
+                    logger.warning("⚠️ PostgreSQL backup failed")
+        except Exception as e:
+            logger.warning(f"⚠️ Database backup failed: {str(e)}")
+    return None
+
+def get_current_state():
+    """Get the current state of the database for comparison."""
+    state = {}
+    with connection.cursor() as cursor:
+        # Get list of all tables
+        if 'sqlite' in connection.vendor:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         else:
-            logger.warning("Database backup is only supported for PostgreSQL")
-            return None
-    except Exception as e:
-        logger.error(f"Error during database backup: {e}")
-        return None
+            cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public';
+            """)
+        tables = cursor.fetchall()
+        
+        # For each table, get row count and sample data
+        for (table_name,) in tables:
+            if table_name.startswith('django_') or table_name.startswith('auth_'):
+                continue  # Skip Django internal tables
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name};")
+                count = cursor.fetchone()[0]
+                state[table_name] = {'count': count}
+            except:
+                continue
+    return state
 
 def run_migrations():
-    """Run all pending migrations."""
+    """Run all pending migrations with safety checks."""
     try:
-        from django.core.management import call_command
+        # Get pre-migration state
+        pre_state = get_current_state()
+        logger.info("Captured pre-migration database state")
         
-        # First, show migration status
-        logger.info("Current migration status:")
-        call_command("showmigrations")
+        # Run migrations using Django's management command
+        from django.core.management import execute_from_command_line
+        execute_from_command_line(['manage.py', 'migrate'])
         
-        # Run migrations with verbosity
-        logger.info("Running all migrations...")
-        call_command("migrate", verbosity=2, no_input=True)
+        # Get post-migration state
+        post_state = get_current_state()
+        logger.info("Captured post-migration database state")
         
-        # Show final migration status
-        logger.info("Migration status after running migrations:")
-        call_command("showmigrations")
+        # Check for data loss
+        has_data_loss = False
+        for table, pre_data in pre_state.items():
+            if table in post_state:
+                if post_state[table]['count'] < pre_data['count']:
+                    has_data_loss = True
+                    logger.error(f"⚠️ Data loss detected in table {table}: {pre_data['count']} -> {post_state[table]['count']} records")
         
+        if has_data_loss:
+            logger.error("❌ Migration resulted in data loss! Check the backup and investigate.")
+            return False
+        
+        logger.info("✅ Migrations completed successfully with no data loss")
         return True
+        
     except Exception as e:
-        logger.error(f"Error running migrations: {e}")
+        logger.error(f"❌ Migration failed: {str(e)}")
         traceback.print_exc()
         return False
 
@@ -90,10 +125,10 @@ def main():
     """Main function to run the migrations safely."""
     logger.info("Starting production migration process...")
     
-    # Backup database schema first
+    # Backup database first
     backup_file = backup_database()
     
-    # Run the migrations
+    # Run the migrations with safety checks
     success = run_migrations()
     
     if success:
