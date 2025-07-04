@@ -131,7 +131,7 @@ gunicorn pawnshop_management.wsgi:application --bind 0.0.0.0:8000
 
 ## Deployment on Render
 
-1. **Push to GitHub**  
+1. **Push to GitHub **  
    Make sure your code is pushed to a GitHub repository.
 
 2. **Create a Render Web Service**  
