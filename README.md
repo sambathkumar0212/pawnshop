@@ -34,7 +34,7 @@ A comprehensive Django-based management system for pawn shops with multiple bran
    source pawnshop_env/bin/activate  # On Windows: pawnshop_env\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Install dependencies :
    ```
    pip install -r requirements.txt
    ```
