@@ -7,501 +7,177 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loan Agreement - {{ loan.loan_number }}</title>
     <style>
-        @page {
-            size: A4;
-            margin: 2cm;
-        }
-        body {
-            font-family: Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            font-size: 12px;
-            line-height: 1.3;
-            color: #000;
-        }
-        .container {
-            width: 100%;
-            margin: 0 auto;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        .header h1 {
-            margin: 0 0 6px 0;
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .header h2 {
-            margin: 0 0 6px 0;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        .header p {
-            margin: 4px 0;
-            font-size: 12px;
-        }
-        .branch-contact {
-            font-size: 11px;
-            margin: 5px 0 10px 0;
-            text-align: center;
-        }
-        table.data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-            font-size: 11px;
-            page-break-inside: avoid; /* Prevent table from breaking across pages */
-        }
-        table.data-table, table.data-table th, table.data-table td {
-            border: 1px solid #000;
-        }
-        table.data-table th, table.data-table td {
-            padding: 3px 5px; /* Reduced padding to make it more compact vertically */
-            text-align: left;
-            line-height: 1.2; /* Reduced line height */
-        }
-        table.gold-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-            font-size: 11px;
-            page-break-inside: avoid; /* Prevent table from breaking across pages */
-        }
-        table.gold-table, table.gold-table th, table.gold-table td {
-            border: 1px solid #000;
-        }
-        table.gold-table th, table.gold-table td {
-            padding: 6px;
-            text-align: center;
-        }
-        table.gold-table th {
-            font-weight: bold;
-            background-color: #f2f2f2;
-            padding: 8px 4px;
-        }
-        /* Make gold table span full width */
-        .gold-table-container {
-            width: 100%;
-            margin-bottom: 15px;
-            page-break-inside: avoid;
-        }
-        /* Expand item description cell width */
-        table.gold-table td.item-cell {
-            text-align: left;
-            vertical-align: top;
-            padding: 8px;
-            width: 55%; /* Increased width for item description */
-            max-width: 55%;
-            word-break: break-word;
-            border-right: 1px solid #000;
-            overflow-wrap: break-word;
-        }
-        /* Adjust column widths for gold details */
-        table.gold-table th.karat-header {
-            padding: 4px 1px;
-            font-size: 10px;
-            background-color: #f2f2f2;
-            width: 15%; /* Increased from 10% */
-        }
-        table.gold-table th.compact-header {
-            padding: 5px 2px;
-            font-size: 10px;
-            background-color: #f2f2f2;
-            width: 15%; /* Left as is */
-        }
-        table.gold-table td.karat-cell {
-            padding: 6px 2px;
-            font-size: 11px;
-            width: 15%; /* Increased from 10% */
-            min-width: 15%;
-            font-weight: bold;
-        }
-        table.gold-table td.compact-cell {
-            padding: 6px 2px;
-            font-size: 11px;
-            width: 15%; /* Left as is */
-            font-weight: bold;
-        }
-        /* Improve item name and description display */
-        .item-name {
-            font-size: 12px;
-            font-weight: bold;
-            margin-bottom: 4px;
-            text-align: left;
-            word-break: break-word;
-            line-height: 1.2;
-            hyphens: auto;
-        }
-        .item-description {
-            font-size: 10px; /* Increased from 8px */
-            color: #333;
-            text-align: left;
-            overflow: hidden;
-            white-space: normal;
-            word-wrap: break-word;
-            line-height: 1.2; /* Increased from 1 */
-            max-width: 100%;
-            display: block;
-            margin-bottom: 3px;
-            hyphens: auto;
-        }
-        .total-items {
-            font-size: 11px;
-            font-weight: bold;
-            color: #00458B;
-            margin-top: 4px;
-            border-top: 1px dotted #ccc;
-            padding-top: 4px;
-        }
-        .terms-section h3 {
-            font-size: 13px;
-            font-weight: bold;
-            margin: 15px 0 10px 0;
-        }
-        .terms-list {
-            padding-left: 25px;
-            margin: 5px 0;
-            font-size: 11px;
-        }
-        .terms-list li {
-            margin-bottom: 6px;
-            text-align: justify;
-        }
-        .signatures {
-            margin-top: 30px;
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-        }
-        .signature-box-left {
-            width: 45%;
-        }
-        .signature-box-right {
-            width: 45%;
-            text-align: right;
-        }
-        .signature-line {
-            border-top: 1px solid #000;
-            margin-top: 40px;
-            margin-bottom: 5px;
-        }
-        .footer {
-            margin-top: 20px;
-            font-size: 11px;
-            text-align: center;
-        }
-        /* Simplified styles for enhanced fields */
-        .highlight-cell {
-            background-color: #f2f2f2;
-        }
-        .important-field {
-            font-weight: bold;
-        }
-        .financial-value {
-            color: #00458B;
-            font-weight: bold;
-        }
-        .date-value {
-            color: #8B0000;
-            font-weight: bold;
-        }
-        .distribution-amount {
-            color: #006400; /* Dark green color */
-            font-size: 10px;
-            font-weight: bold;
-        }
-        .customer-name {
-            font-size: 15px; 
-            font-weight: bold;
-        }
-        .standard-scheme {
-            background-color: #e0f0ff;
-            padding: 2px;
-            border: 1px solid #9ac0e0;
-            margin-bottom: 3px;
-        }
-        .flexible-scheme {
-            background-color: #fff7e0;
-            padding: 2px;
-            border: 1px solid #e0d4a0;
-            margin-bottom: 3px;
-        }
-        .premium-scheme {
-            background-color: #f0e0ff;
-            padding: 2px;
-            border: 1px solid #d4a0e0;
-            margin-bottom: 3px;
-        }
-        .scheme-details {
-            font-size: 10px;
-            margin-top: 1px;
-        }
-        /* Photos table styles - reduced size */
-        table.photos-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 15px;
-        }
-        table.photos-table td {
-            padding: 4px;
-            text-align: center;
-            vertical-align: top;
-            width: 20%; /* 5 photos per row instead of 4 */
-        }
-        .item-photo {
-            width: 60px; /* Reduced from 90px */
-            height: 60px; /* Reduced from 90px */
-            border: 1px solid #000;
-            overflow: hidden;
-            display: inline-block;
-            margin: 0 auto;
-        }
-        .item-photo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .photo-label {
-            font-size: 8px; /* Reduced from 9px */
-            font-weight: bold;
-            text-align: center;
-            margin-top: 2px;
-        }
-        /* Set smaller photo section title */
-        .photo-section-title {
-            font-size: 12px; 
-            margin-top: 15px;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        .customer-photo {
-            width: 45px; /* Reduced from 55px */
-            height: 55px; /* Reduced from 65px */
-            border: 1px solid #000;
-            overflow: hidden;
-            padding: 0;
-            margin: 0;
-        }
-        .customer-photo img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        /* Add new styles for the monthly interest section */
-        .monthly-interest {
-            background-color: #f8f9fa;
-            padding: 5px;
-            margin-bottom: 10px;
-            border-left: 3px solid #3b5998;
-        }
-        .monthly-interest .title {
-            font-weight: bold;
-            color: #3b5998;
-        }
-        .monthly-interest .value {
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        
-        /* Add proper rupee symbol font support */
-        @font-face {
-            font-family: 'Rupee Foradian';
-            src: url('/static/fonts/rupee_foradian.ttf') format('truetype');
-        }
-        
-        .rupee {
-            font-family: 'Arial Unicode MS', 'Rupee Foradian', sans-serif;
-        }
+        @page {size: A4; margin: 2cm;}
+        body {font-family: 'Helvetica', 'Arial', sans-serif; margin: 0; padding: 0; font-size: 11px; line-height: 1.2; color: #000;}
+        .container {width: 100%; margin: 0 auto;}
+        .header {text-align: center; margin-bottom: 10px;}
+        .header h1 {margin: 0 0 4px 0; font-size: 18px; font-weight: bold;}
+        .header h2 {margin: 0 0 4px 0; font-size: 15px; font-weight: bold;}
+        .header p {margin: 2px 0; font-size: 11px;}
+        .branch-contact {font-size: 10px; margin: 4px 0 8px 0; text-align: center;}
+        table.data-table {width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; page-break-inside: avoid;}
+        table.data-table, table.data-table th, table.data-table td {border: 1px solid #000;}
+        table.data-table th, table.data-table td {padding: 4px; text-align: left; line-height: 1.2; vertical-align: top;}
+        .customer-info td {padding: 4px;}
+        .customer-info td b {display: block; margin-bottom: 2px; font-size: 10px;}
+        .data-section {margin-bottom: 12px;}
+        table.gold-table {width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px;}
+        table.gold-table, table.gold-table th, table.gold-table td {border: 1px solid #000;}
+        table.gold-table th {font-weight: bold; background-color: #f2f2f2; padding: 5px 3px;}
+        table.gold-table td.item-cell {text-align: left; padding: 5px; width: 55%; word-break: break-word;}
+        table.gold-table td.karat-cell, table.gold-table td.compact-cell {padding: 5px 2px; font-size: 10px; width: 15%; font-weight: bold;}
+        .item-name {font-size: 11px; font-weight: bold; margin-bottom: 3px;}
+        .item-description {font-size: 9px; color: #333; line-height: 1.1; margin-bottom: 2px;}
+        .total-items {font-size: 10px; font-weight: bold; margin-top: 3px; padding-top: 3px; border-top: 1px dotted #ccc;}
+        .terms-section h3 {font-size: 12px; font-weight: bold; margin: 12px 0 6px 0;}
+        .terms-list {padding-left: 20px; margin: 4px 0; font-size: 10px;}
+        .terms-list li {margin-bottom: 5px; text-align: justify;}
+        .signatures {margin-top: 20px; display: flex; justify-content: space-between; width: 100%;}
+        .signature-box-left, .signature-box-right {width: 45%;}
+        .signature-box-right {text-align: right;}
+        .signature-line {border-top: 1px solid #000; margin-top: 30px; margin-bottom: 4px;}
+        .footer {margin-top: 15px; font-size: 10px; text-align: center;}
+        .highlight-cell {background-color: #f2f2f2;}
+        .important-field {font-weight: bold;}
+        .financial-value {color: #00458B; font-weight: bold;}
+        .date-value {color: #8B0000; font-weight: bold;}
+        .distribution-amount {color: #006400; font-weight: bold;}
+        .customer-name {font-size: 13px; font-weight: bold;}
+        .customer-photo {width: 40px; height: 50px; border: 1px solid #000; overflow: hidden; padding: 0; margin: 0 auto;}
+        .customer-photo img {width: 100%; height: 100%; object-fit: cover;}
+        table.photos-table {width: 100%; border-collapse: collapse; margin-bottom: 12px;}
+        table.photos-table td {padding: 3px; text-align: center; vertical-align: top; width: 20%;}
+        .item-photo {width: 50px; height: 50px; border: 1px solid #000; overflow: hidden; display: inline-block; margin: 0 auto;}
+        .item-photo img {width: 100%; height: 100%; object-fit: cover;}
+        .photo-label {font-size: 8px; font-weight: bold; text-align: center; margin-top: 2px;}
+        .photo-section-title {font-size: 11px; margin-top: 12px; margin-bottom: 6px; font-weight: bold;}
+        .rupee {font-weight: bold;}
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>{{ branch.name }}</h1>
-            <p class="branch-contact">
-                {{ branch.address }}, {{ branch.city }}, {{ branch.state }} - {{ branch.zip_code }} | Phone: {{ branch.phone }}
-                {% if branch.email %} | Email: {{ branch.email }}{% endif %}
-            </p>
+            <p class="branch-contact">{{ branch.address }}, {{ branch.city }}, {{ branch.state }} - {{ branch.zip_code }} | Phone: {{ branch.phone }}{% if branch.email %} | Email: {{ branch.email }}{% endif %}</p>
             <h2>Gold Loan Agreement</h2>
         </div>
         
-        <table class="data-table">
-            <tr>
-                <td width="50%"><b>Loan Number</b><br>{{ loan.loan_number }}</td>
-                <td width="50%" rowspan="2" style="vertical-align: top;">
-                    <b>Customer Photo</b><br>
-                    <div class="customer-photo">
-                    {% if customer_photo %}
-                        <img src="data:image/jpeg;base64,{{ customer_photo }}" alt="Customer Photo">
-                    {% else %}
-                        <p style="text-align: center; margin-top: 50px;">No photo available</p>
-                    {% endif %}
-                    </div>
-                </td>
-            </tr>
-            <tr>
-                <td class="highlight-cell">
-                    <b>Borrower Name</b><br><span class="customer-name">{{ customer.full_name }}</span>
-                    <br><br><b>Address</b><br>
-                    {{ customer.address }}
-                    {% if customer.city %}, {{ customer.city }}{% endif %}
-                    {% if customer.state %}, {{ customer.state }}{% endif %}
-                    {% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}
-                </td>
-            </tr>
-            <tr>
-                <td><b>ID Details</b><br>
-                    <span class="important-field">
-                        {% if customer.id_type %}{{ customer.id_type }}: {% endif %}{{ customer.id_number }}
-                    </span>
-                </td>
-                <td>
-                    <b>Phone Number</b><br>{% if customer.phone %}{{ customer.phone }}{% else %}None{% endif %}<br>
-                    <b>Email</b><br>{% if customer.email %}{{ customer.email }}{% else %}None{% endif %}
-                </td>
-            </tr>
-            <tr>
-                <td><b>Processing Fee</b><br>Rs {{ loan.processing_fee }}</td>
-                <td class="highlight-cell"><b>Principal Amount</b><br><span class="financial-value">Rs {{ loan.principal_amount|floatformat:2 }}</span></td>
-            </tr>
-            <tr>
-                <td><b>Distribution Amount</b><br><span class="distribution-amount">Rs {{ loan.distribution_amount|floatformat:2 }}</span></td>
-                <td class="highlight-cell"><b>Interest Rate</b><br>
-                    {% if loan.scheme == 'standard' %}
-                        <span class="financial-value">12.00% per annum</span>
-                    {% elif loan.scheme == 'flexible' %}
-                        <span class="financial-value">24.00% per annum</span>
-                    {% elif loan.scheme == 'premium' %}
-                        <span class="financial-value">36.00% per annum</span>
-                    {% else %}
-                        <span class="financial-value">{{ loan.interest_rate|floatformat:2 }}% per annum</span>
-                    {% endif %}
-                    <br>
-                    <span style="font-size: 9px; color: #00458B; font-weight: bold;">
-                        Monthly Interest: {{ loan|monthly_interest_rate }}% (Rs {{ loan|monthly_interest_per_thousand }} per Rs 100)
-                    </span>
-                </td>
-            </tr>
-            <tr>
-                <td class="highlight-cell"><b>Loan Date</b><br><span class="date-value">{{ loan.issue_date|date:"d/m/Y" }}</span></td>
-                <td class="highlight-cell"><b>Due Date</b><br><span class="date-value">{{ loan.due_date|date:"d/m/Y" }}</span></td>
-            </tr>
-        </table>
+        <!-- Customer Information Section -->
+        <div class="data-section">
+            <table class="data-table customer-info">
+                <tr>
+                    <td width="50%"><b>Loan Number</b><br>{{ loan.loan_number }}</td>
+                    <td width="50%" rowspan="4" style="vertical-align: top; text-align: center;">
+                        <b>Customer Photo</b>
+                        <div class="customer-photo">
+                        {% if customer_photo %}<img src="data:image/jpeg;base64,{{ customer_photo }}" alt="Customer Photo">
+                        {% else %}<p style="text-align: center; font-size: 8px; margin-top: 15px;">No photo</p>{% endif %}
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="highlight-cell"><b>Borrower Name</b><br><span class="customer-name">{{ customer.full_name }}</span></td>
+                </tr>
+                <tr>
+                    <td><b>ID Details</b><br><span class="important-field">{% if customer.id_type %}{{ customer.id_type }}: {% endif %}{{ customer.id_number }}</span></td>
+                </tr>
+                <tr>
+                    <td>
+                        <b>Phone Number</b><br>{% if customer.phone %}{{ customer.phone }}{% else %}None{% endif %}<br>
+                        <b>Email</b><br>{% if customer.email %}{{ customer.email }}{% else %}None{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td><b>Address</b><br>{{ customer.address }}{% if customer.city %}, {{ customer.city }}{% endif %}{% if customer.state %}, {{ customer.state }}{% endif %}{% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}</td>
+                    <td><b>Interest Rate</b><br>{% if loan.scheme == 'standard' %}<span class="financial-value">12.00% per annum</span>{% elif loan.scheme == 'flexible' %}<span class="financial-value">24.00% per annum</span>{% elif loan.scheme == 'premium' %}<span class="financial-value">36.00% per annum</span>{% else %}<span class="financial-value">{{ loan.interest_rate|floatformat:2 }}% per annum</span>{% endif %}</td>
+                </tr>
+            </table>
+        </div>
         
-        <!-- Loan Financial Details -->
-        <div class="section">
-            <h3 class="heading">Financial Details</h3>
+        <!-- Loan Amount Details -->
+        <div class="data-section">
             <table class="data-table">
                 <tr>
-                    <td width="50%"><b>Principal Amount</b><br>Rs {{ loan.principal_amount|floatformat:2 }}</td>
-                    <td width="50%"><b>Processing Fee</b><br>Rs {{ loan.processing_fee }}</td>
+                    <td width="50%" class="highlight-cell"><b>Principal Amount</b><br><span class="financial-value">Rs. {{ loan.principal_amount|floatformat:2 }}</span></td>
+                    <td width="50%"><b>Processing Fee</b><br>Rs. {{ loan.processing_fee }}</td>
                 </tr>
                 <tr>
-                    <td><b>Distribution Amount</b><br>Rs {{ loan.distribution_amount|floatformat:2 }}</td>
-                    <td><b>Scheme</b><br>{{ loan.scheme.name }}</td>
-                </tr>
-                <tr>
-                    <td><b>Annual Interest Rate</b><br>{{ loan.scheme.interest_rate }}% per annum</td>
-                    <td><b>Interest Calculation Method</b><br>Simple Interest</td>
-                </tr>
-                <tr>
-                    <td><b>Monthly Interest Cost:</b><br>Rs {{ loan|monthly_interest_per_thousand }} per Rs 100</td>
-                    <td><b>Monthly Interest Amount</b><br>Rs {{ loan|monthly_interest_amount|floatformat:2 }}</td>
-                </tr>
-                <tr>
-                    <td class="highlight-cell"><b>Issue Date</b><br><span class="date-value">{{ loan.issue_date|date:"d/m/Y" }}</span></td>
+                    <td><b>Distribution Amount</b><br><span class="distribution-amount">Rs. {{ loan.distribution_amount|floatformat:2 }}</span></td>
                     <td class="highlight-cell"><b>Due Date</b><br><span class="date-value">{{ loan.due_date|date:"d/m/Y" }}</span></td>
                 </tr>
             </table>
         </div>
         
-        <div class="gold-table-container">
-        <table class="gold-table">
-            <thead>
-                <tr>
-                    <th>Item Description</th>
-                    <th class="karat-header">Gold Karat</th>
-                    <th class="compact-header">Gross Weight (g)</th>
-                    <th class="compact-header">Net Weight (g)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in loan_items %}
-                <tr>
-                    <td class="item-cell">
-                        <div class="item-name">{{ item.item.name }}</div>
-                        {% if item.item.description %}
-                            {% with desc_length=item.item.description|length %}
-                                {% if desc_length > 100 %}
-                                <div class="item-description very-long-description">
-                                {% elif desc_length > 50 %}
-                                <div class="item-description long-description">
-                                {% else %}
-                                <div class="item-description">
-                                {% endif %}
-                                    {{ item.item.description|linebreaksbr }}
-                                </div>
-                            {% endwith %}
-                        {% endif %}
-                        {% with total_items=item.item.name|calculate_total_items %}
-                            {% if total_items > 0 %}
-                                <div class="total-items">
-                                    Total Items: <strong>{{ total_items }}</strong>
-                                </div>
-                            {% endif %}
-                        {% endwith %}
-                    </td>
-                    <td class="karat-cell">{{ item.gold_karat }}K</td>
-                    <td class="compact-cell">{{ item.gross_weight|floatformat:3 }}</td>
-                    <td class="compact-cell">{{ item.net_weight|floatformat:3 }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- Gold Items Section -->
+        <div class="data-section">
+            <h3 class="heading" style="font-size: 12px; margin: 8px 0;">Gold Items</h3>
+            <div class="gold-table-container">
+                <table class="gold-table">
+                    <thead>
+                        <tr>
+                            <th>Item Description</th>
+                            <th class="karat-header">Gold Karat</th>
+                            <th class="compact-header">Gross Weight</th>
+                            <th class="compact-header">Net Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in loan_items %}
+                        <tr>
+                            <td class="item-cell">
+                                <div class="item-name">{{ item.item.name }}</div>
+                                {% if item.item.description %}<div class="item-description">{{ item.item.description|linebreaksbr }}</div>{% endif %}
+                                {% with total_items=item.item.name|calculate_total_items %}
+                                    {% if total_items > 0 %}<div class="total-items">Total: <strong>{{ total_items }}</strong></div>{% endif %}
+                                {% endwith %}
+                            </td>
+                            <td class="karat-cell">{{ item.gold_karat }}K</td>
+                            <td class="compact-cell">{{ item.gross_weight|floatformat:3 }}</td>
+                            <td class="compact-cell">{{ item.net_weight|floatformat:3 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
         
+        <!-- Loan Photos Section -->
         {% if item_photos and item_photos|length > 0 %}
-        <h3 class="photo-section-title">Pledged Gold Item Photos</h3>
-        <table class="photos-table">
-            <tr>
-                {% for photo in item_photos %}
-                <td>
-                    <div class="item-photo">
-                        <img src="data:image/jpeg;base64,{{ photo }}" alt="Gold Item {{ forloop.counter }}">
-                    </div>
-                    <div class="photo-label">Item {{ forloop.counter }}</div>
-                </td>
-                {% if forloop.counter|divisibleby:5 and not forloop.last %}</tr><tr>{% endif %}
-                {% endfor %}
-            </tr>
-        </table>
+        <div class="data-section">
+            <h3 class="photo-section-title">Pledged Gold Item Photos</h3>
+            <table class="photos-table">
+                <tr>
+                    {% for photo in item_photos %}
+                    <td>
+                        <div class="item-photo"><img src="data:image/jpeg;base64,{{ photo }}" alt="Gold Item {{ forloop.counter }}"></div>
+                        <div class="photo-label">Item {{ forloop.counter }}</div>
+                    </td>
+                    {% if forloop.counter|divisibleby:5 and not forloop.last %}</tr><tr>{% endif %}
+                    {% endfor %}
+                </tr>
+            </table>
+        </div>
         {% endif %}
         
+        <!-- Terms and Conditions Section -->
         <div class="terms-section">
             <h3>TERMS AND CONDITIONS</h3>
             <ol class="terms-list">
-                <li><b>Purpose of Loan:</b> The loan is granted solely on the security of gold ornaments/items deposited as collateral with the lender.
-                The borrower confirms that the gold items pledged are legally owned by the borrower.</li>
-                <li><b>KYC Compliance:</b> The borrower has provided necessary Know Your Customer (KYC) documents as required under RBI
-                guidelines, including proof of identity and address.</li>
+                <li><b>Purpose of Loan:</b> The loan is granted solely on the security of gold ornaments/items deposited as collateral with the lender. The borrower confirms that the gold items pledged are legally owned by the borrower.</li>
+                <li><b>KYC Compliance:</b> The borrower has provided necessary Know Your Customer (KYC) documents as required under RBI guidelines, including proof of identity and address.</li>
                 <li><b>Fair Practices Code:</b> The lender abides by the Fair Practices Code as prescribed by RBI.</li>
-                <li><b>Grievance Redressal:</b> Any complaints or grievances can be registered with the branch manager. If not resolved, the borrower
-                can escalate to the designated Grievance Redressal Officer at the head office.</li>
+                <li><b>Grievance Redressal:</b> Any complaints or grievances can be registered with the branch manager. If not resolved, the borrower can escalate to the designated Grievance Redressal Officer at the head office.</li>
                 <li><b>Receipt Requirement:</b> The borrower <span style="color: #8B0000; font-weight: bold;">must present this original loan agreement document</span> when closing the loan and collecting the pledged gold items. No release of pledged items will be processed without verification of this document along with valid ID proof.</li>
-                <li><b>Declaration:</b> The borrower declares that all information provided is true and correct. The borrower has read and understood all
-                the terms and conditions mentioned herein.</li>
+                <li><b>Declaration:</b> The borrower declares that all information provided is true and correct. The borrower has read and understood all the terms and conditions mentioned herein.</li>
             </ol>
         </div>
         
+        <!-- Signatures Section -->
         <div class="signatures">
             <div class="signature-box-left">
                 <div class="signature-line"></div>
-                <p>&nbsp;</p>
-                <p>&nbsp;</p>
                 <p><b>Borrower Signature</b><br>{{ customer.full_name }}</p>
             </div>
-            
             <div class="signature-box-right">
                 <div class="signature-line"></div>
                 <p><b>Authorized Signatory</b><br>{{ branch.city }}</p>
