@@ -176,42 +176,6 @@
                             {% endif %}
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-12 mb-3">
-                            <label for="id_id_image">ID Document Image</label>
-                            <div class="card p-3">
-                                <div class="row align-items-center">
-                                    <!-- File Upload Option -->
-                                    <div class="col-md-6 mb-2 mb-md-0">
-                                        <div class="d-flex flex-column">
-                                            <label class="mb-2"><i class="fas fa-upload me-2"></i>Upload ID Document:</label>
-                                            <input type="file" name="id_image" id="id_id_image" class="form-control" accept="image/*">
-                                        </div>
-                                    </div>
-                                    <!-- Camera Capture Option -->
-                                    <div class="col-md-6">
-                                        <div class="d-flex flex-column">
-                                            <label class="mb-2"><i class="fas fa-camera me-2"></i>Take Picture:</label>
-                                            <button type="button" id="capture-id-button" class="btn btn-primary w-100" data-auto-start="true">
-                                                <i class="fas fa-camera me-2"></i>Capture ID Image
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row mt-3">
-                                    <div class="col text-center">
-                                        <img id="id-image-preview" src="#" alt="ID Image Preview" 
-                                            style="max-width: 100%; max-height: 200px; display: none; border: 1px solid #ddd;">
-                                    </div>
-                                </div>
-                            </div>
-                            {% if form.id_image.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.id_image.errors }}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
                 {% else %}
                     <!-- Default layout for other sections -->
                     {% for field_name in fieldset.fields %}
@@ -255,73 +219,11 @@
 
 {% block extra_js %}
 <script>
-    // Global camera configuration
-    window.cameraConfig = {
-        autoStart: true,
-        width: 640,
-        height: 480,
-        format: 'jpeg',
-        quality: 0.85
-    };
-</script>
-<script src="{% static 'accounts/js/camera-capture.js' %}?v=3"></script>
-<script>
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM fully loaded");
         
-        // Debug info for troubleshooting
-        console.log("Checking camera capture elements:");
-        const cameraBtn = document.getElementById('capture-id-button');
-        console.log("Capture ID button found:", cameraBtn !== null);
-        
-        const cameraVideoEl = document.getElementById('camera-video');
-        console.log("Camera video element found:", cameraVideoEl !== null);
-        
-        const imagePreview = document.getElementById('id-image-preview');
-        console.log("Image preview found:", imagePreview !== null);
-        
-        const imageDataField = document.getElementById('camera_image_data');
-        console.log("Image data field found:", imageDataField !== null);
-        
-        {% if form.instance.id_image %}
-        // Show existing image if available
-        if (imagePreview) {
-            imagePreview.src = "{{ form.instance.id_image.url }}";
-            imagePreview.style.display = 'block';
-            console.log("Loaded existing image preview from: {{ form.instance.id_image.url }}");
-        }
-        {% endif %}
-        
-        // Make sure the file input's change event updates the preview
-        const fileInput = document.getElementById('id_id_image');
-        if (fileInput) {
-            fileInput.addEventListener('change', function(e) {
-                if (this.files && this.files[0] && imagePreview) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        imagePreview.src = e.target.result;
-                        imagePreview.style.display = 'block';
-                        // Clear any camera capture data since we're using a file upload
-                        if (imageDataField) imageDataField.value = '';
-                    };
-                    reader.readAsDataURL(this.files[0]);
-                }
-            });
-        }
-        
         // Display user agent and browser info for debugging
         console.log("Browser info:", navigator.userAgent);
-        
-        // Check if camera API is available
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            console.log("Camera API is available");
-        } else {
-            console.warn("Camera API not available in this browser");
-            if (cameraBtn) {
-                cameraBtn.disabled = true;
-                cameraBtn.title = "Camera not available in this browser";
-            }
-        }
     });
 </script>
 {% endblock %}
