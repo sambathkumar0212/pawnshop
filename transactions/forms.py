@@ -13,14 +13,14 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
 class LoanForm(forms.ModelForm):
-    distribution_amount = forms.DecimalField(
+    distribution_amount = forms.IntegerField(
         disabled=True,
         required=False,
-        max_digits=10,
-        decimal_places=0,
-        help_text="Amount to be distributed after processing fee",
+        help_text="Amount to be distributed after processing fee (in whole Rupees)",
         widget=forms.NumberInput(attrs={
-            'data-show-words': 'true'  # Custom attribute to identify fields that need words display
+            'data-show-words': 'true',  # Custom attribute to identify fields that need words display
+            'step': '1',  # Only allow whole numbers
+            'pattern': '[0-9]*'  # Only allow digits
         })
     )
 
@@ -75,13 +75,15 @@ class LoanForm(forms.ModelForm):
         initial='22',
         help_text="Select the purity of gold"
     )
-    market_price_22k = forms.DecimalField(
+    market_price_22k = forms.IntegerField(
         required=False,
-        max_digits=10,
-        decimal_places=2,
+        min_value=0,
         label="Today's 22K Gold Price (per gram)",
-        help_text="Enter today's market price for 22K gold per gram",
-        widget=forms.TextInput()  # Changed to TextInput
+        help_text="Enter today's market price for 22K gold per gram (in whole Rupees)",
+        widget=forms.NumberInput(attrs={
+            'step': '1',  # Only allow whole numbers
+            'pattern': '[0-9]*'  # Only allow digits
+        })
     )
     gross_weight = forms.DecimalField(
         required=False,
@@ -109,14 +111,12 @@ class LoanForm(forms.ModelForm):
         required=False,  # Add this line to make it not required for form submission
         help_text="Interest rate per year"
     )
-    processing_fee = forms.DecimalField(
-        max_digits=10,
-        decimal_places=0,  # Keep this as 0 for integers
+    processing_fee = forms.IntegerField(
+        min_value=0,
         initial=0,
-        help_text="Processing fee amount in Rupees",
+        help_text="Processing fee amount in whole Rupees",
         widget=forms.NumberInput(attrs={
             'step': '1',  # Only allow whole numbers
-            'min': '0',   # Prevent negative values
             'pattern': '[0-9]*'  # Only allow digits
         })
     )
@@ -132,6 +132,11 @@ class LoanForm(forms.ModelForm):
             'issue_date': forms.DateInput(attrs={'type': 'date'}),
             'due_date': forms.DateInput(attrs={'type': 'date'}),
             'grace_period_end': forms.DateInput(attrs={'type': 'date'}),
+            'principal_amount': forms.NumberInput(attrs={
+                'data-show-words': 'true',
+                'step': '1',  # Only allow whole numbers
+                'pattern': '[0-9]*'  # Only allow digits
+            })
         }
         labels = {
             'issue_date': 'Loan Date',
@@ -171,19 +176,25 @@ class LoanForm(forms.ModelForm):
             print("No schemes found in schemes app, consider creating some.")
 
         # Update principal_amount field to use integer values
-        self.fields['principal_amount'] = forms.DecimalField(
-            max_digits=10,
-            decimal_places=0,
-            help_text=""  # Removing help text as we'll display amount in words instead
+        self.fields['principal_amount'] = forms.IntegerField(
+            min_value=0,
+            help_text="Loan amount in whole Rupees",
+            widget=forms.NumberInput(attrs={
+                'data-show-words': 'true',
+                'step': '1',  # Only allow whole numbers
+                'pattern': '[0-9]*'  # Only allow digits
+            })
         )
 
         # Update processing_fee field to use integer values
-        self.fields['processing_fee'] = forms.DecimalField(
-            max_digits=10,
-            decimal_places=0,
+        self.fields['processing_fee'] = forms.IntegerField(
+            min_value=0,
             initial=0,
-            help_text="Processing fee amount in Rupees",
-            widget=forms.TextInput()  # Changed to TextInput
+            help_text="Processing fee amount in whole Rupees",
+            widget=forms.NumberInput(attrs={
+                'step': '1',  # Only allow whole numbers
+                'pattern': '[0-9]*'  # Only allow digits
+            })
         )
 
         # Configure customer field - filter by current branch if user has branch assigned
@@ -270,6 +281,10 @@ class LoanForm(forms.ModelForm):
             
         # If this is an existing loan, populate the item fields
         if self.instance and self.instance.pk:
+            # Set the processing_fee from the existing loan
+            if self.instance.processing_fee is not None:
+                self.fields['processing_fee'].initial = self.instance.processing_fee
+            
             # Get the first loan item associated with this loan
             loan_item = self.instance.loanitem_set.first()
             if loan_item:
@@ -354,12 +369,23 @@ class LoanForm(forms.ModelForm):
 
         # Ensure principal_amount and processing_fee are integers
         try:
-            if 'principal_amount' in cleaned_data:
-                cleaned_data['principal_amount'] = int(float(cleaned_data['principal_amount']))
-            if 'processing_fee' in cleaned_data:
-                cleaned_data['processing_fee'] = int(float(cleaned_data['processing_fee']))
+            if 'principal_amount' in cleaned_data and cleaned_data['principal_amount'] is not None:
+                cleaned_data['principal_amount'] = int(cleaned_data['principal_amount'])
+            
+            if 'processing_fee' in cleaned_data and cleaned_data['processing_fee'] is not None:
+                cleaned_data['processing_fee'] = int(cleaned_data['processing_fee'])
+            
+            if 'market_price_22k' in cleaned_data and cleaned_data['market_price_22k'] is not None:
+                cleaned_data['market_price_22k'] = int(cleaned_data['market_price_22k'])
+            
+            # Calculate distribution amount as an integer
+            if 'principal_amount' in cleaned_data and 'processing_fee' in cleaned_data:
+                principal = cleaned_data.get('principal_amount', 0)
+                fee = cleaned_data.get('processing_fee', 0)
+                cleaned_data['distribution_amount'] = int(principal) - int(fee)
+                
         except (ValueError, TypeError):
-            raise ValidationError("Please enter valid whole numbers for principal amount and processing fee")
+            raise ValidationError("Please enter valid whole numbers for amount fields")
 
         # Calculate processing fee and distribution amount
         principal_amount = cleaned_data.get('principal_amount')

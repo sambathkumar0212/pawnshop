@@ -113,7 +113,7 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
         # Keep trying to generate a unique loan number until we succeed
         while True:
             random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-            loan_number = f"{current_date.year}-{current_date.month:02d}-{branch_code}-{random_chars}"
+            loan_number = f"{current_date.year}-{current_date.month:02d}-{random_chars}"
             
             # Check if this loan number already exists
             if not Loan.objects.filter(loan_number=loan_number).exists():
@@ -125,6 +125,41 @@ class LoanCreateView(LoginRequiredMixin, CreateView):
             form.instance.interest_rate = form.instance.scheme.interest_rate
         else:
             form.instance.interest_rate = 12.00
+            
+        # Calculate and set total_payable to fix the null constraint violation
+        from decimal import Decimal
+        principal_amount = form.instance.principal_amount
+        
+        # Make sure issue_date and due_date are set
+        if not form.instance.issue_date:
+            form.instance.issue_date = current_date.date()
+            
+        if not form.instance.due_date and form.instance.issue_date:
+            # Default to 1 year loan term if not specified
+            form.instance.due_date = form.instance.issue_date + timezone.timedelta(days=365)
+            
+        # Calculate months between issue date and due date for interest calculation
+        months = ((form.instance.due_date.year - form.instance.issue_date.year) * 12 + 
+                 form.instance.due_date.month - form.instance.issue_date.month)
+        
+        # If there's any partial month, count it as a full month
+        if form.instance.due_date.day > form.instance.issue_date.day:
+            months += 1
+            
+        # Ensure we have at least 1 month for calculation purposes
+        months = max(1, months)
+            
+        # Monthly interest rate (annual rate / 12)
+        monthly_rate = Decimal(form.instance.interest_rate) / Decimal('12')
+        
+        # Calculate monthly interest amount
+        monthly_interest = (principal_amount * monthly_rate) / Decimal('100')
+        
+        # Calculate total interest over the loan term
+        total_interest = monthly_interest * Decimal(str(months))
+        
+        # Calculate and set total_payable - this is the critical fix
+        form.instance.total_payable = principal_amount + total_interest
         
         # Process customer face capture photo
         customer_face_capture = self.request.POST.get('customer_face_capture')

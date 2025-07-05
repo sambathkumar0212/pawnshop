@@ -363,11 +363,11 @@
                     {% if customer.state %}, {{ customer.state }}{% endif %}
                     {% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}
                 </td>
-                <td class="highlight-cell"><b>Principal Amount</b><br><span class="financial-value">₹{{ loan.principal_amount|floatformat:2 }}</span></td>
+                <td class="highlight-cell"><b>Principal Amount</b><br><span class="financial-value">Rs {{ loan.principal_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
-                <td><b>Processing Fee</b><br>₹{{ loan.processing_fee }}</td>
-                <td><b>Distribution Amount</b><br><span class="distribution-amount">₹{{ loan.distribution_amount|floatformat:2 }}</span></td>
+                <td><b>Processing Fee</b><br>Rs {{ loan.processing_fee }}</td>
+                <td><b>Distribution Amount</b><br><span class="distribution-amount">Rs {{ loan.distribution_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
                 <td><b>Interest Rate</b><br>
@@ -382,7 +382,7 @@
                     {% endif %}
                     <br>
                     <span style="font-size: 9px; color: #00458B; font-weight: bold;">
-                        Monthly Interest: {{ loan|monthly_interest_rate }}% (₹{{ loan|monthly_interest_per_thousand }} per ₹1,000)
+                        Monthly Interest: {{ loan|monthly_interest_rate }}% (Rs {{ loan|monthly_interest_per_thousand }} per Rs 1,000)
                     </span>
                 </td>
                 <td class="highlight-cell"><b>Loan Scheme</b>
@@ -423,11 +423,11 @@
             <h3 class="heading">Financial Details</h3>
             <table class="data-table">
                 <tr>
-                    <td width="50%"><b>Principal Amount</b><br>₹{{ loan.principal_amount|floatformat:2 }}</td>
-                    <td width="50%"><b>Processing Fee</b><br>₹{{ loan.processing_fee }}</td>
+                    <td width="50%"><b>Principal Amount</b><br>Rs {{ loan.principal_amount|floatformat:2 }}</td>
+                    <td width="50%"><b>Processing Fee</b><br>Rs {{ loan.processing_fee }}</td>
                 </tr>
                 <tr>
-                    <td><b>Distribution Amount</b><br>₹{{ loan.distribution_amount|floatformat:2 }}</td>
+                    <td><b>Distribution Amount</b><br>Rs {{ loan.distribution_amount|floatformat:2 }}</td>
                     <td><b>Scheme</b><br>{{ loan.scheme.name }}</td>
                 </tr>
                 <tr>
@@ -435,14 +435,8 @@
                     <td><b>Interest Calculation Method</b><br>Simple Interest</td>
                 </tr>
                 <tr>
-                    <td><b>Monthly Interest Rate</b><br>{{ loan|monthly_interest_rate }}% per month</td>
-                    <td><b>Monthly Interest Amount</b><br>₹{{ loan|monthly_interest_amount|floatformat:2 }}</td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="monthly-interest">
-                        <div class="title">Monthly Interest Cost:</div>
-                        <div class="value">₹{{ loan|monthly_interest_per_thousand }} per ₹1,000 borrowed</div>
-                    </td>
+                    <td><b>Monthly Interest Cost:</b><br>Rs {{ loan|monthly_interest_per_thousand }} per Rs 1,000</td>
+                    <td><b>Monthly Interest Amount</b><br>Rs {{ loan|monthly_interest_amount|floatformat:2 }}</td>
                 </tr>
                 <tr>
                     <td class="highlight-cell"><b>Issue Date</b><br><span class="date-value">{{ loan.issue_date|date:"d/m/Y" }}</span></td>

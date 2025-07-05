@@ -172,7 +172,7 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="text-muted">Distribution Amount</label>
-                            <p class="mb-0 rupee-symbol">₹{{ loan.distribution_amount|floatformat:2 }}</p>
+                            <p class="mb-0 rupee-symbol">₹{{ loan.distribution_amount }}</p>
                             <small class="text-muted" id="distributionAmountWords" style="font-size: 0.65rem;">
                                 {{ loan.distribution_amount|number_to_words|title }} Rupees Only
                             </small>
@@ -452,7 +452,7 @@
                                     <td>{{ item.gold_karat }}K</td>
                                     <td>{{ item.gross_weight }}g</td>
                                     <td>{{ item.net_weight }}g</td>
-                                    <td>₹{{ item.market_price_22k|floatformat:2 }}</td>
+                                    <td>₹{{ item.market_price_22k }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>

@@ -39,21 +39,25 @@ class Loan(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     
     # Financial details
-    principal_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=0,
-        validators=[MinValueValidator(0)]
+    principal_amount = models.IntegerField(
+        validators=[MinValueValidator(0)],
+        help_text="Principal loan amount in whole Rupees"
     )
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=12.00)
+    total_payable = models.IntegerField(
+        validators=[MinValueValidator(0)],
+        null=True,  # Temporarily allow null
+        blank=True,  # Temporarily allow blank
+        help_text="Total amount payable for the loan in whole Rupees"
+    )
     processing_fee = models.IntegerField(
         validators=[MinValueValidator(0)],
         default=0,
         help_text="Processing fee amount in whole Rupees"
     )
-    distribution_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=0,
-        validators=[MinValueValidator(0)]
+    distribution_amount = models.IntegerField(
+        validators=[MinValueValidator(0)],
+        help_text="Amount distributed to customer after processing fee deduction in whole Rupees"
     )
     
     # Important dates
@@ -341,7 +345,10 @@ class LoanItem(models.Model):
     gross_weight = models.DecimalField(max_digits=7, decimal_places=3, help_text="Total weight of the ornament in grams")
     net_weight = models.DecimalField(max_digits=7, decimal_places=3, help_text="Weight of pure gold content in grams")
     stone_weight = models.DecimalField(max_digits=7, decimal_places=3, help_text="Weight of stones if any in grams", null=True, blank=True)
-    market_price_22k = models.DecimalField(max_digits=10, decimal_places=2, help_text="Market price of 22K gold per gram at the time of loan")
+    market_price_22k = models.IntegerField(
+        validators=[MinValueValidator(0)],
+        help_text="Market price of 22K gold per gram at the time of loan in whole Rupees"
+    )
     
     class Meta:
         unique_together = ['loan', 'item']  # An item can only be used once in a loan

@@ -307,6 +307,7 @@
                                             </div>
                                             <div class="col-md-4">
                                                 {{ form.processing_fee|as_crispy_field }}
+                                                <small id="processingFeeWords" class="text-muted d-block mt-0 mb-2" style="font-size: 0.75rem; font-style: italic;"></small>
                                             </div>
                                             <div class="col-md-8">
                                                 <div class="row g-2">
@@ -375,18 +376,9 @@
                 return tens[ten] + (unit !== 0 ? '-' + ones[unit] : '');
             };
             
-            // Handle decimals
+            // Handle whole numbers only
             const numStr = num.toString();
-            const decimalIndex = numStr.indexOf('.');
-            let wholeNum = num;
-            let decimalNum = 0;
-            
-            if (decimalIndex !== -1) {
-                wholeNum = parseInt(numStr.substring(0, decimalIndex));
-                // Get decimal part and convert to cents (up to 2 decimal places)
-                const decimalStr = numStr.substring(decimalIndex + 1, decimalIndex + 3).padEnd(2, '0');
-                decimalNum = parseInt(decimalStr);
-            }
+            const wholeNum = Math.round(num); // Ensure we're working with a whole number
             
             // Convert the whole number part
             const billion = Math.floor(wholeNum / 1000000000);
@@ -396,35 +388,87 @@
             
             let result = '';
             
-            if (billion) result += convertLessThanOneThousand(billion) + ' Billion ';
-            if (million) result += convertLessThanOneThousand(million) + ' Million ';
-            if (thousand) result += convertLessThanOneThousand(thousand) + ' Thousand ';
-            if (remainder || result === '') result += convertLessThanOneThousand(remainder);
-            
-            // Add decimal part if exists
-            if (decimalNum > 0) {
-                result += ' and ' + convertLessThanOneThousand(decimalNum) + ' Cents';
-            } else {
-                result += ' Only';
+            if (billion) result += convertLessThanOneThousand(billion) + ' Billion, ';
+            if (million) result += convertLessThanOneThousand(million) + ' Million, ';
+            if (thousand) result += convertLessThanOneThousand(thousand) + ' Thousand, ';
+            if (remainder) {
+                const hundreds = Math.floor(remainder / 100);
+                const tensAndUnits = remainder % 100;
+                
+                if (hundreds) {
+                    result += ones[hundreds] + ' Hundred';
+                    if (tensAndUnits) result += ' And ';
+                }
+                
+                if (tensAndUnits) result += convertLessThanOneThousand(tensAndUnits);
             }
             
-            return result;
+            // Clean up commas
+            result = result.replace(/,\s*$/, '');
+            
+            return result.trim();
         }
         
-        // Function to update the amount in words
+        // Function to update the amount in words - modified to use local function instead of API
         function updateAmountInWords() {
-            // Remove this function entirely as we'll use the AJAX call exclusively
-            // The AJAX call will handle this functionality
+            const principalAmount = parseFloat($('#id_principal_amount').val()) || 0;
+            const distributionAmount = parseFloat($('#id_distribution_amount').val()) || 0;
+            const processingFeeAmount = parseFloat($('#id_processing_fee').val()) || 0;
+            
+            // Update principal amount in words
+            if (principalAmount > 0) {
+                const principalWords = numberToWords(Math.round(principalAmount));
+                $('#principalAmountWords').text(principalWords + ' Rupees Only');
+            } else {
+                $('#principalAmountWords').text('');
+            }
+            
+            // Update distribution amount in words
+            if (distributionAmount > 0) {
+                const distributionWords = numberToWords(Math.round(distributionAmount));
+                $('#distributionAmountWords').text(distributionWords + ' Rupees Only');
+            } else {
+                $('#distributionAmountWords').text('');
+            }
+            
+            // Update processing fee in words
+            if (processingFeeAmount > 0) {
+                const processingFeeWords = numberToWords(Math.round(processingFeeAmount));
+                $('#processingFeeWords').text(processingFeeWords + ' Rupees Only');
+            } else {
+                $('#processingFeeWords').text('');
+            }
         }
         
-        // Add input event listener to principal amount field
-        $('#id_principal_amount').on('input', function() {
-            // Don't call updateAmountInWords here
-            // The calculateDistributionAmount function will handle this
-        });
+        // Function to update the principal and distribution amount in words on input change
+        function updateAmountFields() {
+            const principalAmount = parseFloat($('#id_principal_amount').val()) || 0;
+            const distributionAmount = parseFloat($('#id_distribution_amount').val()) || 0;
+            
+            // Update principal amount in words
+            if (principalAmount > 0) {
+                const principalWords = numberToWords(Math.round(principalAmount));
+                $('#principalAmountWords').text(principalWords + ' Rupees Only');
+            } else {
+                $('#principalAmountWords').text('');
+            }
+            
+            // Update distribution amount in words
+            if (distributionAmount > 0) {
+                const distributionWords = numberToWords(Math.round(distributionAmount));
+                $('#distributionAmountWords').text(distributionWords + ' Rupees Only');
+            } else {
+                $('#distributionAmountWords').text('');
+            }
+        }
         
-        // Initialize on page load
-        // updateAmountInWords(); // Remove this line
+        // Initial call to set amount in words on page load
+        updateAmountInWords();
+        
+        // Add input event listener to principal and distribution amount fields
+        $('#id_principal_amount, #id_distribution_amount, #id_processing_fee').on('input change', function() {
+            updateAmountInWords();
+        });
         
         // Add showAlert function to window object so it can be called from loan-calculator.js
         window.showAlert = function(message, type) {
@@ -1129,19 +1173,8 @@
             const distributionAmount = principal - processingFeeAmount;
             $('#id_distribution_amount').val(Math.round(distributionAmount));
 
-            // Update distribution amount in words
-            $.get(`/transactions/number_to_words/${Math.round(distributionAmount)}`, function(response) {
-                $('#distributionAmountWords').text(response.words + ' Rupees Only');
-            });
-            
-            // Also update the principal amount in words
-            if (principal > 0) {
-                $.get(`/transactions/number_to_words/${Math.round(principal)}`, function(response) {
-                    $('#principalAmountWords').text(response.words + ' Rupees Only');
-                });
-            } else {
-                $('#principalAmountWords').text('');
-            }
+            // Update amounts in words directly using our local function
+            updateAmountInWords();
         };
 
         // Set up event handlers
@@ -1149,8 +1182,30 @@
         $('#id_market_price_22k, #id_gold_karat, #id_net_weight').on('input', calculateGoldValue);
         $('#id_principal_amount')
             .on('input', calculateDistributionAmount)
-            .trigger('input'); // Trigger on page load
+            .trigger('input'); // Trigger on page load to calculate processing fee
 
+        // Also calculate processing fee when page loads if principal amount is already set
+        $(document).ready(function() {
+            if ($('#id_principal_amount').val()) {
+                calculateDistributionAmount();
+                updateAmountInWords(); // Explicitly call to update all word displays
+            }
+            
+            // Make sure processing fee is displayed in words when it changes
+            $('#id_processing_fee').on('change input', function() {
+                const amount = parseFloat($(this).val()) || 0;
+                const processingFeeWords = numberToWords(Math.round(amount));
+                $('#processingFeeWords').text(processingFeeWords + ' Rupees Only');
+            });
+            
+            // Trigger processing fee word update on page load
+            if ($('#id_processing_fee').val()) {
+                const amount = parseFloat($('#id_processing_fee').val()) || 0;
+                const processingFeeWords = numberToWords(Math.round(amount));
+                $('#processingFeeWords').text(processingFeeWords + ' Rupees Only');
+            }
+        });
+        
         // Validate principal amount against min/max
         $('#id_principal_amount').on('change', function() {
             const marketPrice = parseFloat($('#id_market_price_22k').val()) || 0;

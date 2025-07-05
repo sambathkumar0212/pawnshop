@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get display containers
     const schemeInfoBox = document.getElementById('scheme-info');
     const loanMetricsBox = document.getElementById('loan-metrics');
+
+    // Check if we're editing an existing loan by looking for an existing processing fee
+    const isEditMode = processingFeeInput && processingFeeInput.value !== '';
     
     // Define karat purity constants
     const KARAT_PURITY = {
@@ -33,32 +36,34 @@ document.addEventListener('DOMContentLoaded', function() {
         '14': 0.583
     };
     
-    // Function to format currency
+    // Function to format currency as integers (no decimals)
     function formatCurrency(amount) {
-        return '₹' + parseFloat(amount).toLocaleString('en-IN', {
-            maximumFractionDigits: 2,
-            minimumFractionDigits: 2
-        });
+        return '₹' + Math.round(parseFloat(amount)).toLocaleString('en-IN');
+    }
+    
+    // Function to ensure integer values only
+    function ensureInteger(value) {
+        return Math.round(parseFloat(value) || 0);
     }
     
     // Function to calculate loan metrics
     function calculateLoanMetrics() {
-        // Get input values
-        const principal = parseInt(principalInput.value) || 0;
+        // Get input values - ensure all are integers
+        const principal = ensureInteger(principalInput.value);
         const interestRate = parseFloat(interestRateInput.value) || 0;
-        const processingFee = parseInt(processingFeeInput.value) || 0;
+        const processingFee = ensureInteger(processingFeeInput.value);
         
-        // Calculate metrics
+        // Calculate metrics - ensure all are integers
         const interestAmount = Math.round(principal * interestRate / 100);
         const totalRepayment = principal + interestAmount;
         const distributionAmount = principal - processingFee;
         
-        // Calculate monthly interest
+        // Calculate monthly interest - ensure all are integers where appropriate
         const monthlyInterestRate = interestRate / 12;
         const monthlyInterestAmount = Math.round(principal * monthlyInterestRate / 100);
         const perThousandRate = Math.round((monthlyInterestRate / 100) * 1000);
         
-        // Update distribution amount input
+        // Update distribution amount input - ensure integer
         if (distributionAmountInput) {
             distributionAmountInput.value = Math.round(distributionAmount);
         }
@@ -101,16 +106,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Function to calculate gold value and display min/max principal amounts
     function calculateGoldValueAndLimits() {
-        // Get input values
-        const marketPrice = parseFloat(marketPriceInput.value) || 0;
+        // Get input values - ensure market price is an integer
+        const marketPrice = ensureInteger(marketPriceInput.value);
         const goldKarat = goldKaratSelect.value || '22';
         const netWeight = parseFloat(netWeightInput.value) || 0;
         
         // Get purity ratio for the selected karat
         const purityRatio = KARAT_PURITY[goldKarat] || 0.916;  // Default to 22k if not found
         
-        // Calculate gold value
-        const goldValue = marketPrice * netWeight * purityRatio;
+        // Calculate gold value - ensure result is an integer
+        const goldValue = Math.round(marketPrice * netWeight * purityRatio);
         
         // Update gold value display if element exists
         const goldValueDisplay = document.getElementById('gold-value-display');
@@ -123,12 +128,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const maxLoanDisplay = document.getElementById('max-loan-display');
         
         if (minLoanDisplay) {
-            const minLoan = goldValue * 0.5;  // 50% of gold value
+            const minLoan = Math.round(goldValue * 0.5);  // 50% of gold value, rounded to integer
             minLoanDisplay.textContent = formatCurrency(minLoan);
         }
         
         if (maxLoanDisplay) {
-            const maxLoan = goldValue * 0.85;  // 85% of gold value
+            const maxLoan = Math.round(goldValue * 0.85);  // 85% of gold value, rounded to integer
             maxLoanDisplay.textContent = formatCurrency(maxLoan);
         }
     }
@@ -241,18 +246,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     schemeInfoBox.style.display = 'block';
                 }
                 
-                // Get processing fee percentage from additional_conditions or default to 2%
+                // Get processing fee percentage from additional_conditions or default to 1%
                 const processingFeePercentage = 
-                    (scheme.additional_conditions && scheme.additional_conditions.processing_fee_percentage) || 2;
+                    (scheme.additional_conditions && scheme.additional_conditions.processing_fee_percentage) || 1;
                 
                 // Update interest rate input with scheme value
                 if (interestRateInput) {
                     interestRateInput.value = scheme.interest_rate;
                 }
                 
-                // Calculate processing fee based on principal amount and scheme percentage
+                // Calculate processing fee based on principal amount and scheme percentage - ensure integer
                 if (processingFeeInput && principalInput.value) {
-                    const principal = parseInt(principalInput.value) || 0;
+                    const principal = ensureInteger(principalInput.value);
                     processingFeeInput.value = Math.round(principal * processingFeePercentage / 100);
                 }
                 
@@ -280,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <p><strong>Type:</strong> ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'}</p>
                                 <p><strong>Interest Rate:</strong> ${scheme.interest_rate}% per annum</p>
                                 <p><strong>Monthly Interest:</strong> ${monthlyInterestRate.toFixed(2)}% per month</p>
-                                <p><strong>Per ₹1,000 Rate:</strong> ₹${perThousandRate.toFixed(2)}</p>
+                                <p><strong>Per ₹1,000 Rate:</strong> ${formatCurrency(perThousandRate)}</p>
                             </div>
                             <div class="col-md-6">
                                 <p><strong>Loan Period:</strong> ${scheme.loan_duration} days</p>
@@ -328,12 +333,46 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (principalInput) {
         principalInput.addEventListener('input', function() {
+            // Ensure integer value
+            this.value = ensureInteger(this.value);
+            
             // If a scheme is selected, recalculate processing fee based on scheme percentage
             if (schemeSelect && schemeSelect.value && processingFeeInput) {
-                // Re-fetch scheme details to get processing fee percentage
-                loadSchemeDetails();
+                // Get the current scheme ID
+                const schemeId = schemeSelect.value;
+                
+                // Fetch scheme details from API to get processing fee percentage
+                fetch(`/schemes/${schemeId}/json/`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to load scheme details');
+                        }
+                        return response.json();
+                    })
+                    .then(scheme => {
+                        // Get processing fee percentage from additional_conditions or default to 1%
+                        const processingFeePercentage = 
+                            (scheme.additional_conditions && scheme.additional_conditions.processing_fee_percentage) || 1;
+                        
+                        // Calculate processing fee based on principal amount and scheme percentage
+                        const principal = ensureInteger(this.value);
+                        processingFeeInput.value = Math.round(principal * processingFeePercentage / 100);
+                        
+                        // Update loan metrics with new values
+                        calculateLoanMetrics();
+                    })
+                    .catch(error => {
+                        console.error('Error loading scheme details:', error);
+                        // If there's an error, still calculate metrics with current values
+                        calculateLoanMetrics();
+                    });
             } else {
-                // Otherwise just calculate loan metrics with current values
+                // If no scheme selected, use default 1% processing fee
+                if (processingFeeInput) {
+                    const principal = ensureInteger(this.value);
+                    processingFeeInput.value = Math.round(principal * 0.01); // Default 1%
+                }
+                // Calculate loan metrics with current values
                 calculateLoanMetrics();
             }
         });
@@ -341,7 +380,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Add event listeners for gold value calculation
     if (marketPriceInput) {
-        marketPriceInput.addEventListener('input', calculateGoldValueAndLimits);
+        marketPriceInput.addEventListener('input', function() {
+            // Ensure integer value
+            this.value = ensureInteger(this.value);
+            calculateGoldValueAndLimits();
+        });
     }
     
     if (goldKaratSelect) {
@@ -357,7 +400,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (processingFeeInput) {
-        processingFeeInput.addEventListener('input', calculateLoanMetrics);
+        processingFeeInput.addEventListener('input', function() {
+            // Ensure integer value
+            this.value = ensureInteger(this.value);
+            calculateLoanMetrics();
+        });
     }
     
     if (issueDateInput) {
@@ -372,6 +419,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initial calculation if values are pre-populated
     if (schemeSelect && schemeSelect.value) {
         loadSchemeDetails();
+    } else if (isEditMode && processingFeeInput) {
+        // In edit mode, if we have a processing fee value but no scheme selected,
+        // make sure we keep the existing processing fee value from the database
+        calculateLoanMetrics();
     } else {
         calculateLoanMetrics();
     }
