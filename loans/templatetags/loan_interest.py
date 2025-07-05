@@ -19,9 +19,10 @@ def monthly_interest_amount(loan):
 
 @register.filter
 def monthly_interest_per_thousand(loan):
-    """Display the monthly interest per 1000 of principal."""
+    """Display the monthly interest per 100 of principal."""
     if hasattr(loan, 'monthly_interest'):
-        return loan.monthly_interest['per_thousand']
+        # Dividing per_thousand value by 10 to get per_hundred
+        return Decimal(loan.monthly_interest['per_thousand']) / Decimal('10')
     return Decimal('0.00')
 
 @register.simple_tag

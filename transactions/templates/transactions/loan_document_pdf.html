@@ -343,6 +343,11 @@
             <tr>
                 <td class="highlight-cell">
                     <b>Borrower Name</b><br><span class="customer-name">{{ customer.full_name }}</span>
+                    <br><br><b>Address</b><br>
+                    {{ customer.address }}
+                    {% if customer.city %}, {{ customer.city }}{% endif %}
+                    {% if customer.state %}, {{ customer.state }}{% endif %}
+                    {% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}
                 </td>
             </tr>
             <tr>
@@ -357,20 +362,12 @@
                 </td>
             </tr>
             <tr>
-                <td><b>Address</b><br>
-                    {{ customer.address }}
-                    {% if customer.city %}, {{ customer.city }}{% endif %}
-                    {% if customer.state %}, {{ customer.state }}{% endif %}
-                    {% if customer.zip_code %} - {{ customer.zip_code }}{% endif %}
-                </td>
+                <td><b>Processing Fee</b><br>Rs {{ loan.processing_fee }}</td>
                 <td class="highlight-cell"><b>Principal Amount</b><br><span class="financial-value">Rs {{ loan.principal_amount|floatformat:2 }}</span></td>
             </tr>
             <tr>
-                <td><b>Processing Fee</b><br>Rs {{ loan.processing_fee }}</td>
                 <td><b>Distribution Amount</b><br><span class="distribution-amount">Rs {{ loan.distribution_amount|floatformat:2 }}</span></td>
-            </tr>
-            <tr>
-                <td><b>Interest Rate</b><br>
+                <td class="highlight-cell"><b>Interest Rate</b><br>
                     {% if loan.scheme == 'standard' %}
                         <span class="financial-value">12.00% per annum</span>
                     {% elif loan.scheme == 'flexible' %}
@@ -382,34 +379,8 @@
                     {% endif %}
                     <br>
                     <span style="font-size: 9px; color: #00458B; font-weight: bold;">
-                        Monthly Interest: {{ loan|monthly_interest_rate }}% (Rs {{ loan|monthly_interest_per_thousand }} per Rs 1,000)
+                        Monthly Interest: {{ loan|monthly_interest_rate }}% (Rs {{ loan|monthly_interest_per_thousand }} per Rs 100)
                     </span>
-                </td>
-                <td class="highlight-cell"><b>Loan Scheme</b>
-                    <div style="margin-top: 2px">
-                        {% if loan.scheme == 'standard' %}
-                        <div class="standard-scheme">
-                            <b>Standard Scheme:</b> 12% interest, minimum 3 months term.<br>
-                            <span class="scheme-details">
-                                Cannot be fully repaid before {{ loan.issue_date|date_add_days:90|date:"d/m/Y" }}
-                            </span>
-                        </div>
-                        {% elif loan.scheme == 'flexible' %}
-                        <div class="flexible-scheme">
-                            <b>Flexible Scheme:</b> 24% interest, no interest if repaid within 23 days.<br>
-                            <span class="scheme-details">
-                                Zero interest if repaid by {{ loan.issue_date|date_add_days:23|date:"d/m/Y" }}
-                            </span>
-                        </div>
-                        {% elif loan.scheme == 'premium' %}
-                        <div class="premium-scheme">
-                            <b>Premium Scheme:</b> 36% interest, no interest if repaid within 30 days.<br>
-                            <span class="scheme-details">
-                                Zero interest if repaid by {{ loan.issue_date|date_add_days:30|date:"d/m/Y" }}
-                            </span>
-                        </div>
-                        {% endif %}
-                    </div>
                 </td>
             </tr>
             <tr>
@@ -435,7 +406,7 @@
                     <td><b>Interest Calculation Method</b><br>Simple Interest</td>
                 </tr>
                 <tr>
-                    <td><b>Monthly Interest Cost:</b><br>Rs {{ loan|monthly_interest_per_thousand }} per Rs 1,000</td>
+                    <td><b>Monthly Interest Cost:</b><br>Rs {{ loan|monthly_interest_per_thousand }} per Rs 100</td>
                     <td><b>Monthly Interest Amount</b><br>Rs {{ loan|monthly_interest_amount|floatformat:2 }}</td>
                 </tr>
                 <tr>
