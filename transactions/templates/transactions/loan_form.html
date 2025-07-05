@@ -98,7 +98,7 @@
                                             </div>
                                             <div class="col-md-6">
                                                 {{ form.scheme|as_crispy_field }}
-                                                <div id="scheme-info" class="alert alert-info py-1 px-2 small mb-0 mt-1" style="display: none;">
+                                                <div id="scheme-info" class="card bg-light py-1 px-2 small mb-0 mt-1">
                                                     <span id="scheme-details"></span>
                                                 </div>
                                             </div>
@@ -123,7 +123,22 @@
                                                 {{ form.item_name|as_crispy_field }}
                                             </div>
                                             <div class="col-md-6">
-                                                {{ form.item_category|as_crispy_field }}
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        {{ form.item_category|as_crispy_field }}
+                                                    </div>
+                                                    <div class="ms-2 mt-4">
+                                                        <div class="d-flex align-items-center">
+                                                            <small class="text-muted me-1 fw-bold">Total Items:</small>
+                                                            <div class="input-group input-group-sm" style="max-width: 80px;">
+                                                                <span class="input-group-text bg-success text-white py-0">
+                                                                    <i class="fas fa-list-ol"></i>
+                                                                </span>
+                                                                <input type="text" class="form-control form-control-sm py-0" id="calculatedTotalItems" readonly>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             
                                             <!-- Second row: Item Description (left) and Today's 22K Gold Price (right) -->
@@ -152,27 +167,6 @@
                                                     </div>
                                                     <div class="col-4">
                                                         {{ form.net_weight|as_crispy_field }}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Total Items Count Display (moved to last row and size reduced) -->
-                                            <div class="col-md-6 mt-2">
-                                                <!-- Empty space or you can add another field here if needed -->
-                                            </div>
-                                            <div class="col-md-6 mt-2">
-                                                <div id="totalItemsDisplay" style="display: none;">
-                                                    <div class="d-flex align-items-center">
-                                                        <small class="text-muted me-2">Total Items:</small>
-                                                        <div class="input-group input-group-sm" style="max-width: 120px;">
-                                                            <span class="input-group-text bg-success text-white py-0">
-                                                                <i class="fas fa-list-ol"></i>
-                                                            </span>
-                                                            <input type="text" class="form-control form-control-sm py-0" id="calculatedTotalItems" readonly>
-                                                        </div>
-                                                        <small class="ms-2 text-muted fst-italic" style="font-size: 0.7rem;">
-                                                            (from "ring-6, chain-1")
-                                                        </small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -299,25 +293,15 @@
                                         <div class="row g-2">
                                             <div class="col-md-6">
                                                 {{ form.principal_amount|as_crispy_field }}
-                                                <small id="principalAmountWords" class="text-muted d-block mt-0 mb-2" style="font-size: 0.75rem; font-style: italic;"></small>
                                             </div>
                                             <div class="col-md-6">
                                                 {{ form.distribution_amount|as_crispy_field }}
-                                                <small id="distributionAmountWords" class="text-muted d-block mt-0 mb-2" style="font-size: 0.75rem; font-style: italic;"></small>
                                             </div>
                                             <div class="col-md-4">
                                                 {{ form.processing_fee|as_crispy_field }}
-                                                <small id="processingFeeWords" class="text-muted d-block mt-0 mb-2" style="font-size: 0.75rem; font-style: italic;"></small>
                                             </div>
                                             <div class="col-md-8">
-                                                <div class="row g-2">
-                                                    <div class="col-6">
-                                                        {{ form.due_date|as_crispy_field }}
-                                                    </div>
-                                                    <div class="col-6">
-                                                        {{ form.grace_period_end|as_crispy_field }}
-                                                    </div>
-                                                </div>
+                                                {{ form.due_date|as_crispy_field }}
                                             </div>
                                         </div>
                                     </div>
@@ -437,28 +421,6 @@
                 $('#processingFeeWords').text(processingFeeWords + ' Rupees Only');
             } else {
                 $('#processingFeeWords').text('');
-            }
-        }
-        
-        // Function to update the principal and distribution amount in words on input change
-        function updateAmountFields() {
-            const principalAmount = parseFloat($('#id_principal_amount').val()) || 0;
-            const distributionAmount = parseFloat($('#id_distribution_amount').val()) || 0;
-            
-            // Update principal amount in words
-            if (principalAmount > 0) {
-                const principalWords = numberToWords(Math.round(principalAmount));
-                $('#principalAmountWords').text(principalWords + ' Rupees Only');
-            } else {
-                $('#principalAmountWords').text('');
-            }
-            
-            // Update distribution amount in words
-            if (distributionAmount > 0) {
-                const distributionWords = numberToWords(Math.round(distributionAmount));
-                $('#distributionAmountWords').text(distributionWords + ' Rupees Only');
-            } else {
-                $('#distributionAmountWords').text('');
             }
         }
         
@@ -1024,8 +986,9 @@
             const itemName = $('#id_item_name').val() || '';
             let totalItems = 0;
             
-            // Pattern to match formats like "ring-6" or "earrings-2"
-            const pattern = /(\w+)-(\d+)/g;
+            // Pattern to match formats like "ring-6" or "earrings-2" or "ring - 6"
+            // Improved regex to handle spaces around the dash
+            const pattern = /(\w+)\s*-\s*(\d+)/g;
             let match;
             let itemsFound = false;
             
@@ -1038,8 +1001,9 @@
                 }
             }
             
-            // If no pattern matches found, default to 1
-            if (!itemsFound) {
+            // If no pattern matches found, check if we have a non-empty item name
+            if (!itemsFound && itemName.trim() !== '') {
+                // Default to 1 if there's an item name but no count pattern
                 totalItems = 1;
             }
             
@@ -1050,7 +1014,7 @@
         }
         
         // Set initial value and attach event listener
-        updateTotalItemsCount();
+        setTimeout(updateTotalItemsCount, 100); // Add delay to ensure DOM is ready
         $('#id_item_name').on('input', updateTotalItemsCount);
 
         // Original loan form JS code
@@ -1136,25 +1100,10 @@
                 // Trigger the distribution amount calculation
                 calculateDistributionAmount();
                 
-                // Calculate actual percentage of rounded principal
-                const actualPercentage = (suggestedPrincipal / goldValue) * 100;
-                
-                // Calculate min and max principal values to display
-                const minPrincipalValue = Math.round(goldValue * 0.5);
-                const maxPrincipalValue = Math.round(goldValue * 0.85);
-                
-                // Updated help text showing min and max percentages with their values
-                const helpText = `<i class="fas fa-info-circle"></i> Gold Value: ₹${goldValue.toFixed(0)} | Principal: ₹${suggestedPrincipal} (${actualPercentage.toFixed(1)}%) | Min Principal (50%): ₹${minPrincipalValue} - Max Principal (85%): ₹${maxPrincipalValue}`;
-                
-                // Update the form-text element or create it if it doesn't exist
-                let formText = $('#div_id_principal_amount .form-text');
-                if (formText.length === 0) {
-                    formText = $('<div class="form-text gold-value-message small"></div>');
-                    formText.appendTo('#div_id_principal_amount');
-                } else {
-                    formText.addClass('gold-value-message');
-                }
-                formText.html(helpText);
+                // Add info message about the suggested principal amount
+                const message = $('<div class="gold-value-message text-info small mt-1"></div>')
+                    .text(`Suggested loan amount based on gold value: ₹${suggestedPrincipal.toLocaleString('en-IN')}`);
+                message.insertAfter('#div_id_principal_amount .form-text');
             }
         }, 300);
 
@@ -1232,145 +1181,47 @@
             }
             
             // Update amount in words
-            $.get(`/transactions/number_to_words/${principal}`, function(response) {
-                $('#principalAmountWords').text(response.words + ' Rupees Only');
-            });
+            updateAmountInWords();
         });
 
-        // Add amount in words display for distribution amount
+        // Update amount in words when distribution amount changes
         $('#id_distribution_amount').on('change', function() {
-            const amount = parseFloat($(this).val()) || 0;
-            $.get(`/transactions/number_to_words/${amount}`, function(response) {
-                $('#distributionAmountWords').text(response.words + ' Rupees Only');
-            });
+            updateAmountInWords();
         });
 
-        // Add help text containers after the input fields
+        // Add containers for the amount in words
         $('#div_id_principal_amount').append('<small id="principalAmountWords" class="text-muted d-block mt-1"></small>');
         $('#div_id_distribution_amount').append('<small id="distributionAmountWords" class="text-muted d-block mt-1" style="font-size: 0.65rem;"></small>');
+        $('#div_id_processing_fee').append('<small id="processingFeeWords" class="text-muted d-block mt-1" style="font-size: 0.65rem;"></small>');
         
-        // Add form submission handling
-        $('#loanForm').on('submit', function(event) {
-            // Store current photos in localStorage before submit
-            if (itemPhotos.length > 0) {
-                localStorage.setItem('tempItemPhotos', JSON.stringify(itemPhotos));
-            }
-            if (customerFaceCapture.value) {
-                localStorage.setItem('tempCustomerPhoto', customerFaceCapture.value);
-            }
-        });
-
-        // Restore photos after page load if form had errors
-        $(document).ready(function() {
-            // Check if we have stored photos from a previous submission
-            const storedItemPhotos = localStorage.getItem('tempItemPhotos');
-            const storedCustomerPhoto = localStorage.getItem('tempCustomerPhoto');
-
-            if (storedItemPhotos) {
-                try {
-                    const parsedPhotos = JSON.parse(storedItemPhotos);
-                    parsedPhotos.forEach(photo => {
-                        addItemPhoto(photo.dataUrl);
-                    });
-                    // Clear stored photos after restoring
-                    localStorage.removeItem('tempItemPhotos');
-                } catch (e) {
-                    console.error('Error restoring item photos:', e);
+        // Function to calculate and update the total items count
+        function updateTotalItems() {
+            let total = 0;
+            
+            // Count all rows in the gold items table
+            $('#goldItems tbody tr').each(function() {
+                // Only count rows that have values (not empty rows)
+                const weightValue = $(this).find('input[name$="-weight"]').val();
+                if (weightValue && parseFloat(weightValue) > 0) {
+                    total += 1;
                 }
-            }
-
-            if (storedCustomerPhoto && !customerFaceCapture.value) {
-                capturedPhoto.src = storedCustomerPhoto;
-                capturedPhoto.style.display = 'block';
-                customerFaceCapture.value = storedCustomerPhoto;
-                if (noCaptureText) noCaptureText.style.display = 'none';
-                if (retakeBtn) retakeBtn.disabled = false;
-                // Clear stored customer photo after restoring
-                localStorage.removeItem('tempCustomerPhoto');
-            }
-        });
-        
-        // Continue to iterate button functionality
-        const continueIterateBtn = document.getElementById('continueIterateBtn');
-        if (continueIterateBtn) {
-            continueIterateBtn.addEventListener('click', function() {
-                // Store current form data in sessionStorage
-                const formData = {
-                    branch: $('#id_branch').val(),
-                    customer: $('#id_customer').val(),
-                    item_category: $('#id_item_category').val(),
-                    market_price_22k: $('#id_market_price_22k').val(),
-                    gold_karat: $('#id_gold_karat').val(),
-                    scheme: $('#id_scheme').val()
-                };
-                
-                // Store photos in sessionStorage
-                if (itemPhotos.length > 0) {
-                    sessionStorage.setItem('tempItemPhotos', JSON.stringify(itemPhotos));
-                }
-                if (customerFaceCapture.value) {
-                    sessionStorage.setItem('tempCustomerPhoto', customerFaceCapture.value);
-                }
-                
-                // Store form data in sessionStorage
-                sessionStorage.setItem('loanFormData', JSON.stringify(formData));
-                sessionStorage.setItem('continueIteration', 'true');
-                
-                // Redirect to create a new loan
-                window.location.href = '{% url "loan_create" %}';
             });
+            
+            // Update the total items display
+            $('#calculatedTotalItems').val(total);
         }
         
-        // Check if we're continuing an iteration
-        $(document).ready(function() {
-            if (sessionStorage.getItem('continueIteration') === 'true') {
-                try {
-                    // Restore form data
-                    const formData = JSON.parse(sessionStorage.getItem('loanFormData') || '{}');
-                    
-                    // Set form field values
-                    if (formData.branch) $('#id_branch').val(formData.branch);
-                    if (formData.customer) $('#id_customer').val(formData.customer);
-                    if (formData.item_category) $('#id_item_category').val(formData.item_category);
-                    if (formData.market_price_22k) $('#id_market_price_22k').val(formData.market_price_22k);
-                    if (formData.gold_karat) $('#id_gold_karat').val(formData.gold_karat);
-                    if (formData.scheme) $('#id_scheme').val(formData.scheme);
-                    
-                    // Trigger the scheme info update if scheme is selected
-                    if (formData.scheme) {
-                        $('#id_scheme').trigger('change');
-                    }
-                    
-                    // Show a notification that we're continuing from previous entry
-                    showAlert('Continuing with similar loan entry. You can modify the details as needed.', 'info');
-                    
-                    // Clear the flag
-                    sessionStorage.removeItem('continueIteration');
-                } catch (e) {
-                    console.error('Error restoring form data:', e);
-                    sessionStorage.removeItem('loanFormData');
-                    sessionStorage.removeItem('continueIteration');
-                }
-            }
+        // Call updateTotalItems whenever gold items are added, removed or changed
+        $(document).on('change', '#goldItems input', updateTotalItems);
+        $(document).on('click', '.add-form-row, .remove-form-row', function() {
+            // Use setTimeout to ensure the DOM is updated before counting
+            setTimeout(updateTotalItems, 100);
         });
-
-        // Clear photos when creating a new loan
-        {% if not form.instance.pk %}
-        // Clear customer photo
-        capturedPhoto.src = '';
-        customerFaceCapture.value = '';
-        noCaptureText.style.display = 'block';
-        retakeBtn.disabled = true;
-
-        // Clear item photos
-        itemPhotos = [];
-        itemPhotosData.value = '';
-        photoCountBadge.textContent = '0 Photos';
-        photoCountBadge.className = 'badge bg-danger';
-        noItemPhotosText.style.display = 'block';
-        itemPhotosContainer.innerHTML = '';
-        clearItemPhotosBtn.disabled = true;
-        {% endif %}
+        
+        // Initial calculation when page loads
+        $(document).ready(function() {
+            updateTotalItems();
+        });
     });
 </script>
 {% endblock %}

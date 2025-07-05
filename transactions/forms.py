@@ -16,7 +16,6 @@ class LoanForm(forms.ModelForm):
     distribution_amount = forms.IntegerField(
         disabled=True,
         required=False,
-        help_text="Amount to be distributed after processing fee (in whole Rupees)",
         widget=forms.NumberInput(attrs={
             'data-show-words': 'true',  # Custom attribute to identify fields that need words display
             'step': '1',  # Only allow whole numbers
@@ -178,7 +177,6 @@ class LoanForm(forms.ModelForm):
         # Update principal_amount field to use integer values
         self.fields['principal_amount'] = forms.IntegerField(
             min_value=0,
-            help_text="Loan amount in whole Rupees",
             widget=forms.NumberInput(attrs={
                 'data-show-words': 'true',
                 'step': '1',  # Only allow whole numbers

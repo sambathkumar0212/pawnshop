@@ -41,7 +41,6 @@ class Loan(models.Model):
     # Financial details
     principal_amount = models.IntegerField(
         validators=[MinValueValidator(0)],
-        help_text="Principal loan amount in whole Rupees"
     )
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=12.00)
     total_payable = models.IntegerField(

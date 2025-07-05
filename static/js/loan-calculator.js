@@ -276,24 +276,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const monthlyInterestRate = scheme.interest_rate / 12;
                 const perThousandRate = (monthlyInterestRate / 100) * 1000;
                 
-                // Create scheme details HTML
+                // Create scheme details HTML - display permanently in the scheme-info element
                 const schemeDetailsHTML = `
-                    <div class="card-body bg-light">
-                        <h5 class="card-title">${scheme.name} Details</h5>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <p><strong>Type:</strong> ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'}</p>
-                                <p><strong>Interest Rate:</strong> ${scheme.interest_rate}% per annum</p>
-                                <p><strong>Monthly Interest:</strong> ${monthlyInterestRate.toFixed(2)}% per month</p>
-                                <p><strong>Per ₹1,000 Rate:</strong> ${formatCurrency(perThousandRate)}</p>
-                            </div>
-                            <div class="col-md-6">
-                                <p><strong>Loan Period:</strong> ${scheme.loan_duration} days</p>
-                                <p><strong>No Interest Period:</strong> ${noInterestPeriodDays} days</p>
-                                <p><strong>Grace Period:</strong> ${gracePeriodDays} days</p>
-                            </div>
-                        </div>
-                    </div>
+                    ${scheme.name} | ${noInterestPeriodDays}days 0 interest | ${scheme.loan_duration}days Details<br>
+                    <strong>Type:</strong> ${scheme.additional_conditions && scheme.additional_conditions.scheme_type || 'Standard'}<br>
+                    <strong>Interest Rate:</strong> ${scheme.interest_rate}% per annum<br>
+                    <strong>Monthly Interest:</strong> ${monthlyInterestRate.toFixed(2)}% per month<br>
+                    <strong>Per ₹1,000 Rate:</strong> ${formatCurrency(perThousandRate)}
                 `;
                         
                 // Display scheme details in the info box
